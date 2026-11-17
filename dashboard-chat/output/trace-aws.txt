@@ -1,0 +1,58 @@
+$ uv run python ext-trace-alarms/trace_run.py --target aws
+alarms: ['recipe-chat-errors', 'recipe-chat-slow-answers', 'recipe-chat-daily-cost']
+5518d9ef-2d26-4f1b-aab2-49d26308f817  3 calls    1235.0 ms  answered   How many orders are there?
+95783883-f3bc-41cb-9b02-3e59015a2889  3 calls    1329.7 ms  answered   What were total sales in Vancouver?
+037ba263-830c-4434-85f1-963f2e923353  3 calls    1263.3 ms  answered   Which category sold the most items?
+ca92c41a-5305-4883-94cf-696e82c683bc  3 calls    1256.8 ms  answered   How much did I spend in total?
+cfb20c62-357d-48bc-bb6e-9afd8750a4a7  1 calls     534.3 ms  no_answer  What is the weather today?
+8409d84d-c794-4523-bd89-1843ace01807  1 calls     553.0 ms  no_answer  Delete all the orders
+[exit 0]
+
+$ uv run python ext-trace-alarms/analyze.py --target aws
+
+per request
+┌──────────┬───────────┬────────┬────────┬──────────┐
+│ requests │ median_ms │ p90_ms │ errors │ cost_cad │
+│  int64   │  double   │ double │ int128 │  double  │
+├──────────┼───────────┼────────┼────────┼──────────┤
+│        6 │    1246.0 │ 1297.0 │      0 │ 0.000287 │
+└──────────┴───────────┴────────┴────────┴──────────┘
+
+
+time by kind of call
+┌────────────┬───────┬──────────┬────────┐
+│    kind    │ calls │ total_ms │  pct   │
+│  varchar   │ int64 │  double  │ double │
+├────────────┼───────┼──────────┼────────┤
+│ model_call │    10 │   6118.0 │   99.3 │
+│ tool_call  │     4 │     41.0 │    0.7 │
+└────────────┴───────┴──────────┴────────┘
+
+
+calls per request
+┌─────────┬──────────┐
+│ n_calls │ requests │
+│  int64  │  int64   │
+├─────────┼──────────┤
+│       1 │        2 │
+│       3 │        4 │
+└─────────┴──────────┘
+
+
+slowest requests, with their calls
+┌─────────────────────────────────────┬────────────┬─────────┬────────────┬─────────────────┬─────────────┬─────────┐
+│              question               │ request_ms │ span_id │    kind    │      name       │ duration_ms │ status  │
+│               varchar               │   double   │ varchar │  varchar   │     varchar     │   double    │ varchar │
+├─────────────────────────────────────┼────────────┼─────────┼────────────┼─────────────────┼─────────────┼─────────┤
+│ What were total sales in Vancouver? │     1329.7 │ 0001    │ model_call │ qwen3.6-35b-a3b │      708.22 │ ok      │
+│ What were total sales in Vancouver? │     1329.7 │ 0002    │ tool_call  │ run_sql         │        3.82 │ ok      │
+│ What were total sales in Vancouver? │     1329.7 │ 0003    │ model_call │ qwen3.6-35b-a3b │      615.49 │ ok      │
+│ Which category sold the most items? │     1263.3 │ 0001    │ model_call │ qwen3.6-35b-a3b │      652.29 │ ok      │
+│ Which category sold the most items? │     1263.3 │ 0002    │ tool_call  │ run_sql         │        4.07 │ ok      │
+│ Which category sold the most items? │     1263.3 │ 0003    │ model_call │ qwen3.6-35b-a3b │      604.65 │ ok      │
+│ How much did I spend in total?      │     1256.8 │ 0001    │ model_call │ qwen3.6-35b-a3b │      656.55 │ ok      │
+│ How much did I spend in total?      │     1256.8 │ 0002    │ tool_call  │ run_sql         │        2.17 │ ok      │
+│ How much did I spend in total?      │     1256.8 │ 0003    │ model_call │ qwen3.6-35b-a3b │      596.03 │ ok      │
+└─────────────────────────────────────┴────────────┴─────────┴────────────┴─────────────────┴─────────────┴─────────┘
+
+[exit 0]

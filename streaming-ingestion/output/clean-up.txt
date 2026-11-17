@@ -1,0 +1,31 @@
+$ uv run python clean_up.py
+removing the streaming-ingestion resources with prefix 'recipe' in ca-central-1
+absent   function recipe-consumer
+absent   log group /aws/lambda/recipe-consumer
+absent   policy of role recipe-consumer-role
+absent   role recipe-consumer-role
+absent   function recipe-windows
+absent   log group /aws/lambda/recipe-windows
+absent   policy of role recipe-windows-role
+absent   role recipe-windows-role
+absent   function recipe-dashboard
+absent   log group /aws/lambda/recipe-dashboard
+absent   policy of role recipe-dashboard-role
+absent   role recipe-dashboard-role
+absent   function recipe-history
+absent   log group /aws/lambda/recipe-history
+absent   policy of role recipe-history-role
+absent   role recipe-history-role
+removed  topic recipe-updates-topic
+absent   queue recipe-consumer-failures
+absent   queue recipe-windows-failures
+absent   queue recipe-dashboard
+absent   queue recipe-dashboard-dlq
+absent   queue recipe-history
+absent   queue recipe-history-dlq
+absent   table recipe-updates
+absent   table recipe-windows
+absent   table recipe-dashboard
+absent   table recipe-history
+absent   stream recipe-updates
+[exit 0]

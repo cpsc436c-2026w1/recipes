@@ -1,0 +1,20 @@
+$ uv run python clean_up.py
+removed schedule recipe-lake-optimize
+removed schedule recipe-lake-vacuum
+removed alarms recipe-cdc-iterator-age, recipe-cdc-lag
+removed event source mapping b378d69c-3f30-41f2-84d9-3b051db6b655
+removed Lambda function recipe-cdc-to-firehose
+removed Firehose stream recipe-trip-changes
+removed Glue table recipe_cdc.trip_changes
+removed Glue table recipe_cdc.trips_current
+removed Glue database recipe_cdc
+removed 25 objects under s3://my-bucket-111122223333/lake/
+removed 53 objects under s3://my-bucket-111122223333/athena-results/
+removed 1 objects under s3://my-bucket-111122223333/freshness/
+removed bucket my-bucket-111122223333
+removed DynamoDB table recipe-trips (its stream goes with it)
+removed IAM role recipe-cdc-lambda-role
+removed IAM role recipe-cdc-firehose-role
+removed IAM role recipe-cdc-scheduler-role
+17 resources removed for PREFIX=recipe in ca-central-1
+[exit 0]

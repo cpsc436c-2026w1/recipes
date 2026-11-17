@@ -1,0 +1,20 @@
+# Laptop run 2026-11-14, written 05:28:15 UTC (the time in the run's per-query file); no AWS in this run.
+$ uv run python -m main.run --embedder gateway --answers gateway
+Retrieval (16 labelled queries, local indexes, gateway embeddings)
+
+| method | recall@5 | MRR | exact code | other words | plain words | typo |
+|---|---:|---:|---:|---:|---:|---:|
+| keyword | 0.81 | 0.77 | 1.00 | 0.60 | 1.00 | 0.67 |
+| embedding | 0.88 | 0.81 | 1.00 | 0.80 | 1.00 | 0.67 |
+| hybrid | 0.94 | 0.94 | 1.00 | 0.80 | 1.00 | 1.00 |
+
+Answers (gateway answerer, from the hybrid top 5)
+
+| correct | grounded | retrieval hit, answer wrong | retrieval missed |
+|---:|---:|---:|---:|
+| 0.94 | 0.94 | 0 | 1 |
+
+gateway: 2 embedding requests, 838 tokens; 16 chat calls, 3796 input and 474 output tokens; 0.000246 CAD at the gateway's prices
+
+rows per query: output/eval-local-gateway-gateway.json
+[exit 0]

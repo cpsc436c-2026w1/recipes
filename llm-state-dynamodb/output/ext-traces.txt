@@ -1,0 +1,9 @@
+# Sandbox run 2026-11-14.
+$ uv run python ext-traces/trace_run.py --target aws
+target aws  prefix recipe  region ca-central-1
+request e5994556c36d464998a366d02d155f79
+  1  model  plan           ok     in 420  out 30
+  2  tool   search_orders  ok     in 0  out 0
+  3  tool   lookup_store   error  in 0  out 0  TimeoutError: store service did not answer in 2 s
+  4  model  reply          ok     in 610  out 55
+[exit 0]

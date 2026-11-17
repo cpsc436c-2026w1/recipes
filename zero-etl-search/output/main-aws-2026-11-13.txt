@@ -1,0 +1,102 @@
+# Sandbox run 2026-11-13 07:33:26-07:48:47 UTC (temporary errors retried in the function, partial
+# batch responses, 10 retries, probe before the mapping, index creation waiting for the policies).
+# The scenario stopped at its replay step: it waited 180 s for the failure-queue message, and Lambda's 11 tries of the
+# refused record took 2 min 45 s (function log below), so it counted one item too many. Its lines were printed only at
+# the end and are lost; main/run.py now prints each line as it is known and waits up to 10 minutes.
+
+$ uv run python -m main.run --target aws
+Traceback (most recent call last):
+TimeoutError: not searchable after 120 s
+collection let you in 1 s after it was ACTIVE
+function cannot write yet ({'ok': False, 'detail': 'HTTP 403 from the collection: b\'{"status":403,"request-id":"1f1bdd29-97ec-9bd2-af6e-c01860384e91","error":{"reason":"403 Forbidden","type":"Forbidden"}}\\n\''}); trying again in 10 s
+Command exited with non-zero status 1
+[wall 488.55 s]
+[exit 1]
+
+# The function's log, one line per batch (times UTC): every change written on the first attempt, no temporary error;
+# I11 refused, split off alone and tried 11 times from 07:36:30 to 07:39:15. From 07:43:17: the backfill into items-v2.
+07:35:57 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:35:57 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:35:58 {"records": 3, "indexed": 3, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:35:58 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:04 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:11 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:15 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:18 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:20 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:23 {"records": 1, "indexed": 0, "deleted": 1, "refused": [], "attempts": 1, "temporary": ""}
+07:36:28 {"records": 1, "indexed": 0, "deleted": 1, "refused": [], "attempts": 1, "temporary": ""}
+07:36:30 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:30 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:30 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:36:31 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:31 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:33 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:36 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:43 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:36:57 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:37:18 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:38:07 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:39:15 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:17 {"records": 3, "indexed": 3, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:43:17 {"records": 3, "indexed": 2, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:17 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:17 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:18 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:19 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:20 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:43:22 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:43:22 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:43:23 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+
+$ INDEX_VERSION=2 uv run python -m main.run --target aws --setup
+1 s after ACTIVE: refused (200 (no hint header)); trying again in 10 s
+11 s after ACTIVE: refused (200 (no hint header)); trying again in 10 s
+collection let you in 21 s after it was ACTIVE
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+function cannot write yet ({'ok': False, 'detail': '[403, 403]'}); trying again in 10 s
+[aws ca-central-1] function recipe-search-indexer now writes to items-v2; index version recorded: {'index_version': 2, 'writer': 'recipe-search-indexer', 'fields': ['brand', 'category', 'description', 'in_stock', 'name', 'price_cad'], 'source_table': 'recipe-items'}
+[exit 0]
+$ INDEX_VERSION=2 uv run python -m main.migrate backfill
+{'items': 10, 'gone meanwhile': 0}
+[exit 0]
+$ (count check) items-v2 against the table
+table 10 items, items-v2 9 documents (the item with price_cad "free" is refused)
+[exit 0]
+$ INDEX_VERSION=2 uv run python -m main.migrate drop items-v1
+Traceback (most recent call last):
+botocore.errorfactory.ValidationException: An error occurred (ValidationException) when calling the CreateAccessPolicy operation: Policy json is invalid, error: [$: there must be a minimum of 1 items in the array]
+[exit 1]
+
+$ uv run python clean_up.py
+removed  event source mapping 9cc44474-7610-404c-b560-84f3418ee122
+removed  Lambda function recipe-search-indexer
+removed  log group /aws/lambda/recipe-search-indexer
+removed  queue recipe-search-indexer-failed
+removed  collection recipe-items (its indexes go with it)
+removed  data access policy recipe-items
+removed  network policy recipe-items
+removed  encryption policy recipe-items
+removed  collection group recipe-search
+removed  DynamoDB table recipe-items (its stream goes with it)
+removed  IAM role recipe-search-indexer-role
+absent   Lambda function recipe-reembed-enqueue
+absent   log group /aws/lambda/recipe-reembed-enqueue
+absent   queue recipe-reembed
+absent   queue recipe-reembed-dlq
+absent   collection recipe-item-vectors
+absent   data access policy recipe-item-vectors
+absent   network policy recipe-item-vectors
+absent   encryption policy recipe-item-vectors
+absent   S3 bucket of ext-zero-etl
+absent   IAM role recipe-reembed-enqueue-role
+absent   IAM role recipe-search-pipeline-role
+not checked pipeline recipe-items-sync (denied by a service control policy)
+11 resources removed, 0 failed, for PREFIX=recipe in ca-central-1
+[wall 314.11 s]
+[exit 0]

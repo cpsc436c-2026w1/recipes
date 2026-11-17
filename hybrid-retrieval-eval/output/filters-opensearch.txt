@@ -1,0 +1,16 @@
+# Sandbox run 2026-11-14, 05:32:49 to 05:32:55 UTC, on the collection of main-opensearch.txt.
+$ timeout 420 uv run python ext-filters/filters_run.py --backend opensearch --embedder gateway
+| query | filter | results inside | results after | recall@5 inside | recall@5 after |
+|---|---|---:|---:|---:|---:|
+| speaker | {'price_cad': {'lte': 100}} | 5 | 2 | 1.00 | 1.00 |
+| two | {'category': ['outdoor']} | 3 | 0 | 1.00 | 0.00 |
+| light | {'price_cad': {'lte': 20}} | 2 | 1 | 1.00 | 1.00 |
+| wireless | {'category': ['accessories']} | 4 | 3 | 1.00 | 1.00 |
+| coffee | {'price_cad': {'lte': 60}} | 5 | 3 | 1.00 | 1.00 |
+| desk | {'category': ['lighting']} | 2 | 1 | 1.00 | 1.00 |
+| charger | {'in_stock': True} | 5 | 4 | 1.00 | 1.00 |
+
+mean recall@5: inside 1.00, after 0.86
+
+facets for the keyword matches of 'wireless': {'category': {'audio': 2, 'accessories': 2}, 'brand': {'Hush': 2, 'Key': 2}, 'price': {'under 50': 1, '50 to 200': 2, '200 and up': 1}}
+[exit 0]

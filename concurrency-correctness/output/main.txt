@@ -1,0 +1,13 @@
+$ uv run python main/run.py --target aws
+removed  table recipe-race-trips
+absent   table recipe-race-requests
+target: aws, table: recipe-race-trips
+mode     rounds one winner both told yes winner is stored
+unsafe       20          0            20                0
+safe         20         20             0               20
+
+one race on trip t-0042, safe mode:
+  d-7: accepted
+  d-9: refused, the trip is held by d-7
+  table: driver d-7, version 2
+[exit 0]

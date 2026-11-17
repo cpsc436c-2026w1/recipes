@@ -1,0 +1,84 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "dashboard-chat"
+format = "main-scenario"
+task = "Users ask plain-language questions over a team's table; the model writes read-only SQL through one tool, app code checks and runs it in DuckDB, and each question leaves one trace item in DynamoDB"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = ["Chat on the dashboard", "Answer or retrieval cache", "Guardrails with a red-team log", "Trace analysis and alarms"]
+lectures = ["L15", "L16"]
+core = ["DuckDB", "Parquet", "DynamoDB", "CloudWatch", "SNS", "course LLM gateway"]
+secondary = ["sqlglot", "Shiny Express", "querychat", "chatlas", "ECS on Fargate"]
+region = "ca-central-1"
+cost_one_run = "0.000287 CAD of gateway budget for the six questions (measured, output/main-gateway.txt); DynamoDB writes far below one cent (AWS price list); alarms 0.10 USD per alarm-month and metrics 0.30 USD per metric-month while they exist (AWS bulk price list, ca-central-1, published 2026-11-04)"
+
+summary = "Chat on a dashboard: the model writes one read-only SQL query through one tool, app code checks it and DuckDB computes the number, and every question leaves a trace in DynamoDB"
+
+# What the recipe teaches
+[[practices]]
+name = "The number comes from a query the app checks and runs, never from the model's text"
+source = "L15 (guarded text-to-SQL); Generative AI Lens GENSEC02-BP01; Agentic AI Lens AGENTSEC02-BP02"
+
+[[practices]]
+name = "One read-only tool, the least the model needs; a locked engine as a second layer"
+source = "Generative AI Lens GENSEC05-BP01, GENSEC01-BP03; Agentic AI Lens AGENTREL02-BP02"
+
+[[practices]]
+name = "Who may see whose rows is enforced where the query runs: an engine that holds only the asking user's rows"
+source = "Agentic AI Lens AGENTREL02-BP02; Generative AI Lens GENSEC05-BP01"
+
+[[practices]]
+name = "Bounded work per question: a cap on model calls, output tokens, rows and the time of one call and one query"
+source = "Generative AI Lens GENCOST05-BP01, GENREL03-BP02, GENCOST03-BP01, GENCOST03-BP02"
+
+[[practices]]
+name = "Model calls through the model gateway with a per-student key; one trace per question"
+source = "L16 (model gateway); AI Engineering ch. 10; Generative AI Lens GENOPS03-BP02"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["main/sqlcheck.py", "main/engine.py", "main/chat.py", "main/model.py", "main/traces.py", "ext-answer-cache/cache.py", "ext-guardrails-redteam/guards.py", "ext-guardrails-redteam/redteam.py", "ext-trace-alarms/spans.py", "ext-trace-alarms/alarms.py", "ext-trace-alarms/analyze.py", "ext-feedback/feedback.py", "ext-shiny-app/app.py", "ext-shiny-app/source.py", "ext-shiny-app/client.py", "ext-shiny-app/fargate/deploy.sh"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub"
+shows = "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"           # the README's requirements, as behave scenarios; offline
+run = "uv run python -m main.run --target aws"
+run_offline = "uv run python -m main.run --target local --model stub"
+app_offline = "APP_MODEL=stub uv run shiny run ext-shiny-app/app.py --port 8000"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-answer-cache = "uv run python ext-answer-cache/cache_run.py --target aws"
+ext-guardrails-redteam = "uv run python ext-guardrails-redteam/redteam.py --model gateway"
+ext-trace-alarms = "uv run python ext-trace-alarms/trace_run.py --target aws"
+ext-feedback = "uv run python ext-feedback/feedback_run.py --target aws report"
+ext-shiny-app = "uv run python ext-shiny-app/browser_check.py"   # offline; on Fargate: bash ext-shiny-app/fargate/deploy.sh, then start.sh (not run by the course yet)
+
+[env]
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1; GATEWAY_URL still works"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment only; COURSE_MCP_TOKEN still works"
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+CHAT_MODEL = "default qwen3.6-35b-a3b"
+APP_MODEL = "the web page only: gateway (default) or stub"
+APP_TABLE = "the web page only: the table it shows, default orders"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+dynamodb_tables = ["$PREFIX-chat-traces", "$PREFIX-chat-cache", "$PREFIX-chat-spans"]
+cloudwatch_alarms = ["$PREFIX-chat-errors", "$PREFIX-chat-slow-answers", "$PREFIX-chat-daily-cost"]
+sns_topics = ["$PREFIX-chat-alarms"]
+# ext-shiny-app/fargate/deploy.sh creates these; ext-shiny-app/fargate/teardown.sh removes them, clean_up.py does not
+fargate = ["secret $PREFIX-chat-app/token", "role $PREFIX-chat-app-exec", "ECR repository, ECS cluster, security group and task definition $PREFIX-chat-app", "log group /ecs/$PREFIX-chat-app"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"
+sql_is_checked_in_app_code = true   # main/sqlcheck.py runs before DuckDB; never let the model's SQL run unchecked
+engine_is_locked = true             # main/engine.py: external access off, configuration locked, each query one statement in a read-only transaction
+one_tool_read_only = true           # do not add a tool that writes without an approval step
+numbers_come_from_duckdb = true     # the reply quotes rows; never ask the model to compute a number
+tests_offline = true                # stub model and moto; no network, no key

@@ -1,0 +1,99 @@
+
+== 1. Run the handler on this machine first, against your tables (needs Python 3 and boto3; CloudShell has both)
+
+$ env PREFIX=recipe python3 lambda-dynamodb/main/handler.py
+{"action": "get", "trip_id": "t-0042"} -> {"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 0.5}
+{"action": "get", "trip_id": "t-0042", "strong": true} -> {"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 1.0}
+{"action": "rider", "rider_id": "r-03", "since": "2026-10-08"} -> {"items": [{"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0038", "requested_at": "2026-10-08T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0043", "requested_at": "2026-10-09T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0048", "requested_at": "2026-10-10T11:15:00Z"}, {"trip_id": "t-0100", "requested_at": "2026-10-21T18:30:00Z", "pickup_zone": "SoHo", "rider_id": "r-03"}], "read_units": 0.5}
+{"action": "claim", "trip_id": "t-0042", "driver_id": "d-9"} -> {"claimed": false, "held_by": "d-7"}
+{"action": "accept", "trip_id": "t-0101", "driver_id": "d-3"} -> {"accepted": false, "reasons": {"trip": "None", "driver": "ConditionalCheckFailed"}}
+
+== 2. A role for the function. The trust policy says who may use it: the Lambda service
+
+$ aws iam create-role --role-name recipe-api-role --tags Key=purpose,Value=recipe --assume-role-policy-document {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+    "Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]} --query Role.Arn
+"arn:aws:iam::111122223333:role/recipe-api-role"
+
+== 3. What the role may do: read and update the three tables, and write its own logs. Nothing else
+
+$ aws iam put-role-policy --role-name recipe-api-role --policy-name tables-and-logs --policy-document {"Version":"2012-10-17","Statement":[
+  {"Sid":"TripsAndDrivers","Effect":"Allow",
+   "Action":["dynamodb:GetItem","dynamodb:Query","dynamodb:UpdateItem"],
+   "Resource":["arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-trips","arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-rider-trips","arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-drivers"]},
+  {"Sid":"OwnLogs","Effect":"Allow",
+   "Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+   "Resource":"arn:aws:logs:ca-central-1:111122223333:log-group:/aws/lambda/recipe-api:*"}]}
+
+== 4. The function's log group, kept 7 days; then package and create the function: Python 3.12 on arm64, 128 MB, 10 s timeout (boto3 is in the runtime already)
+
+$ aws logs create-log-group --log-group-name /aws/lambda/recipe-api --tags purpose=recipe
+
+$ aws logs put-retention-policy --log-group-name /aws/lambda/recipe-api --retention-in-days 7
+
+$ python3 -c import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w'); z.write(sys.argv[2],'handler.py'); z.close() /tmp/recipe-api.zip lambda-dynamodb/main/handler.py
+
+$ aws lambda create-function --function-name recipe-api --runtime python3.12 --architectures arm64 --memory-size 128 --timeout 10 --handler handler.lambda_handler --role arn:aws:iam::111122223333:role/recipe-api-role --zip-file fileb:///tmp/recipe-api.zip --environment Variables={PREFIX=recipe} --tags purpose=recipe --query {name: FunctionName, runtime: Runtime, arch: Architectures[0], memory_mb: MemorySize, state: State}
+{
+    "name": "recipe-api",
+    "runtime": "python3.12",
+    "arch": "arm64",
+    "memory_mb": 128,
+    "state": "Pending"
+}
+
+$ aws lambda wait function-active-v2 --function-name recipe-api
+
+== 5. Call it directly once, with an event (the way another AWS service would call it)
+
+$ aws lambda invoke --function-name recipe-api --cli-binary-format raw-in-base64-out --payload {"action":"get","trip_id":"t-0042","strong":true} /tmp/recipe-api-out.json --query {status: StatusCode, error: FunctionError}
+{
+    "status": 200,
+    "error": null
+}
+{"statusCode": 200, "body": "{\"item\": {\"driver_id\": \"d-7\", \"fare_quote\": 24, \"pickup_zone\": \"Astoria\", \"status\": \"accepted\", \"trip_id\": \"t-0042\"}, \"read_units\": 1.0}"}
+
+== 6. A public HTTPS address: a function URL with auth type NONE. Anyone who has the URL can call it
+
+$ aws lambda create-function-url-config --function-name recipe-api --auth-type NONE --query {url: FunctionUrl, auth: AuthType}
+{
+    "url": "https://<url-id>.lambda-url.ca-central-1.on.aws/",
+    "auth": "NONE"
+}
+
+== 7. A public URL needs two statements in the function's resource policy: invoke through the URL, and invoke at all only via the URL
+
+$ aws lambda add-permission --function-name recipe-api --statement-id url-public --action lambda:InvokeFunctionUrl --principal * --function-url-auth-type NONE --query Statement --output text
+{"Sid":"url-public","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl","Resource":"arn:aws:lambda:ca-central-1:111122223333:function:recipe-api","Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}}
+
+$ aws lambda add-permission --function-name recipe-api --statement-id url-invoke --action lambda:InvokeFunction --principal * --invoked-via-function-url --query Statement --output text
+{"Sid":"url-invoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:ca-central-1:111122223333:function:recipe-api","Condition":{"Bool":{"lambda:InvokedViaFunctionUrl":"true"}}}
+
+== 8. Call it the way the app would
+
+$ curl -X POST <url> -d '{"action":"get","trip_id":"t-0042"}'
+{"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 0.5}   [HTTP 200, 0.071619 s]
+
+$ curl -X POST <url> -d '{"action":"rider","rider_id":"r-03","since":"2026-10-08"}'
+{"items": [{"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0038", "requested_at": "2026-10-08T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0043", "requested_at": "2026-10-09T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0048", "requested_at": "2026-10-10T11:15:00Z"}, {"trip_id": "t-0100", "requested_at": "2026-10-21T18:30:00Z", "pickup_zone": "SoHo", "rider_id": "r-03"}], "read_units": 0.5}   [HTTP 200, 0.110921 s]
+
+$ curl -X POST <url> -d '{"action":"claim","trip_id":"t-0042","driver_id":"d-9"}'
+{"claimed": false, "held_by": "d-7"}   [HTTP 200, 0.091652 s]
+
+$ curl -X POST <url> -d '{"action":"accept","trip_id":"t-0101","driver_id":"d-3"}'
+{"accepted": false, "reasons": {"trip": "None", "driver": "ConditionalCheckFailed"}}   [HTTP 200, 0.248040 s]
+
+$ curl -X POST <url> -d '{"action":"delete-everything"}'
+{"error": "unknown action 'delete-everything'"}   [HTTP 400, 0.058048 s]
+
+== 9. What each call was billed: the REPORT line Lambda logs after every call (logs can take a few seconds to arrive)
+
+$ aws logs filter-log-events --log-group-name /aws/lambda/recipe-api --filter-pattern "REPORT RequestId" --query events[].message --output text
+REPORT RequestId: 3b93f44a-7fe9-40ee-b778-c5e1937b2692	Duration: 316.02 ms	Billed Duration: 810 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	Init Duration: 493.18 ms	
+	REPORT RequestId: f52c5468-b161-4c17-837e-5269740c6a08	Duration: 24.70 ms	Billed Duration: 25 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 28852fb3-80d1-49c2-bd41-4610020c4775	Duration: 63.89 ms	Billed Duration: 64 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 8ede63fc-ae70-477f-a266-4dd56d9aa615	Duration: 77.05 ms	Billed Duration: 78 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 6603191c-ed10-413d-9a36-cf1817843e26	Duration: 232.50 ms	Billed Duration: 233 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+	REPORT RequestId: 35e733c9-185f-4900-acb3-4c419864f421	Duration: 1.63 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+
+
+== Done. KEEP=1: the API stays up and public. Remove it with: bash clean_up.sh

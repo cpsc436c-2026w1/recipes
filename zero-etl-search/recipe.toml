@@ -1,0 +1,115 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "zero-etl-search"
+format = "main-scenario"
+task = "Keep an OpenSearch Serverless keyword index in step with a DynamoDB table through the table's stream and a Lambda function (document id = item key, a failure queue for a bad record, a collection that scales to zero), with an interactive search demo; extensions: re-embed changed items through SQS into a vector index, and the same sync with an OpenSearch Ingestion pipeline (zero-ETL, denied in the course sandbox)"
+shapes = ["genai-first", "operational-first"]
+extensions = ["hybrid retrieval with an eval"]
+lectures = ["L14", "L17"]
+core = ["Amazon DynamoDB", "DynamoDB Streams", "AWS Lambda", "Amazon OpenSearch Serverless", "Amazon SQS"]
+secondary = ["opensearch-py", "marimo", "Amazon OpenSearch Ingestion (ext-zero-etl)", "course LLM gateway (ext-embeddings)", "PyYAML"]
+region = "ca-central-1"
+cost_one_run = "at most about 0.24 USD for one run of about 14 minutes with the index move, create to clean-up (upper bound: 4 OCU at 0.266 USD per OCU-hour, AWS bulk price list, ca-central-1, read 2026-11-12; Lambda, DynamoDB and SQS under 0.01 USD); measured in a sandbox 2026-11-13, bill not read"
+summary = "DynamoDB stays the source of truth; a Lambda function on its stream keeps a keyword index in OpenSearch Serverless in step, one document per item key, with bad records set aside in a queue; a notebook shows a table change becoming searchable"
+
+[[practices]]
+name = "The source of truth stays in DynamoDB; the search index is derived from it and can be rebuilt"
+source = "L14; DDIA 2e ch. 12 'Databases and Streams', 'Change Data Capture'"
+
+[[practices]]
+name = "Idempotent writes: the item key is the document id, so a retried batch leaves one document per item"
+source = "REL04-BP04 make mutating operations idempotent"
+
+[[practices]]
+name = "One bad record does not block the stream: bisect on error, a bounded number of retries, an on-failure queue"
+source = "L14; AWS docs, Lambda: retain discarded records for a DynamoDB event source"
+
+[[practices]]
+name = "Temporary errors are retried with backoff and jitter inside the function, then from the earliest unwritten record (partial batch response); only refused records are set aside"
+source = "REL05-BP03 control and limit retry calls; AWS docs, Lambda: partial batch response with DynamoDB"
+
+[[practices]]
+name = "Capacity that scales to zero, with the smallest maximum the service allows"
+source = "AWS docs, OpenSearch Serverless collection group capacity limits and scale to zero; course constraint (sandbox budget)"
+
+[[practices]]
+name = "Least privilege: the function may write documents in one index of one collection; the data access policy and the IAM role name no wildcard resources"
+source = "SEC03-BP02 grant least privilege access; AWS docs, OpenSearch Serverless data access policies"
+
+[[practices]]
+name = "Index versions are recorded: in the index name, the mapping's _meta and every document"
+source = "L17; course choice"
+
+[instruments]
+files = [
+  "main/handler.py",
+  "main/infra.py",
+  "main/migrate.py",
+  "main/mappings.py",
+  "main/envs.py",
+  "main/standin.py",
+  "demo/search_demo.py",
+  "ext-embeddings/enqueue.py",
+  "ext-embeddings/worker.py",
+  "ext-zero-etl/pipeline.py",
+  "ext-zero-etl/pipeline.example.yaml",
+  "clean_up.py",
+]
+
+[validates]
+command = "uv run pytest -q"
+shows = "inserts, updates and deletes reach the stand-in index through the real handler; a replayed batch leaves the same documents; temporary errors (6 or 30 failing calls in a row) lose no good record; a refused record ends alone in the failure queue and the next write still arrives; requests are signed for aoss; the policies name no wildcard resources; clean-up leaves nothing; the extensions' definitions validate"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python -m main.run --target aws"
+run_offline = "uv run python -m main.run"
+demo = "uv run marimo edit demo/search_demo.py"
+demo_aws = "uv run marimo edit demo/search_demo.py -- --target aws"
+clean = "uv run python clean_up.py"
+migrate_backfill = "uv run python -m main.migrate backfill"
+migrate_check = "uv run python -m main.migrate check"
+migrate_drop = "uv run python -m main.migrate drop items-v1"
+migrate_drop_principal = "uv run python -m main.migrate drop-principal <role arn>"
+
+[extension_commands]
+ext-embeddings-setup = "uv run python ext-embeddings/worker.py --setup --target aws"
+ext-embeddings = "uv run python ext-embeddings/worker.py --target aws"
+ext-zero-etl-offline = "uv run python ext-zero-etl/zero_etl.py"
+ext-zero-etl = "uv run python ext-zero-etl/zero_etl.py --target aws"
+
+[env]
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+LAMBDA_ROLE_ARN = "optional: existing role for the indexing function (stream read, sqs:SendMessage to the failure queue, its logs, aoss:APIAccessAll on the collection); created otherwise"
+INDEX_VERSION = "mappings version; default 1, index items-v{INDEX_VERSION}"
+PIPELINE_ROLE_ARN = "ext-zero-etl, optional: existing role the pipeline assumes; created otherwise"
+BUCKET = "ext-zero-etl, optional; default {PREFIX}-search-{account id}"
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1 (ext-embeddings); from the course page or the team repo on github.students; GATEWAY_URL still works"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment only (ext-embeddings); COURSE_MCP_TOKEN still works"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+dynamodb = ["table $PREFIX-items (stream NEW_AND_OLD_IMAGES)"]
+lambda = ["function $PREFIX-search-indexer", "event source mapping on the table's stream (batch 10, bisect, 10 retries, records older than an hour given up, on-failure queue)", "log group /aws/lambda/$PREFIX-search-indexer (1 day)"]
+sqs = ["queue $PREFIX-search-indexer-failed"]
+opensearch_serverless = ["collection group $PREFIX-search (NextGen, 0 to 2 OCU)", "collection group $PREFIX-search-vectors (ext-embeddings: a group holds one type of collection)", "collection $PREFIX-items", "encryption, network and data access policies named after the collection"]
+iam = ["role $PREFIX-search-indexer-role, tagged recipe=zero-etl-search (unless LAMBDA_ROLE_ARN is set)"]
+ext_embeddings = ["function $PREFIX-reembed-enqueue and its mapping and log group", "queues $PREFIX-reembed, $PREFIX-reembed-dlq", "collection $PREFIX-item-vectors and its policies", "role $PREFIX-reembed-enqueue-role"]
+ext_zero_etl = ["pipeline $PREFIX-items-sync", "bucket $PREFIX-search-<account> (unless BUCKET is set)", "role $PREFIX-search-pipeline-role", "point-in-time recovery on the table"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"   # ext-embeddings only
+roles_least_privilege = "main/infra.py indexer_statements and policies; ext-embeddings/worker.py setup_aws; ext-zero-etl/zero_etl.py pipeline_statements"   # clean_up.py removes only tagged roles
+app_writes_only_to_dynamodb = true    # never write the index from app code; the function derives it from the stream
+document_id_is_item_key = true        # idempotent: a retried batch leaves one document per item
+function_package_one_file = true      # main/handler.py imports only the standard library, boto3 and botocore
+no_wildcard_aoss_resources = true     # tests/test_policies.py
+index_name_carries_version = true     # items-v{N}; validate_index() enforces it
+pipeline_example_current = true       # ext-zero-etl/pipeline.example.yaml == render(example_settings()); a test checks
+at_most_two_stream_readers = true     # the indexing function and ext-embeddings' enqueue function (or the pipeline)
+tests_offline = true                  # moto, stand-in mapping and index, stub embedder; no network, no key
+run_clean_up_same_day = true

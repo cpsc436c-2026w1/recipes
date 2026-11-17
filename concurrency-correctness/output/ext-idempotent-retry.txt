@@ -1,0 +1,15 @@
+$ uv run python ext-idempotent-retry/run.py --target aws
+naive: rider taps 'add 5 tip' on t-tip-naive, the app sends it with no request id
+  attempt 1: timed out (ReadTimeoutError), retrying
+  attempt 2: applied
+  tip on the trip now: 10 (the rider asked for 5)
+
+request id: rider taps 'add 5 tip' on t-tip-once, the app sends it with request id f716ce6c-a19e-4b18-b20f-613470ef3bdb
+  attempt 1: timed out (ReadTimeoutError), retrying
+  attempt 2: applied
+  tip on the trip now: 5 (the rider asked for 5)
+
+removed  table recipe-race-trips
+removed  table recipe-race-requests
+target: aws; tip after one tap and one retry: naive 10, with request id 5
+[exit 0]

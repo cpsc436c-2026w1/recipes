@@ -1,0 +1,11 @@
+model: stub; at most 5 model calls
+sectioning
+  screen: ok
+  shown: Sorry about the late, open carton; yes, we have rye bread.
+  seconds: 0.2
+voting
+  labels: ['complaint', 'complaint', 'question']
+  label: complaint
+  agreed: 2 of 3
+  seconds: 0.2
+model calls: 5

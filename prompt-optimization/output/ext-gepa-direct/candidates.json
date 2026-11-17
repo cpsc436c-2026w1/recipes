@@ -1,0 +1,17 @@
+[
+ {
+  "idx": 0,
+  "val_score": 0.3333333333333333,
+  "instructions": "Answer the question with one DuckDB SQL query over the tables above. The app runs the query and shows its single value to the user. Reply with the query."
+ },
+ {
+  "idx": 1,
+  "val_score": 0.6666666666666666,
+  "instructions": "Answer the question with one DuckDB SQL query over the tables above. The app runs the query and shows its single value to the user. Reply with the query.\nA question that asks for a percentage wants a number on the 0 to 100 scale: multiply the share by 100.0."
+ },
+ {
+  "idx": 2,
+  "val_score": 1.0,
+  "instructions": "Answer the question with one DuckDB SQL query over the tables above. The app runs the query and shows its single value to the user. Reply with the query.\nA question that asks for a percentage wants a number on the 0 to 100 scale: multiply the share by 100.0.\nReturn only the SQL: one SELECT statement, with no semicolon and no text after it.\nA wait asked in minutes: take epoch(ready_at - placed_at), which is in seconds, and divide by 60.0."
+ }
+]

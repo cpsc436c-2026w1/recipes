@@ -1,0 +1,10 @@
+{"id": "r01", "label": "simple", "text": "How much is the HX-200 charger?", "relevant": ["P01"]}
+{"id": "r02", "label": "simple", "text": "Is the Trail 2 tent in stock?", "relevant": ["P16"]}
+{"id": "r03", "label": "simple", "text": "Price of the Glow LED desk lamp", "relevant": ["P14"]}
+{"id": "r04", "label": "simple", "text": "Do you sell a chef knife?", "relevant": ["P22"]}
+{"id": "r05", "label": "simple", "text": "What does the Key quiet mouse cost?", "relevant": ["P27"]}
+{"id": "r06", "label": "hard", "text": "I need to charge a laptop and a phone at once, under 60 CAD, and it must be in stock. Which charger?", "relevant": ["P01"]}
+{"id": "r07", "label": "hard", "text": "Headphones for flights, but my budget is 120 CAD", "relevant": ["P07"]}
+{"id": "r08", "label": "hard", "text": "Cheapest way to make coffee at my desk", "relevant": ["P19"]}
+{"id": "r09", "label": "hard", "text": "Gear to sleep outside for two people, in stock, under 300 CAD in total", "relevant": ["P16"]}
+{"id": "r10", "label": "hard", "text": "Bag that fits a 16 inch laptop and keeps it dry in the rain", "relevant": ["P23"]}

@@ -1,0 +1,35 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+name = "<folder-name>"
+format = "main-scenario"          # "main-scenario" (main/ + ext-*/) or "task-class" (rep-*/)
+task = "<the whole task in one sentence>"
+shapes = []                       # lakehouse-first, operational-first, genai-first
+extensions = []                   # names from the project proposal page
+lectures = []                     # for example "L12"
+core = []                         # course technology students read and change
+secondary = []                    # scaffolded technology
+region = "ca-central-1"
+cost_one_run = "<amount, and whether measured or from the price list>"
+summary = "<one sentence an assistant can show a student>"
+
+# What the recipe teaches
+[[practices]]
+name = "<the best practice, in plain words>"
+source = "<lecture, book chapter, or Lens best-practice ID>"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["<path>"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q"
+shows = "<what passing shows, in one sentence>"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+run = "uv run python main/run.py --target aws"
+clean = "uv run python clean_up.py"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"   # delete if the recipe makes no model calls

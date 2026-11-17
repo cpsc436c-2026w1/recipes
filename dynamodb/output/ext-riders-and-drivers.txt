@@ -1,0 +1,164 @@
+
+== 1. A table for each rider's trips in time order: partition key rider_id, sort key requested_at
+
+$ aws dynamodb create-table --table-name recipe-rider-trips --billing-mode PAY_PER_REQUEST --key-schema '[{"AttributeName":"rider_id","KeyType":"HASH"},{"AttributeName":"requested_at","KeyType":"RANGE"}]' --attribute-definitions '[{"AttributeName":"rider_id","AttributeType":"S"},{"AttributeName":"requested_at","AttributeType":"S"}]' --tags Key=purpose,Value=recipe --query TableDescription.TableStatus
+"CREATING"
+
+== 2. A table of drivers and their status
+
+$ aws dynamodb create-table --table-name recipe-drivers --billing-mode PAY_PER_REQUEST --key-schema AttributeName=driver_id,KeyType=HASH --attribute-definitions AttributeName=driver_id,AttributeType=S --tags Key=purpose,Value=recipe --query TableDescription.TableStatus
+"CREATING"
+
+== 3. Load history: 50 past trips of 5 riders over 10 days, and 5 available drivers
+
+$ aws dynamodb batch-write-item --request-items '{"recipe-rider-trips": [{"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-01T08:15:00Z"}, "trip_id": {"S": "h-0000"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-01T09:15:00Z"}, "trip_id": {"S": "h-0001"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-01T10:15:00Z"}, "trip_id": {"S": "h-0002"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-01T11:15:00Z"}, "trip_id": {"S": "h-0003"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-01T12:15:00Z"}, "trip_id": {"S": "h-0004"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-02T08:15:00Z"}, "trip_id": {"S": "h-0005"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-02T09:15:00Z"}, "trip_id": {"S": "h-0006"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-02T10:15:00Z"}, "trip_id": {"S": "h-0007"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-02T11:15:00Z"}, "trip_id": {"S": "h-0008"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-02T12:15:00Z"}, "trip_id": {"S": "h-0009"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-03T08:15:00Z"}, "trip_id": {"S": "h-0010"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-03T09:15:00Z"}, "trip_id": {"S": "h-0011"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-03T10:15:00Z"}, "trip_id": {"S": "h-0012"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-03T11:15:00Z"}, "trip_id": {"S": "h-0013"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-03T12:15:00Z"}, "trip_id": {"S": "h-0014"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-04T08:15:00Z"}, "trip_id": {"S": "h-0015"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-04T09:15:00Z"}, "trip_id": {"S": "h-0016"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-04T10:15:00Z"}, "trip_id": {"S": "h-0017"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-04T11:15:00Z"}, "trip_id": {"S": "h-0018"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-04T12:15:00Z"}, "trip_id": {"S": "h-0019"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-05T08:15:00Z"}, "trip_id": {"S": "h-0020"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-05T09:15:00Z"}, "trip_id": {"S": "h-0021"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-05T10:15:00Z"}, "trip_id": {"S": "h-0022"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-05T11:15:00Z"}, "trip_id": {"S": "h-0023"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-05T12:15:00Z"}, "trip_id": {"S": "h-0024"}, "pickup_zone": {"S": "JFK"}}}}]}' --query '{unprocessed: length(UnprocessedItems)}'
+{
+    "unprocessed": 0
+}
+
+$ aws dynamodb batch-write-item --request-items '{"recipe-rider-trips": [{"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-06T08:15:00Z"}, "trip_id": {"S": "h-0025"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-06T09:15:00Z"}, "trip_id": {"S": "h-0026"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-06T10:15:00Z"}, "trip_id": {"S": "h-0027"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-06T11:15:00Z"}, "trip_id": {"S": "h-0028"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-06T12:15:00Z"}, "trip_id": {"S": "h-0029"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-07T08:15:00Z"}, "trip_id": {"S": "h-0030"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-07T09:15:00Z"}, "trip_id": {"S": "h-0031"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-07T10:15:00Z"}, "trip_id": {"S": "h-0032"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-07T11:15:00Z"}, "trip_id": {"S": "h-0033"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-07T12:15:00Z"}, "trip_id": {"S": "h-0034"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-08T08:15:00Z"}, "trip_id": {"S": "h-0035"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-08T09:15:00Z"}, "trip_id": {"S": "h-0036"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-08T10:15:00Z"}, "trip_id": {"S": "h-0037"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-08T11:15:00Z"}, "trip_id": {"S": "h-0038"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-08T12:15:00Z"}, "trip_id": {"S": "h-0039"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-09T08:15:00Z"}, "trip_id": {"S": "h-0040"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-09T09:15:00Z"}, "trip_id": {"S": "h-0041"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-09T10:15:00Z"}, "trip_id": {"S": "h-0042"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-09T11:15:00Z"}, "trip_id": {"S": "h-0043"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-09T12:15:00Z"}, "trip_id": {"S": "h-0044"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-10T08:15:00Z"}, "trip_id": {"S": "h-0045"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-10T09:15:00Z"}, "trip_id": {"S": "h-0046"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-10T10:15:00Z"}, "trip_id": {"S": "h-0047"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-10T11:15:00Z"}, "trip_id": {"S": "h-0048"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-10T12:15:00Z"}, "trip_id": {"S": "h-0049"}, "pickup_zone": {"S": "JFK"}}}}]}' --query '{unprocessed: length(UnprocessedItems)}'
+{
+    "unprocessed": 0
+}
+
+$ aws dynamodb batch-write-item --request-items '{"recipe-drivers": [{"PutRequest": {"Item": {"driver_id": {"S": "d-1"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-2"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-3"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-4"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-5"}, "status": {"S": "available"}}}}]}' --query '{unprocessed: length(UnprocessedItems)}'
+{
+    "unprocessed": 0
+}
+
+== 3b. Start clean: remove trips t-0100 and t-0101 left by an earlier run, and make d-3 available
+
+$ aws dynamodb delete-item --table-name recipe-trips --key '{"trip_id":{"S":"t-0100"}}'
+
+$ aws dynamodb delete-item --table-name recipe-trips --key '{"trip_id":{"S":"t-0101"}}'
+
+$ aws dynamodb update-item --table-name recipe-drivers --key '{"driver_id":{"S":"d-3"}}' --update-expression 'REMOVE trip_id SET #s = :s' --expression-attribute-names '{"#s":"status"}' --expression-attribute-values '{":s":{"S":"available"}}'
+
+== 4. Rider r-03 opens their history for Oct 3 to Oct 6: Query, one partition key and a sort-key range, in time order
+
+$ aws dynamodb query --table-name recipe-rider-trips --key-condition-expression 'rider_id = :r AND requested_at BETWEEN :a AND :b' --expression-attribute-values '{":r":{"S":"r-03"},":a":{"S":"2026-10-03"},":b":{"S":"2026-10-06T23:59:59Z"}}' --return-consumed-capacity TOTAL --query '{trips: Items[].[requested_at.S, trip_id.S], read: ScannedCount, read_units: ConsumedCapacity.CapacityUnits}'
+{
+    "trips": [
+        [
+            "2026-10-03T11:15:00Z",
+            "h-0013"
+        ],
+        [
+            "2026-10-04T11:15:00Z",
+            "h-0018"
+        ],
+        [
+            "2026-10-05T11:15:00Z",
+            "h-0023"
+        ],
+        [
+            "2026-10-06T11:15:00Z",
+            "h-0028"
+        ]
+    ],
+    "read": 4,
+    "read_units": 0.5
+}
+
+== 5. ...and their latest trip only: newest first, one item
+
+$ aws dynamodb query --table-name recipe-rider-trips --key-condition-expression 'rider_id = :r' --expression-attribute-values '{":r":{"S":"r-03"}}' --no-scan-index-forward --limit 1 --query 'Items[0].[requested_at.S, trip_id.S]'
+[
+    "2026-10-10T11:15:00Z",
+    "h-0048"
+]
+
+== 6. Rider r-03 requests a new trip. It must appear in BOTH tables or in neither: one transaction, two Puts
+
+$ aws dynamodb transact-write-items --transact-items '[{"Put": {"TableName": "recipe-trips", "ConditionExpression": "attribute_not_exists(trip_id)",
+   "Item": {"trip_id": {"S": "t-0100"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"},
+            "fare_quote": {"N": "21"}, "rider_id": {"S": "r-03"}, "version": {"N": "1"}}}},
+ {"Put": {"TableName": "recipe-rider-trips",
+   "Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-21T18:30:00Z"}, "trip_id": {"S": "t-0100"},
+            "pickup_zone": {"S": "SoHo"}}}}]' --return-consumed-capacity TOTAL --cli-error-format text --query 'ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}'
+[
+    {
+        "table": "recipe-rider-trips",
+        "write_units": 2.0
+    },
+    {
+        "table": "recipe-trips",
+        "write_units": 2.0
+    }
+]
+
+== 7. Driver d-3 accepts t-0100: the trip is free and d-3 is available, so both items change (2 write units each)
+
+$ aws dynamodb transact-write-items --transact-items '[{"Update": {"TableName": "recipe-trips", "Key": {"trip_id": {"S": "t-0100"}},
+   "UpdateExpression": "SET driver_id = :d, #s = :accepted", "ConditionExpression": "attribute_not_exists(driver_id)",
+   "ExpressionAttributeNames": {"#s": "status"},
+   "ExpressionAttributeValues": {":d": {"S": "d-3"}, ":accepted": {"S": "accepted"}}}},
+ {"Update": {"TableName": "recipe-drivers", "Key": {"driver_id": {"S": "d-3"}},
+   "UpdateExpression": "SET #s = :busy, trip_id = :t", "ConditionExpression": "#s = :available",
+   "ExpressionAttributeNames": {"#s": "status"},
+   "ExpressionAttributeValues": {":busy": {"S": "busy"}, ":available": {"S": "available"}, ":t": {"S": "t-0100"}}}}]' --return-consumed-capacity TOTAL --cli-error-format text --query 'ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}'
+[
+    {
+        "table": "recipe-trips",
+        "write_units": 2.0
+    },
+    {
+        "table": "recipe-drivers",
+        "write_units": 2.0
+    }
+]
+
+== 8. Rider r-01 requests trip t-0101, the same way as step 6
+
+$ aws dynamodb transact-write-items --transact-items '[{"Put": {"TableName": "recipe-trips", "ConditionExpression": "attribute_not_exists(trip_id)",
+   "Item": {"trip_id": {"S": "t-0101"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"},
+            "fare_quote": {"N": "40"}, "rider_id": {"S": "r-01"}, "version": {"N": "1"}}}},
+ {"Put": {"TableName": "recipe-rider-trips",
+   "Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-21T18:31:00Z"}, "trip_id": {"S": "t-0101"},
+            "pickup_zone": {"S": "JFK"}}}}]' --return-consumed-capacity TOTAL --cli-error-format text --query 'ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}'
+[
+    {
+        "table": "recipe-rider-trips",
+        "write_units": 2.0
+    },
+    {
+        "table": "recipe-trips",
+        "write_units": 2.0
+    }
+]
+
+== 9. d-3, still busy with t-0100, accepts t-0101: the driver's condition fails, so NEITHER item changes
+
+$ aws dynamodb transact-write-items --transact-items '[{"Update": {"TableName": "recipe-trips", "Key": {"trip_id": {"S": "t-0101"}},
+   "UpdateExpression": "SET driver_id = :d, #s = :accepted", "ConditionExpression": "attribute_not_exists(driver_id)",
+   "ExpressionAttributeNames": {"#s": "status"},
+   "ExpressionAttributeValues": {":d": {"S": "d-3"}, ":accepted": {"S": "accepted"}}}},
+ {"Update": {"TableName": "recipe-drivers", "Key": {"driver_id": {"S": "d-3"}},
+   "UpdateExpression": "SET #s = :busy, trip_id = :t", "ConditionExpression": "#s = :available",
+   "ExpressionAttributeNames": {"#s": "status"},
+   "ExpressionAttributeValues": {":busy": {"S": "busy"}, ":available": {"S": "available"}, ":t": {"S": "t-0101"}}}}]' --return-consumed-capacity TOTAL --cli-error-format text --query 'ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}'
+TransactionCanceledException	Transaction cancelled, please refer cancellation reasons for specific reasons [None, ConditionalCheckFailed]
+CANCELLATIONREASONS	None	
+CANCELLATIONREASONS	ConditionalCheckFailed	The conditional request failed
+# cancelled: one reason per item, in order; the driver's says ConditionalCheckFailed
+
+$ aws dynamodb get-item --table-name recipe-trips --key '{"trip_id":{"S":"t-0101"}}' --consistent-read --query '{trip: Item.trip_id.S, status: Item.status.S, driver: Item.driver_id.S}'
+{
+    "trip": "t-0101",
+    "status": "requested",
+    "driver": null
+}
+
+== 10. The fare of t-0100 changes on two screens at once. Each sends the version it read; only the first write lands
+
+$ aws dynamodb update-item --table-name recipe-trips --key '{"trip_id":{"S":"t-0100"}}' --update-expression 'SET fare_quote = :f, version = version + :one' --condition-expression 'version = :seen' --expression-attribute-values '{":f":{"N":"24"},":seen":{"N":"1"},":one":{"N":"1"}}' --return-values UPDATED_NEW --cli-error-format text --query 'Attributes.{fare: fare_quote.N, version: version.N}'
+{
+    "fare": "24",
+    "version": "2"
+}
+
+$ aws dynamodb update-item --table-name recipe-trips --key '{"trip_id":{"S":"t-0100"}}' --update-expression 'SET fare_quote = :f, version = version + :one' --condition-expression 'version = :seen' --expression-attribute-values '{":f":{"N":"26"},":seen":{"N":"1"},":one":{"N":"1"}}' --return-values UPDATED_NEW --cli-error-format text --query 'Attributes.{fare: fare_quote.N, version: version.N}'
+ConditionalCheckFailedException	The conditional request failed	The conditional request failed
+# refused: the version moved on; this screen reads the trip again, then decides
+
+== Done. KEEP=1: everything stays for the next recipe. Clean up later with: bash dynamodb/dynamodb-99-clean-up/run.sh

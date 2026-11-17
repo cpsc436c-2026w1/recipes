@@ -1,0 +1,124 @@
+# Helpers that are meant to be the same in every folder that has a copy. tools/check_shared.py compares them and
+# fails when two copies differ. A recipe folder is self-contained, so these are copies, not imports.
+#
+# Add a helper here when two folders need the same code and a fix in one must reach the other. Do not add code that
+# only looks alike: a helper each recipe is expected to change for its own data (a Settings class, a price table,
+# a stub) is not listed. `why` says what goes wrong when the copies drift.
+#
+#   name      the function, class or module-level name (Python), or the shell function
+#   kind      "python" (default) or "shell"
+#   files     every file that holds a copy, from the repo root
+#   optional  true: a listed file may lack the helper (used while the pull requests that add the copies are open)
+
+[[helper]]
+name = "cost_cad"
+why = "the cost of one model call from the gateway's price table; two recipes that price a call differently report different costs for the same run"
+files = ["dashboard-chat/main/model.py", "model-routing/main/model.py"]
+
+[[helper]]
+name = "_norm"
+why = "the key of a stub reply and of a cached answer; a different normal form makes the same question miss"
+files = ["dashboard-chat/main/model.py", "model-routing/main/model.py"]
+
+[[helper]]
+name = "_ms"
+why = "event time to milliseconds, in each Lambda of streaming-ingestion (each function is zipped on its own); a different parse gives a different lag for the same record"
+files = [
+  "streaming-ingestion/main/consumer.py",
+  "streaming-ingestion/ext-fan-out/fanout_consumer.py",
+  "streaming-ingestion/ext-windowed-aggregates/windows.py",
+]
+
+[[helper]]
+name = "_ddb"
+why = "one DynamoDB client per Lambda execution environment, made on first use"
+files = [
+  "streaming-ingestion/main/consumer.py",
+  "streaming-ingestion/ext-fan-out/fanout_consumer.py",
+  "streaming-ingestion/ext-windowed-aggregates/windows.py",
+]
+
+[[helper]]
+name = "offline_env"
+why = "fake credentials for an offline run; a copy that keeps AWS_PROFILE or a real key lets a test reach a real account"
+files = ["cdc-to-lake/main/config.py", "zero-etl-search/main/config.py"]
+
+[[helper]]
+name = "offline_aws"
+why = "the same guard for the recipes that start moto inside the run"
+files = ["llm-state-dynamodb/main/run.py", "limits-and-alarms/main/run.py"]
+
+[[helper]]
+name = "account_id"
+why = "the account number that bucket and role names are built from"
+files = ["cdc-to-lake/main/infra.py", "zero-etl-search/main/infra.py"]
+
+[[helper]]
+name = "ignore_conflict"
+why = "makes creating an OpenSearch Serverless policy or collection repeatable: 'already exists' is passed over, every other refusal is raised"
+files = ["hybrid-retrieval-eval/main/opensearch_store.py", "zero-etl-search/main/infra.py"]
+
+[[helper]]
+name = "run"
+kind = "shell"
+why = "prints every command before it runs and runs nothing with DRY=1 (README, course constraint 5); a copy without the DRY test spends money in a dry run"
+files = ["dynamodb/lib.sh", "lambda-dynamodb/lib.sh", "dashboard-chat/ext-shiny-app/fargate/common.sh"]
+
+[[helper]]
+name = "say"
+kind = "shell"
+why = "step headings of the bash recipes; the captured outputs are read by these"
+files = ["dynamodb/lib.sh", "lambda-dynamodb/lib.sh", "dashboard-chat/ext-shiny-app/fargate/common.sh"]
+
+# The clean-up helper: every step is attempted, each failure is reported, the exit code is non-zero when one failed.
+# A clean-up that stops at the first refused call leaves everything after it in the sandbox. `optional = true` lets
+# a listed file lack its copy; take the line out to make every listed clean_up.py keep one.
+[[helper]]
+name = "Steps"
+optional = true
+why = "a clean-up that stops at the first refused call, or prints 'removed' for something it did not delete, leaves resources that bill"
+files = [
+  "cdc-to-lake/clean_up.py",
+  "streaming-ingestion/clean_up.py",
+  "zero-etl-search/clean_up.py",
+  "hybrid-retrieval-eval/clean_up.py",
+  "dashboard-chat/clean_up.py",
+  "limits-and-alarms/clean_up.py",
+  "llm-state-dynamodb/clean_up.py",
+  "project-skeleton/clean_up.py",
+  "concurrency-correctness/clean_up.py",
+]
+
+[[helper]]
+name = "GONE"
+optional = true
+why = "the error codes a clean-up reads as 'already gone'; a code missing in one copy turns a second clean-up run into a failure"
+# streaming-ingestion/clean_up.py and project-skeleton/clean_up.py hold the same GONE and are not listed here.
+files = [
+  "cdc-to-lake/clean_up.py",
+  "zero-etl-search/clean_up.py",
+  "hybrid-retrieval-eval/clean_up.py",
+  "dashboard-chat/clean_up.py",
+  "limits-and-alarms/clean_up.py",
+  "llm-state-dynamodb/clean_up.py",
+  "concurrency-correctness/clean_up.py",
+]
+
+[[helper]]
+name = "sampling"
+why = "the temperature a chat sends: 0, except none for OpenAI GPT and o-series models, which refuse 0 (400 upstream_rejected on the gateway); a copy that drifts sends 0 to a GPT model again"
+files = [
+  "llm-gateway/main/call_gateway.py",
+  "project-skeleton/rep-genai-first/genai.py",
+  "model-routing/main/model.py",
+  "dashboard-chat/main/model.py",
+  "hybrid-retrieval-eval/main/llm.py",
+]
+
+[[helper]]
+name = "gateway_env"
+why = "where the gateway's address and the token come from: COURSE_GATEWAY_URL and KB_MCP_TOKEN, then the older GATEWAY_URL and COURSE_MCP_TOKEN; copies that read the names in another order send another token"
+files = [
+  "llm-gateway/main/call_gateway.py",
+  "prompt-optimization/main/models.py",
+]

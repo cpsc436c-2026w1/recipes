@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KeysAndUsage",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:ca-central-1:111122223333:table/llm-gateway-keys",
+        "arn:aws:dynamodb:ca-central-1:111122223333:table/llm-gateway-usage",
+        "arn:aws:dynamodb:ca-central-1:111122223333:table/llm-gateway-texts"
+      ]
+    },
+    {
+      "Sid": "UpstreamKey",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:ca-central-1:111122223333:secret:llm-gateway/upstream-key-*"
+    },
+    {
+      "Sid": "Alerts",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:ca-central-1:111122223333:llm-gateway-alerts"
+    },
+    {
+      "Sid": "OwnLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:ca-central-1:111122223333:log-group:/aws/lambda/llm-gateway:*"
+    }
+  ]
+}

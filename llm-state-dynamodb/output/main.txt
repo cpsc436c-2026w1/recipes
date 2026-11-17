@@ -1,0 +1,13 @@
+# Sandbox run 2026-11-14. The run printed the same lines as the run of 2026-11-12.
+$ uv run python main/run.py --target aws
+remove the tables when you are done: uv run python clean_up.py
+target aws  prefix recipe  region ca-central-1
+tables created: recipe-chat-conversations, recipe-chat-history
+user-ana reads her newest 3 turns, newest first:
+  assistant One: Victoria.
+  user      And last year?
+  assistant Two: Kelowna and Nanaimo.
+user-ben read on user-ana's conversation: refused
+user-ben write on user-ana's conversation: refused
+user-ben reads his own: 1 turn
+[exit 0]

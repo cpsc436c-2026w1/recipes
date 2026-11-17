@@ -1,0 +1,34 @@
+# Offline run of main/call_gateway.py against the gateway's own code (ext-deploy/), a fake model service and moto,
+# set up as in tests/test_client.py. The example models and USD prices come from ext-deploy/src/gateway/pricing.py;
+# the course gateway serves the course models and prices in CAD. Five runs, one after the other:
+#   a new key; a key with 0.0001 left, max_tokens 1000 and then 100; a key limited to 1 request a minute, twice.
+1. models this key may call
+   example-embed, example-large, example-small
+2. one chat on example-small, max_tokens 300
+   reply: 'bonjour'
+   tokens: 42 in, 3 out; request id 270b08b1-fcd5-475d-a6d4-676e78be9534
+   charged to your key: 0.000004 in your key's currency (the gateway's own count for this call)
+1. models this key may call
+   example-embed, example-large, example-small
+2. one chat on example-large, max_tokens 1000
+   refused: HTTP 429 budget_exhausted
+   budget spent: 0.000000 of 0.000100 USD used. Ask the person who issued your key for more.
+   what to do: this request does not fit what is left of your budget: lower max_tokens, or stop and ask the teaching team
+1. models this key may call
+   example-embed, example-large, example-small
+2. one chat on example-large, max_tokens 100
+   reply: 'bonjour'
+   tokens: 42 in, 3 out; request id a04e67d1-339f-4302-8ccd-79bb41265d28
+   charged to your key: 0.000006 in your key's currency (the gateway's own count for this call)
+1. models this key may call
+   example-embed, example-large, example-small
+2. one chat on example-small, max_tokens 300
+   reply: 'bonjour'
+   tokens: 42 in, 3 out; request id 686c8a81-6d84-407d-8b98-ba03e59caaba
+   charged to your key: 0.000004 in your key's currency (the gateway's own count for this call)
+1. models this key may call
+   example-embed, example-large, example-small
+2. one chat on example-small, max_tokens 300
+   refused: HTTP 429 rate_limit_exceeded
+   rate limit of 1 requests per minute reached
+   what to do: too many requests this minute: wait for the next minute

@@ -1,0 +1,82 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "limits-and-alarms"
+format = "main-scenario"
+task = "Give a team's app limits that live outside its code (AWS Budgets, Lambda reserved concurrency and timeout, the key's budget at the gateway) and observability of errors, latency and cost per request (embedded metric format logs, three CloudWatch alarms on them and two on Lambda's own errors and throttles, one dashboard), and show each alarm and limit working"
+shapes = ["genai-first", "operational-first", "lakehouse-first"]
+extensions = ["Trace analysis and alarms", "Agent under controlled autonomy"]
+lectures = ["L16", "L17"]
+core = ["CloudWatch", "Lambda", "AWS Budgets", "SNS"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "cents when cleaned up the same day: 5 standard alarms at 0.10 USD per alarm metric month and up to 12 custom metrics at 0.30 USD per metric-month, both prorated by the hour (AWS bulk price list ca-central-1, published 2026-11-04, read 2026-11-13); EMF log ingestion 0.55 USD per GB; 12 Lambda requests; a budget without actions is free (AWS Budgets pricing page); one dashboard inside the free three of up to 50 metrics (AWS bulk price list, read 2026-11-13)"
+summary = "An instrument set for a team's app: errors, latency and cost per request written as CloudWatch embedded-metric-format log lines, alarms on error count, p95 latency and daily cost, one dashboard, an AWS Budgets budget and Lambda reserved concurrency; an agent loop with a step cap and a deadline, stopped by the key's budget at the gateway when its own limits fail"
+
+[[practices]]
+name = "Limits that live outside the code path, so a bug in the app cannot raise them"
+source = "L16 (controlled autonomy); Agentic AI Lens AGENTCOST07-BP01 (automated cost controls with intelligent cutoffs)"
+
+[[practices]]
+name = "Fast stop at the gateway's per-key budget, AWS Budgets as the slow backstop"
+source = "L16; Agentic AI Lens AGENTCOST07-BP01; AWS Billing User Guide, Budgets best practices (billing data updated at least once a day)"
+
+[[practices]]
+name = "Per-cycle, per-task and per-day limits: step cap and deadline per task, per-key budget at the gateway, daily-cost alarm"
+source = "Agentic AI Lens AGENTCOST07-BP01"
+
+[[practices]]
+name = "Observe errors, latency and cost on every request, from app code, and alarm on them"
+source = "L16; Generative AI Lens GENOPS02-BP01 (monitor all application layers)"
+
+[[practices]]
+name = "Metrics from structured logs with low-cardinality dimensions; request ids stay plain fields"
+source = "CloudWatch User Guide, Embedded metric format specification"
+
+[[practices]]
+name = "M of N alarms for metrics whose logs can arrive late"
+source = "CloudWatch User Guide, Setting alarms on metrics created with the embedded metric format"
+
+[instruments]
+files = ["main/emf.py", "main/alarms.py", "main/limits.py", "main/dashboard.py", "main/alarm_eval.py", "main/fire.py", "ext-runaway-loop/agent_loop.py", "clean_up.py"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "the app writes one valid EMF line per request, failures included; each alarm goes to ALARM on its own synthetic traffic and stays OK on the others; the budget, reserved concurrency, timeout and dashboard exist as defined; a runaway loop is stopped by its step cap, its deadline, or, with both broken, by the gateway budget, and that spend fires the daily-cost alarm"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python main/run.py --target aws"
+run_offline = "uv run python main/run.py --target local"
+fire = "uv run python main/fire.py --target aws"
+fire_synthetic = "uv run python main/fire.py --target aws --synthetic"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-runaway-loop = "uv run python ext-runaway-loop/loop_run.py"
+
+[env]
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+ALARM_EMAIL = "optional: address subscribed to the alarm topic"
+LAMBDA_ROLE_ARN = "optional: an existing role Lambda can assume; when unset, --target aws creates $PREFIX-app-role (writes its own log group only)"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+cloudwatch_alarms = ["$PREFIX-app-errors", "$PREFIX-app-p95-latency", "$PREFIX-app-daily-cost", "$PREFIX-app-lambda-errors", "$PREFIX-app-lambda-throttles"]
+cloudwatch_dashboards = ["$PREFIX-app"]
+lambda_functions = ["$PREFIX-app"]
+log_groups = ["/aws/lambda/$PREFIX-app"]
+budgets = ["$PREFIX-monthly"]
+sns_topics = ["$PREFIX-limits-alarms"]
+iam_roles = ["$PREFIX-app-role"]          # only when LAMBDA_ROLE_ARN is unset; clean_up.py removes only this tagged role
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway (the loop's call_model; a stand-in with the gateway's limits in this recipe)"
+iam_role_least_privilege = true      # the created role writes the function's own log group only; LAMBDA_ROLE_ARN overrides
+no_request_id_dimension = true       # high-cardinality dimensions create one billed metric per value
+limits_checked_before_each_call = true
+no_retry_on_gateway_refusal = true
+tests_offline = true                 # moto and a simulated clock; no network, no account

@@ -1,0 +1,10 @@
+One call on the course LLM gateway, 2026-11-17: the labelling call of main/parallel.py (system prompt LABEL, user
+message MESSAGE), model qwen3.8-27b, max_tokens 600, temperature 0.7. Status, finish reason, token counts and the reply; the
+reasoning text is left out.
+
+HTTP 200
+finish_reason: stop
+prompt_tokens: 89
+completion_tokens: 546
+reasoning_tokens: 541
+reply: complaint

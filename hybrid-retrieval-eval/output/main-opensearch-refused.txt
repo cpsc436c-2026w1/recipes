@@ -1,0 +1,21 @@
+$ timeout 2280 uv run python -m main.run --backend opensearch --embedder gateway --answers gateway
+Traceback (most recent call last):
+    main()
+    search = make_search(args.backend, args.embedder, s)
+    return OpenSearchSearch.create(products, embedder, s)
+    endpoint = create_collection(s)
+    ignore_conflict(aoss.create_collection_group, name=name, generation="NEXTGEN", standbyReplicas="DISABLED",
+                    capacityLimits={"minIndexingCapacityInOCU": 0, "minSearchCapacityInOCU": 0,
+                                    "maxIndexingCapacityInOCU": MAX_OCU, "maxSearchCapacityInOCU": MAX_OCU})
+    fn(**kw)
+    return self._make_api_call(operation_name, kwargs)
+    return func(*args, **kwargs)
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ValidationException: An error occurred (ValidationException) when calling the CreateCollectionGroup operation: StandbyReplicas cannot be set to DISABLED for NEXTGEN collection groups.
+[exit 1]
+$ uv run python clean_up.py
+removed data access policy recipe-products
+removed network policy recipe-products
+removed encryption policy recipe-products
+3 resources removed for PREFIX=recipe in ca-central-1
+[exit 0]

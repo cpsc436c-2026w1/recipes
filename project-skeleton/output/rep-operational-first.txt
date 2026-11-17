@@ -1,0 +1,10 @@
+$ uv run python rep-operational-first/run.py --target aws
+1. 305 updates to send (keys: 20)
+2. function URL <FUNCTION_URL> (AWS_IAM: requests are signed)
+3. POST /updates: stored 300, older 0, duplicates 5
+4. GET /number, window 2026-11-13T03:03:00.000Z to 2026-11-13T04:03:00.000Z: 143
+   page for users: .local/operational-first.html
+5. exporting the table to S3 (several minutes)
+6. Athena over s3://my-bucket-111122223333/exports/AWSDynamoDB/01794542676548-3d7fba4d/data/: Data scanned 9366 bytes
+updates in the last hour: API 143, lake 143
+[exit 0]

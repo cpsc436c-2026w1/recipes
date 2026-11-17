@@ -1,0 +1,5 @@
+$ uv run python clean_up.py
+removing the concurrency-correctness tables with prefix 'recipe' in ca-central-1
+absent   table recipe-race-trips
+absent   table recipe-race-requests
+[exit 0]

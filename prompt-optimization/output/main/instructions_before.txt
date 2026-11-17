@@ -1,0 +1,2 @@
+Answer the question about the cafe's orders with one DuckDB SQL query over the tables given.
+The app runs the query and shows its single value to the user.

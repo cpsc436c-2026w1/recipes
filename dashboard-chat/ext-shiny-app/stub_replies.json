@@ -1,0 +1,7 @@
+{
+  "Show the orders of more than 40 dollars": {"filter": "SELECT * FROM orders WHERE amount_cad > 40", "title": "Orders of more than 40 dollars"},
+  "Show the cake orders": {"filter": "SELECT * FROM orders WHERE category = 'cake'", "title": "Cake orders"},
+  "What were total sales by category?": {"query": "SELECT category, ROUND(SUM(amount_cad), 2) AS sales_cad FROM orders GROUP BY category ORDER BY sales_cad DESC"},
+  "How many orders are there?": {"query": "SELECT COUNT(*) AS orders FROM orders"},
+  "Delete all the orders": {"query": "DELETE FROM orders"}
+}

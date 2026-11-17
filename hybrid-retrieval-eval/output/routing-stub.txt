@@ -1,0 +1,9 @@
+10 requests, stub replies
+
+| policy | accuracy | cost (CAD) | of which router | share sent to the stronger model |
+|---|---:|---:|---:|---:|
+| all-cheap | 0.70 | 0.000114 | 0.000000 | 0.00 |
+| all-strong | 1.00 | 0.000234 | 0.000000 | 1.00 |
+| routed | 0.90 | 0.000217 | 0.000039 | 0.50 |
+
+router label agrees with the hand label on 0.80 of the requests

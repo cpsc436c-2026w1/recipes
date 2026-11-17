@@ -1,0 +1,39 @@
+
+== 1. Every function writes to its own log group
+
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-api --query logGroups[].{name: logGroupName, stored_bytes: storedBytes}
+[
+    {
+        "name": "/aws/lambda/recipe-api",
+        "stored_bytes": 0
+    }
+]
+
+== 2. The REPORT line Lambda writes after every call: duration, billed duration, memory size and memory used
+
+$ aws logs filter-log-events --log-group-name /aws/lambda/recipe-api --filter-pattern "REPORT RequestId" --max-items 8 --query events[].message --output text
+REPORT RequestId: 3b93f44a-7fe9-40ee-b778-c5e1937b2692	Duration: 316.02 ms	Billed Duration: 810 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	Init Duration: 493.18 ms	
+	REPORT RequestId: f52c5468-b161-4c17-837e-5269740c6a08	Duration: 24.70 ms	Billed Duration: 25 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 28852fb3-80d1-49c2-bd41-4610020c4775	Duration: 63.89 ms	Billed Duration: 64 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 8ede63fc-ae70-477f-a266-4dd56d9aa615	Duration: 77.05 ms	Billed Duration: 78 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 6603191c-ed10-413d-9a36-cf1817843e26	Duration: 232.50 ms	Billed Duration: 233 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+	REPORT RequestId: 35e733c9-185f-4900-acb3-4c419864f421	Duration: 1.63 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+	REPORT RequestId: d8e2b83b-56e5-44ee-ab0e-5214c29faed5	Duration: 296.34 ms	Billed Duration: 781 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	Init Duration: 484.52 ms	
+	REPORT RequestId: f8f1ca06-17c0-4c07-9f74-cf0256f8333d	Duration: 355.64 ms	Billed Duration: 859 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	Init Duration: 502.92 ms	
+
+None
+
+== 3. Calls in the last hour, and their average and longest duration (CloudWatch metrics)
+
+$ aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Invocations --dimensions Name=FunctionName,Value=recipe-api --start-time 2026-11-14T04:18:56Z --end-time 2026-11-14T05:18:56Z --period 3600 --statistics Sum --query Datapoints[].Sum
+[
+    14.0
+]
+
+$ aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration --dimensions Name=FunctionName,Value=recipe-api --start-time 2026-11-14T04:18:56Z --end-time 2026-11-14T05:18:56Z --period 3600 --statistics Average Maximum --query Datapoints[].{avg_ms: Average, max_ms: Maximum}
+[
+    {
+        "avg_ms": 146.20499999999998,
+        "max_ms": 355.64
+    }
+]

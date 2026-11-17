@@ -1,0 +1,16 @@
+{"id": "q01", "kind": "exact code", "query": "HX-200", "relevant": ["P01"]}
+{"id": "q02", "kind": "exact code", "query": "KX-7", "relevant": ["P21"]}
+{"id": "q03", "kind": "exact code", "query": "BT-9 speaker", "relevant": ["P05"]}
+{"id": "q04", "kind": "exact code", "query": "MK-2 keyboard", "relevant": ["P26"]}
+{"id": "q05", "kind": "other words", "query": "comfy couch", "relevant": ["P09", "P10"]}
+{"id": "q06", "kind": "other words", "query": "earphones", "relevant": ["P07", "P08"]}
+{"id": "q07", "kind": "other words", "query": "external battery", "relevant": ["P28"]}
+{"id": "q08", "kind": "other words", "query": "bag for a laptop", "relevant": ["P23", "P24"]}
+{"id": "q09", "kind": "other words", "query": "chair for back pain", "relevant": ["P13"]}
+{"id": "q10", "kind": "typo", "query": "blutooth speeker", "relevant": ["P04", "P05"]}
+{"id": "q11", "kind": "typo", "query": "standing dsek", "relevant": ["P12"]}
+{"id": "q12", "kind": "typo", "query": "noise canceling headphones", "relevant": ["P06"]}
+{"id": "q13", "kind": "plain words", "query": "camping tent for two people", "relevant": ["P16"]}
+{"id": "q14", "kind": "plain words", "query": "lamp for reading in bed", "relevant": ["P15"]}
+{"id": "q15", "kind": "plain words", "query": "coffee maker", "relevant": ["P19", "P21"]}
+{"id": "q16", "kind": "plain words", "query": "travel charger with adapters", "relevant": ["P03"]}

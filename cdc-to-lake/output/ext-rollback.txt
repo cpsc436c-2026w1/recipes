@@ -1,0 +1,8 @@
+$ uv run python ext-rollback-or-schema/rollback.py --target aws
+[aws: Glue Data Catalog table]
+before the load   snapshot 2679836201694369956: 7 changes, average fare 15.9
+after the load    snapshot 2852506230957226311 and later commits: 11 changes, average fare 581.81   <- fares 100 times too high
+time travel to 2679836201694369956: 7 changes (the earlier table is still there)
+rolled back to 2679836201694369956, good rows from later commits appended again: 0
+after restore: 7 changes, average fare 15.9
+[exit 0]

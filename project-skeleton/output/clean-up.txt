@@ -1,0 +1,14 @@
+$ uv run python clean_up.py
+removed  Firehose stream recipe-to-lake
+removed  Kinesis stream recipe-updates
+removed  function URL of recipe-api
+removed  Lambda function recipe-api
+removed  log group /aws/lambda/recipe-api
+removed  DynamoDB table recipe-updates (its point-in-time backups go with it)
+removed  Glue database recipe_lake and its tables and views
+removed  Athena workgroup recipe-wg
+removed  S3 bucket my-bucket-111122223333 and every object in it
+removed  IAM role recipe-firehose-role
+removed  IAM role recipe-api-role
+removed  .local/
+[exit 0]

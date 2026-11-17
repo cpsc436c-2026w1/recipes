@@ -1,0 +1,14 @@
+$ uv run python -m main.client
+{"step": "list_tools", "tools": [{"name": "get_schema", "read_only": true}, {"name": "query", "read_only": true}]}
+{"step": "get_schema", "is_error": false, "tables": ["orders", "stores"]}
+{"step": "query", "sql": "SELECT s.city, count(*) AS orders, round(sum(o.amount_cad), 2) AS sales_cad FROM orders o JOIN stores s USING (store_id) GROUP BY s.city ORDER BY sales_cad DESC", "is_error": false, "result": {"columns": ["city", "orders", "sales_cad"], "rows": [["Vancouver", 66, 6484.19], ["Kelowna", 34, 3876.0], ["Victoria", 34, 3783.54], ["Burnaby", 33, 3575.27], ["North Vancouver", 33, 3362.0]], "truncated": false}}
+{"step": "query", "sql": "DELETE FROM orders", "is_error": true, "result": "Error executing tool query: query refused: only SELECT is allowed; this is DELETE"}
+
+# in the server terminal
+MCP server on http://127.0.0.1:8799/mcp (Ctrl-C stops it)
+2026-11-12 16:35:46,975 mcp.server.streamable_http_manager StreamableHTTP session manager started
+2026-11-12 16:35:49,847 mcp-server-minimal {"tool": "get_schema", "status": "ok", "ms": 38, "tables": 2}
+2026-11-12 16:35:49,954 mcp-server-minimal {"tool": "query", "status": "ok", "ms": 33, "rows": 5, "truncated": false}
+2026-11-12 16:35:49,960 mcp-server-minimal {"tool": "query", "status": "refused", "ms": 0}
+2026-11-12 16:35:49,961 mcp.server.mcpserver.server Tool 'query' failed: 'Error executing tool query: query refused: only SELECT is allowed; this is DELETE'
+2026-11-12 16:35:50,487 mcp.server.streamable_http_manager StreamableHTTP session manager shutting down

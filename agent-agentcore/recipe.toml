@@ -1,0 +1,93 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "agent-agentcore"
+format = "main-scenario"
+task = "Run an agent whose limits live in app code: a Strands agent with hooks for caps, tool contracts, approval before a write and a once-only write; its tools behind an AgentCore Gateway (Lambda); hosted on AgentCore Runtime; scored by an Inspect eval"
+shapes = ["genai-first", "operational-first", "lakehouse-first"]
+extensions = ["Agent under controlled autonomy", "MCP server for your system"]
+lectures = ["L17", "L18"]
+core = ["Strands Agents (hooks, interrupts)", "AgentCore Gateway", "AgentCore Runtime", "pydantic", "Inspect AI"]
+secondary = ["Lambda", "DynamoDB", "Parameter Store", "Logfire", "pydantic-settings"]
+region = "ca-central-1"
+cost_one_run = "under one cent in AWS charges (assumed from the AgentCore price list, not measured); model calls count against the course LLM gateway budget, at most MAX_MODEL_CALLS per request"
+summary = "A Strands agent with example library tools: hooks keep the caps on model and tool calls, validate tool arguments against pydantic models, ask a person before a write and give the write a request key; the tools are a Lambda function behind an AgentCore Gateway, the agent runs on AgentCore Runtime, Logfire traces are behind a flag, and an Inspect eval scores requests in code, offline on a stub model"
+
+[[practices]]
+name = "Limits in app code, not in the prompt: caps on model calls, tool calls and time in a hook"
+source = "L17 (bounded agent); L18 (hooks); Agentic AI Lens AGENTCOST07-BP01"
+
+[[practices]]
+name = "A write waits for a person, and is made for the signed-in member, whatever the LLM wrote"
+source = "L17; Agentic AI Lens AGENTSEC04-BP02 (human in the loop for critical decisions)"
+
+[[practices]]
+name = "A write is idempotent by a request key and a conditional write"
+source = "L12-L13 (conditional writes); Agentic AI Lens AGENTREL06-BP04"
+
+[[practices]]
+name = "Tool contracts as pydantic models: one definition for the schema the LLM sees and the check before the call"
+source = "Agentic AI Lens AGENTSEC02-BP02 (validate tool inputs and outputs)"
+
+[[practices]]
+name = "Settings in one frozen object read from the environment; secrets in Parameter Store, never in a Runtime's configuration"
+source = "Twelve-Factor App, Config; course settings standard"
+
+[[practices]]
+name = "Eval first: requests with expected tool use and outcome, scored in code, offline on a stub model"
+source = "Course standard stack (Inspect AI)"
+
+[instruments]
+files = [
+    "main/hooks.py",
+    "main/contracts.py",
+    "main/agent.py",
+    "main/config.py",
+    "main/request_key.py",
+    "main/tracing.py",
+    "main/gateway_tools.py",
+    "main/infra.py",
+    "main/session.py",
+    "runtime/agent_entry.py",
+    "tools_lambda/handler.py",
+    "evals/task.py",
+    "evals/scoring.py",
+    "clean_up.py",
+    ".env.example",
+]
+
+[validates]
+command = "uv run pytest -q"
+shows = "On a stub model the caps end a model that never stops, a write waits for a yes and goes to the member of the request, the same write twice adds one row, wrong tool arguments come back to the LLM; the deploy and the clean-up pass on stand-ins for AWS; the Inspect eval scores 11 requests in code; with the Logfire flag off nothing is sent"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+eval = "uv run --env-file .env.example inspect eval evals/task.py"
+run_offline = "uv run --env-file .env.example python -m main.run ask --model stub --yes"
+run = "uv run --env-file .env python -m main.run deploy"
+invoke = "uv run --env-file .env python -m main.invoke"
+clean = "uv run --env-file .env python clean_up.py"
+
+[resources]                         # what a deploy creates; clean_up.py removes it
+aws = [
+    "DynamoDB tables $PREFIX-agent-books, $PREFIX-agent-holds",
+    "Lambda function $PREFIX-agent-tools and its log group",
+    "AgentCore Gateway $PREFIX-agent-gateway with target library-tools",
+    "AgentCore Runtime <PREFIX with underscores>_agent and its log groups",
+    "Parameter Store parameters $PREFIX-agent-kb-mcp-token, $PREFIX-agent-logfire-token",
+    "S3 bucket $PREFIX-agent-code-<account>",
+    "IAM roles $PREFIX-agent-lambda-role, -gateway-role, -runtime-role (only when the role settings are empty)",
+]
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"
+settings_only_in_env_example = true     # no default in code; main/config.py and .env.example list the same names
+caps_and_approval_in_hooks = true       # never move a cap, the approval or the request key into the prompt
+write_needs_person_approval = true
+write_idempotent_by_request_key = true
+no_secret_in_runtime_environment = true
+logfire_off_by_default = true
+tests_offline = true

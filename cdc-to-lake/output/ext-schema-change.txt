@@ -1,0 +1,7 @@
+$ uv run python ext-rollback-or-schema/schema_change.py --target aws
+ran: ALTER TABLE recipe_cdc.trip_changes ADD COLUMNS (payment_type string)
+next, so new changes fill the column:
+  1. add "payment_type": "string" to ITEM_FIELDS in main/handler.py
+  2. uv run python -m main.infra --update-code     (deploys the changed function)
+  3. the view trips_current lists its columns; recreate it from main/sql/current_view.sql to show the new one
+[exit 0]

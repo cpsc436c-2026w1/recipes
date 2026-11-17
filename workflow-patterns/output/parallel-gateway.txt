@@ -1,0 +1,7 @@
+model: gateway; at most 5 model calls
+sectioning
+  screen: ok
+  shown: We're sorry about the oat milk, and yes, we still have rye bread.
+  seconds: 3.7
+voting
+  RuntimeError: the model used its token cap before answering (empty reply)

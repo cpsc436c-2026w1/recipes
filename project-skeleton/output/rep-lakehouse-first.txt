@@ -1,0 +1,8 @@
+$ uv run python rep-lakehouse-first/run.py --target aws
+1. 305 updates to send (keys: 20)
+2. stream arn:aws:kinesis:ca-central-1:111122223333:stream/recipe-updates, Firehose recipe-to-lake, bucket my-bucket-111122223333
+3. sent 305 records; waiting for Firehose to write Parquet (about a minute)
+4. 1 Parquet files under s3://my-bucket-111122223333/updates/
+5. Athena, window 2026-11-13T03:01:00.000Z to 2026-11-13T04:01:00.000Z: Data scanned 6967 bytes
+updates in the last hour: 141   (page for users: .local/lakehouse-first.html)
+[exit 0]

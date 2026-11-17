@@ -1,0 +1,12 @@
+[local: simulated clock, buffer 60 s]
+healthy            change to queryable    62 s   limit 300 s   alarm OK
+stuck for a while  change to queryable   462 s   limit 300 s   alarm ALARM
+alarms defined: recipe-cdc-iterator-age, recipe-cdc-lag
+metrics stored: 1 (CdcToLake/ChangeToQueryableSeconds)
+freshness.json for the dashboard:
+{
+  "table": "trip_changes",
+  "data_last_updated": "2027-01-15T08:01:02+00:00",
+  "change_to_queryable_s": 462.0,
+  "checked_at": "2027-01-15T08:08:44+00:00"
+}

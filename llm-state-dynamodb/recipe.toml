@@ -1,0 +1,70 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "llm-state-dynamodb"
+format = "main-scenario"
+task = "Keep an LLM app's state in DynamoDB: chat history per signed-in user with an owner check and expiry, an exact answer cache keyed on question and index version, and one trace item per model or tool call"
+shapes = ["genai-first", "operational-first"]
+extensions = ["Answer or retrieval cache", "Trace analysis and alarms"]
+lectures = ["L12", "L13", "L16", "L17"]
+core = ["DynamoDB"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "far below one cent: a few dozen DynamoDB on-demand requests for all three scripts (unchecked: counted from the code); ca-central-1 on demand 0.6875 USD per million write request units, 0.1375 USD per million read request units, first 25 GB-months of storage free (AWS bulk price list https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/ca-central-1/index.csv, published 2026-11-11, read 2026-11-13)"
+summary = "Chat history, answer cache and traces for an LLM app in DynamoDB: each conversation checked against its signed-in owner before any read or write, expired items filtered before DynamoDB deletes them, cache keys that carry the index version and never share a user's answer"
+
+[[practices]]
+name = "Memory kept per user or session; every read and write checks the owner"
+source = "L17 (memory); Agentic AI Lens AGENTSEC01-BP01 (memory isolation and integrity controls)"
+
+[[practices]]
+name = "Cache keys carry the version of what the answer was built from, and the user when the answer is personal"
+source = "L17; AI Engineering ch. 10 (exact caching; a cached answer built from one user's data must not reach another); Agentic AI Lens AGENTCOST02-BP03 (caching to reduce redundant model invocations; it prefers semantic caching, which this recipe does not build)"
+
+[[practices]]
+name = "Expiry by TTL, with readers filtering expired items themselves"
+source = "L12-L13; DynamoDB Developer Guide, Using time to live (TTL)"
+
+[[practices]]
+name = "Key design from access patterns: one Query returns a conversation newest first, or a request's calls in order"
+source = "L12-L13 (partition and sort keys)"
+
+[[practices]]
+name = "Owner check and write in one transaction"
+source = "L12 (all or nothing: TransactWriteItems)"
+
+[instruments]
+files = ["main/history.py", "main/tables.py", "ext-answer-cache/answer_cache.py", "ext-traces/trace_store.py", "clean_up.py"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "a user reads their own newest turns; another user's read and write are refused and write nothing; expired turns and cache entries are filtered while still stored; a cache hit skips retrieval and the model, a version bump misses, a personal answer never reaches another user; a request's calls come back in order"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python main/run.py --target aws"
+run_offline = "uv run python main/run.py --target local"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-answer-cache = "uv run python ext-answer-cache/cache_run.py --target aws"
+ext-traces = "uv run python ext-traces/trace_run.py --target aws"
+
+[env]
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+dynamodb_tables = ["$PREFIX-chat-conversations", "$PREFIX-chat-history", "$PREFIX-answer-cache", "$PREFIX-llm-traces"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway (in the team's own generate function; this recipe stubs the model)"
+user_id_from_sign_in = true          # never take the user id from the request body
+owner_check_before_read = true       # history.recent and history.append check the owner first
+readers_filter_expired = true        # TTL deletes late; never drop the FilterExpression on expires_at
+cache_key_has_index_version = true
+personal_answers_per_user = true     # never store an answer with a private source under the shared scope
+tests_offline = true                 # moto; no network, no account

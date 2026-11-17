@@ -1,0 +1,9 @@
+# Sandbox run 2026-11-14, ended 05:38:08 UTC: 6 min 38 s after the first create of main-opensearch.txt (05:31:30).
+$ timeout 900 uv run python clean_up.py
+removed  collection recipe-products
+removed  collection group recipe-products
+removed  data access policy recipe-products
+removed  network policy recipe-products
+removed  encryption policy recipe-products
+5 resources removed, 0 failed, for PREFIX=recipe in ca-central-1
+[exit 0]

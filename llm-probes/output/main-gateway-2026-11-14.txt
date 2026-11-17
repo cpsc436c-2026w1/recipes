@@ -1,0 +1,33 @@
+$ uv run python main/probe.py --groups main
+Endpoint the course LLM gateway, 2026-11-14 05:19 UTC, 60 s timeout per request
+
+| probe | model | works | seconds | note |
+|---|---|---|---:|---|
+| list models |  | yes | 0.09 | qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b |
+| wrong key is refused |  | yes | 0.06 | HTTP 401: missing or malformed API key |
+| unknown model is refused |  | yes | 0.07 | HTTP 403: this key may not use no-such-model. Allowed: qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b |
+| chat | qwen3.6-35b-a3b | yes | 0.72 | replied 'ready'; 29 tokens in, 2 out |
+| chat | qwen3.8-27b | yes | 0.88 | replied 'ready'; 65 tokens in, 30 out, 26 of them reasoning |
+
+Tokens the endpoint reported for this run: 94 in, 32 out
+
+$ uv run python main/probe.py --groups main,tool-calls --models qwen3.6-35b-a3b --timeout 20
+Endpoint the course LLM gateway, 2026-11-14 05:19 UTC, 20 s timeout per request
+
+| probe | model | works | seconds | note |
+|---|---|---|---:|---|
+| list models |  | yes | 0.04 | qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b |
+| wrong key is refused |  | yes | 0.07 | HTTP 401: missing or malformed API key |
+| unknown model is refused |  | yes | 0.06 | HTTP 403: this key may not use no-such-model. Allowed: qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b |
+| chat | qwen3.6-35b-a3b | yes | 0.52 | replied 'ready'; 29 tokens in, 2 out |
+| tool call | qwen3.6-35b-a3b | yes | 0.61 | run_sql('SELECT COUNT(*) FROM trips') |
+| tool result used | qwen3.6-35b-a3b | yes | 0.59 | replied 'The trips table has 48,213 rows.' |
+
+Tokens the endpoint reported for this run: 687 in, 46 out
+
+# The gateway's own spend report for the key of these runs, read by the instructor after the two runs above and the
+# run of every group (all-probes-gateway-2026-11-14.txt); the key's id is masked.
+gw-XXXXXXXX  2026-11-14  qwen3-embedding-0.6b  requests 1  in 26  out 0  0.000001 CAD
+gw-XXXXXXXX  2026-11-14  qwen3.6-35b-a3b  requests 15  in 8197  out 173  0.000441 CAD
+gw-XXXXXXXX  2026-11-14  qwen3.8-27b  requests 12  in 7984  out 612  0.000929 CAD
+total gw-XXXXXXXX  0.001371 CAD

@@ -1,0 +1,12 @@
+$ uv run python -m main.run
+{"request": "What is the status of order 1042?", "label": "lookup", "path": "lookup", "large_model_calls": 0, "reply": "Order 1042 is shipped: 2 item(s), 54.00 CAD.", "cost_cad": "0.00000615"}
+{"request": "Do you have waterproof jackets?", "label": "search", "path": "search", "large_model_calls": 0, "reply": "(stub reply from qwen3.6-35b-a3b) Question: Do you have waterproof jackets?", "cost_cad": "0.00001155"}
+{"request": "I run trails in the rain and have 200 CAD. Which shoe and socks should I get, and why?", "label": "hard", "path": "hard", "large_model_calls": 1, "reply": "(stub reply from qwen3.8-27b) Question: I run trails in the rain and have 200 CAD. Which shoe and socks should I get, and why?", "cost_cad": "0.00005610"}
+{"request": "What will the weather be in Whistler tomorrow?", "label": "out_of_scope", "path": "out_of_scope", "large_model_calls": 0, "reply": "I can help with your orders and with our products. For anything else, please contact us at the store.", "cost_cad": "0.00000650"}
+{"request": "Where is my order?", "label": "lookup", "path": "hard", "large_model_calls": 1, "reply": "(stub reply from qwen3.8-27b) Question: Where is my order?", "cost_cad": "0.00005015"}
+{"request": "Can I return boots I wore once on a hike?", "label": "hard", "path": "hard", "large_model_calls": 1, "reply": "(stub reply from qwen3.8-27b) Question: Can I return boots I wore once on a hike?", "cost_cad": "0.00005245"}
+model: stub; 6 requests; large-model calls 3; total 0.000183 CAD (stub: tokens estimated from characters); 2 misroutes logged in output/misroutes.jsonl
+
+$ cat output/misroutes.jsonl
+{"ts": "2026-11-12T23:41:42+00:00", "request_id": "330bce55729b", "request": "Where is my order?", "label": "lookup", "reason": "lookup without an order number", "sent_to": "hard"}
+{"ts": "2026-11-12T23:41:42+00:00", "request_id": "49854aece4da", "request": "Can I return boots I wore once on a hike?", "label": null, "router_reply": "Policy question", "reason": "router reply is not a label", "sent_to": "hard"}

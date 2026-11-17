@@ -1,0 +1,96 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "cdc-to-lake"
+format = "main-scenario"
+task = "Every change to a DynamoDB table goes through DynamoDB Streams, a Lambda function and Firehose into an Iceberg change-log table in S3 (Glue Data Catalog) that Athena queries, with change time and arrival time on every row"
+shapes = ["lakehouse-first", "operational-first"]
+extensions = ["change data capture", "lag monitoring", "table maintenance", "rollback"]
+lectures = ["L11", "L13"]
+core = ["DynamoDB Streams", "AWS Lambda", "Amazon Data Firehose", "Apache Iceberg", "AWS Glue Data Catalog", "Amazon Athena", "Amazon CloudWatch"]
+secondary = ["PyIceberg", "DuckDB", "EventBridge Scheduler"]
+region = "ca-central-1"
+cost_one_run = "under 0.01 USD (assumed from the AWS bulk price lists, ca-central-1, read 2026-11-13: Firehose Direct PUT to Iceberg 0.083 USD per GB, Athena 5.50 USD per TB of Data scanned with a 10 MB minimum per query); not measured"
+summary = "Feed the lake from the operational store's change stream: DynamoDB Streams to Lambda to Firehose to an Iceberg table that Athena queries, with freshness measured and alarmed"
+
+[[practices]]
+name = "The operational store feeds the lake through its change stream; the app writes once"
+source = "L13; FDE ch. 5 'Change Data Capture' and DDIA 2e ch. 12 'Databases and Streams'"
+
+[[practices]]
+name = "Keep an append-only change log and derive the current state as a view"
+source = "L11; Data Analytics Lens BP 10.1; Firehose docs (AppendOnly)"
+
+[[practices]]
+name = "Measure freshness from change to queryable and alarm when it passes a limit"
+source = "L13; Data Analytics Lens BP 1.2"
+
+[[practices]]
+name = "Undo a bad load from table snapshots, keeping the good commits after it"
+source = "L11; Data Analytics Lens BP 2.4"
+
+[[practices]]
+name = "Compact small files and expire old snapshots on a schedule"
+source = "L11; Athena docs (OPTIMIZE, VACUUM); Data Analytics Lens BP 13.1"
+
+[instruments]
+files = [
+  "main/handler.py",
+  "main/infra.py",
+  "main/sql/create_table.sql",
+  "main/sql/current_view.sql",
+  "main/sql/freshness.sql",
+  "ext-lag-alarm/lag.py",
+  "ext-rollback-or-schema/rollback.py",
+  "ext-rollback-or-schema/schema_change.py",
+  "ext-maintenance/maintenance.py",
+  "clean_up.py",
+]
+
+[validates]
+command = "uv run pytest -q"
+shows = "a changed item appears in the lake query and a removed one leaves the current view; lag is reported and the alarm fires past the limit; rollback restores the earlier row count; compaction gives the same answer from fewer files and less data scanned"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "uv run python -m main.run --target aws"
+run_offline = "uv run python -m main.run"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-lag-alarm = "uv run python ext-lag-alarm/lag.py --target aws"
+ext-rollback-or-schema = "uv run python ext-rollback-or-schema/rollback.py --target aws"
+ext-rollback-or-schema-schema = "uv run python ext-rollback-or-schema/schema_change.py --target aws"
+ext-maintenance = "uv run python ext-maintenance/maintenance.py --target aws --schedule"
+
+[env]
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+LAMBDA_ROLE_ARN = "optional: existing role for the Lambda function (stream read, Firehose write, failures queue, logs); created otherwise"
+FIREHOSE_ROLE_ARN = "optional: existing role Firehose assumes (Glue table, S3 bucket); created otherwise"
+SCHEDULER_ROLE_ARN = "optional: existing role EventBridge Scheduler assumes (ext-maintenance --schedule only); created otherwise"
+BUCKET = "optional; default {PREFIX}-cdc-lake-{account id}"
+BUFFER_SECONDS = "Firehose buffer interval; default 60"
+LAG_LIMIT_SECONDS = "alarm limit for change to queryable; default 300"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+dynamodb = ["table $PREFIX-trips (with its stream)"]
+lambda = ["function $PREFIX-cdc-to-firehose", "event source mapping on the table's stream", "log group /aws/lambda/$PREFIX-cdc-to-firehose"]
+firehose = ["stream $PREFIX-trip-changes"]
+sqs = ["queue $PREFIX-cdc-failures (the batches Lambda gave up on)"]
+glue = ["database ${PREFIX}_cdc (hyphens become underscores)", "table trip_changes", "view trips_current"]
+s3 = ["bucket $PREFIX-cdc-lake-<account> (unless BUCKET is set)", "prefixes lake/, athena-results/, firehose-errors/, freshness/"]
+cloudwatch = ["alarm $PREFIX-cdc-lag", "alarm $PREFIX-cdc-iterator-age"]
+scheduler = ["schedule $PREFIX-lake-optimize", "schedule $PREFIX-lake-vacuum"]
+iam = ["roles $PREFIX-cdc-lambda-role, $PREFIX-cdc-firehose-role, $PREFIX-cdc-scheduler-role, tagged recipe=cdc-to-lake (unless passed in)"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+roles_least_privilege = "main/infra.py role_policies"   # created per service unless an *_ROLE_ARN is set; clean_up.py removes only tagged ones
+append_only_change_log = true        # never update or delete rows in trip_changes from the stream; AppendOnly = true
+one_sql_text = true                  # main/sql/*.sql must run in Athena and in DuckDB
+columns_in_three_places = "main/handler.py ITEM_FIELDS, main/sql/create_table.sql, main/lake.py iceberg_schema (tests/test_schema.py)"
+tests_offline = true                 # moto, local Iceberg, DuckDB; no network, no account
+schedules_removed_by_clean_up = true

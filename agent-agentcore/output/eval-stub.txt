@@ -1,0 +1,18 @@
+$ uv run --env-file .env.example inspect eval evals/task.py --display plain
+Monitor from another shell: inspect ctl task list   (inspect ctl --help)
+Running 1 tasks...
+---------------------------------------------------------
+member_requests_stub (11 samples): mockllm/model
+dataset: (samples)
+---------------------------------------------------------
+
+agent_run    | Steps:  11/11 100% | Samples:  11/ 11 | accuracy: 1.00 | mockllm:  0/20 | HTTP retries: 0
+---------------------------------------------------------
+member_requests_stub (11 samples): mockllm/model
+dataset: (samples)
+
+total time:                                   0:00:02
+outcome          model_calls
+accuracy  1.000  mean         3.818
+---------------------------------------------------------
+

@@ -1,0 +1,25 @@
+[project]
+name = "recipe-hybrid-retrieval-eval"
+version = "0.1.0"
+description = "Keyword and embedding search fused by reciprocal rank fusion, with a retrieval eval (CPSC 436C recipe)"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.35",
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "opensearch-py>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "behave>=1.3.3",
+    "moto>=5.0",
+    "pytest>=8",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = [".", "ext-filters", "ext-model-routing"]
+testpaths = ["tests"]

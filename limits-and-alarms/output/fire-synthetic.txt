@@ -1,0 +1,9 @@
+# Sandbox run 2026-11-14. The run printed the same lines as the run of 2026-11-12.
+$ uv run python main/fire.py --target aws --synthetic
+minute 1: breaching datapoints sent
+minute 2: breaching datapoints sent
+minute 3: breaching datapoints sent
+recipe-app-errors                state ALARM
+recipe-app-p95-latency           state ALARM
+the daily-cost alarm is checked offline (tests) or by a day of real spend; 0.50 CAD of synthetic cost would show up in your team's cost metric for 24 hours
+[exit 0]

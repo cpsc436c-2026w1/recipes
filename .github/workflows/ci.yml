@@ -1,0 +1,87 @@
+# Offline checks only: no AWS account, no course token, no model call. Every job runs with made-up AWS credentials,
+# so a test that reaches for a real account fails instead of spending.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_ACCESS_KEY_ID: testing
+  AWS_SECRET_ACCESS_KEY: testing
+  AWS_SESSION_TOKEN: testing
+  AWS_DEFAULT_REGION: ca-central-1
+  AWS_EC2_METADATA_DISABLED: "true"
+
+jobs:
+  repo:
+    name: shared helpers, requirements, index, outputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      folders: ${{ steps.folders.outputs.folders }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Copies of shared helpers are the same
+        run: uv run --no-project --python 3.12 python tools/check_shared.py
+      - name: Each README requirement has a scenario tagged with it, and each tag names a requirement
+        run: uv run --no-project --python 3.12 python tools/check_requirements.py
+      - name: index.json is what tools/build_index.py writes
+        run: |
+          uv run --no-project --python 3.12 python tools/build_index.py
+          git diff --exit-code -- index.json
+      - name: Tests of the tools; nothing under output/ gives away an account, an endpoint or a key
+        run: uv run --no-project --python 3.12 --with pytest pytest -q tools
+      - name: List the uv projects (one per recipe, plus llm-gateway/ext-deploy)
+        id: folders
+        run: |
+          folders=$(git ls-files '*/pyproject.toml' | xargs -n1 dirname | sort | python3 -c \
+            'import json, sys; print(json.dumps(sys.stdin.read().split()))')
+          echo "folders=$folders" >> "$GITHUB_OUTPUT"
+
+  recipe:
+    name: ${{ matrix.folder }}
+    needs: repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: ${{ fromJson(needs.repo.outputs.folders) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.folder }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.folder }}/uv.lock
+      - name: Pin Python 3.12, or the lowest version the folder allows when that is higher
+        run: |
+          py=$(python3 -c 'import re, tomllib
+          r = tomllib.load(open("pyproject.toml", "rb"))["project"].get("requires-python", "")
+          m = re.search(r">=\s*3\.([0-9]+)", r)
+          print(f"3.{max(12, int(m.group(1)) if m else 12)}")')
+          echo "UV_PYTHON=$py" >> "$GITHUB_ENV"
+          echo "Python $py"
+      - name: uv sync
+        run: uv sync --locked
+      - name: uv run pytest -q
+        run: uv run pytest -q
+      - name: A browser for the scenario that opens a page (only where the lock file has playwright)
+        if: ${{ hashFiles(format('{0}/features/*.feature', matrix.folder)) != '' }}
+        run: |
+          if grep -q '^name = "playwright"' uv.lock; then uv run playwright install --with-deps chromium; fi
+      - name: uv run behave (the scenarios of the README's Requirements; only in folders that have features/)
+        if: ${{ hashFiles(format('{0}/features/*.feature', matrix.folder)) != '' }}
+        run: uv run behave --format progress

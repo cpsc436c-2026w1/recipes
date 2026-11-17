@@ -1,0 +1,8 @@
+# Sandbox run 2026-11-14. The run printed the same lines as the run of 2026-11-12.
+$ uv run python clean_up.py
+removed dynamodb table recipe-chat-conversations
+removed dynamodb table recipe-chat-history
+removed dynamodb table recipe-answer-cache
+removed dynamodb table recipe-llm-traces
+4 tables removed for PREFIX=recipe in ca-central-1
+[exit 0]

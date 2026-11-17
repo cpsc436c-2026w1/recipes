@@ -1,0 +1,14 @@
+$ uv run python -m main.run --target aws
+{"question": "How many orders are there?", "status": "answered", "reply": "There are 1200 orders in total.", "sql": "SELECT COUNT(*) AS total_orders FROM orders", "rows": [[1200]], "model_calls": 2, "latency_ms": 3614.3, "request_id": "9d105fbb-fed2-4816-ad21-24ba6a4834cb"}
+{"question": "What were total sales in Vancouver?", "status": "answered", "reply": "Total sales in Vancouver were $7044.58.", "sql": "SELECT SUM(o.amount_cad) AS total_sales FROM orders o JOIN stores s ON o.store_id = s.store_id WHERE s.city = 'Vancouver'", "rows": [[7044.58]], "model_calls": 2, "latency_ms": 1371.0, "request_id": "4e49cdbd-de0a-4f12-a570-135257603601"}
+{"question": "Which category sold the most items?", "status": "answered", "reply": "The category that sold the most items is coffee, with a total of 1014 items sold.", "sql": "SELECT category, SUM(quantity) as total_items_sold\nFROM orders\nGROUP BY category\nORDER BY total_items_sold DESC\nLIMIT 1", "rows": [["coffee", 1014]], "model_calls": 2, "latency_ms": 1301.8, "request_id": "f7499b34-c919-4008-ac68-b86acae18fda"}
+{"question": "How much did I spend in total?", "status": "answered", "reply": "You spent a total of $501.24.", "sql": "SELECT SUM(amount_cad) AS total_spent FROM orders WHERE customer_id = 'c-0007'", "rows": [[501.24]], "model_calls": 2, "latency_ms": 1322.0, "request_id": "36e2426c-e682-42ab-8a89-9e290f797746"}
+{"question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales.", "sql": "", "rows": [], "model_calls": 1, "latency_ms": 553.8, "request_id": "9f5474b3-8c93-4ac3-919d-26418390b377"}
+{"question": "Delete all the orders", "status": "no_answer", "reply": "I can only answer questions about the shop's sales by running read-only SELECT queries. I cannot perform DELETE operations.", "sql": "", "rows": [], "model_calls": 1, "latency_ms": 654.3, "request_id": "97fd21d1-326d-4581-904c-53c460e79e79"}
+model: gateway; total 0.000287 CAD; traces in recipe-chat-traces
+[exit 0]
+
+$ uv run python -m main.run --target aws --question Which store opened most recently?
+{"question": "Which store opened most recently?", "status": "answered", "reply": "The store that opened most recently is S4 in Surrey, which opened on 2024-06-10.", "sql": "SELECT store_id, city, opened FROM stores ORDER BY opened DESC LIMIT 1", "rows": [["S4", "Surrey", "2024-06-10"]], "model_calls": 2, "latency_ms": 1290.2, "request_id": "bf2429ef-1f13-40cc-9502-6ea4f061ab62"}
+model: gateway; total 0.000060 CAD; traces in recipe-chat-traces
+[exit 0]

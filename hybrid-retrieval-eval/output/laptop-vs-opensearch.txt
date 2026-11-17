@@ -1,0 +1,11 @@
+# The two gateway runs of 2026-11-14 compared query by query: the laptop indexes (eval-gateway.txt, written
+# 05:28:15 UTC) and the OpenSearch indexes (main-opensearch.txt, written 05:32:49 UTC). Counted from the two
+# per-query files the runs wrote, output/eval-local-gateway-gateway.json and
+# output/eval-opensearch-gateway-gateway.json, which are not kept in the repository (.gitignore: output/*.json).
+# One list is the top 5 of one method for one query: 16 queries, 3 methods.
+
+| method | lists | same products | same products in the same order | same recall@5 |
+|---|---:|---:|---:|---:|
+| keyword | 16 | 8 | 6 | 16 |
+| embedding | 16 | 16 | 16 | 16 |
+| hybrid | 16 | 9 | 7 | 16 |

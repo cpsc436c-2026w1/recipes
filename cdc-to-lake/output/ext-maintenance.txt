@@ -1,0 +1,8 @@
+$ uv run python ext-maintenance/maintenance.py --target aws --schedule
+             data scanned    run time
+before              301 B      625 ms
+after               197 B     1233 ms
+OPTIMIZE: 1310 B scanned, 877 ms; VACUUM: 921 ms
+schedule recipe-lake-optimize: cron(0 3 * * ? *) America/Vancouver
+schedule recipe-lake-vacuum: cron(0 4 * * ? *) America/Vancouver
+[exit 0]

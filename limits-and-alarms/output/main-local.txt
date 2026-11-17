@@ -1,0 +1,14 @@
+target local  prefix recipe  region ca-central-1
+role recipe-app-role created: writes its function's logs only
+topic recipe-limits-alarms
+budget recipe-monthly created: 25.00 USD a month
+function recipe-app created: timeout 30 s
+reserved concurrency 5 on recipe-app
+alarms recipe-app-errors, recipe-app-p95-latency, recipe-app-daily-cost, recipe-app-lambda-errors, recipe-app-lambda-throttles
+dashboard recipe-app: https://ca-central-1.console.aws.amazon.com/cloudwatch/home?region=ca-central-1#dashboards/dashboard/recipe-app
+alarm states on ten minutes of synthetic traffic (main/alarm_eval.py):
+  traffic    errors        p95-latency   daily-cost
+  normal     OK            OK            OK
+  errors     ALARM         OK            OK
+  slow       OK            ALARM         OK
+  expensive  OK            OK            ALARM

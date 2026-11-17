@@ -1,0 +1,12 @@
+$ uv run python -m main.run --model gateway
+{"request": "What is the status of order 1042?", "label": "lookup", "path": "lookup", "large_model_calls": 0, "reply": "Order 1042 is shipped: 2 item(s), 54.00 CAD.", "cost_cad": "0.00000710"}
+{"request": "Do you have waterproof jackets?", "label": "search", "path": "search", "large_model_calls": 0, "reply": "Yes, we have the Rain jacket available for 149.00 CAD.", "cost_cad": "0.00001375"}
+{"request": "I run trails in the rain and have 200 CAD. Which shoe and socks should I get, and why?", "label": "hard", "path": "hard", "large_model_calls": 1, "reply": "\n\nGet the Trail running shoe for $139 CAD and the Running socks, 3 pairs for $18 CAD, totaling $157 CAD. The shoe is tagged running, trail, grip, and waterproof, which fits rainy trail running. The socks are tagged running and light, and the pair stays under your $200 CAD budget.", "cost_cad": "0.00014045"}
+{"request": "What will the weather be in Whistler tomorrow?", "label": "out_of_scope", "path": "out_of_scope", "large_model_calls": 0, "reply": "I can help with your orders and with our products. For anything else, please contact us at the store.", "cost_cad": "0.00000725"}
+{"request": "Where is my order?", "label": "lookup", "path": "hard", "large_model_calls": 1, "reply": "\n\nI can\u2019t answer that from the catalog or policy. They don\u2019t include order-tracking information. If you need a return, returns are accepted within 30 days of delivery, unused, with the order number. Shipping is free over 75 CAD.", "cost_cad": "0.00012785"}
+{"request": "Can I return boots I wore once on a hike?", "label": "out_of_scope", "path": "out_of_scope", "large_model_calls": 0, "reply": "I can help with your orders and with our products. For anything else, please contact us at the store.", "cost_cad": "0.00000725"}
+model: gateway; 6 requests; large-model calls 2; total 0.000304 CAD; 1 misroutes logged in output/misroutes.jsonl
+
+$ uv run python -m main.run --model gateway --request "Is order 1043 packed yet?"
+{"request": "Is order 1043 packed yet?", "label": "lookup", "path": "lookup", "large_model_calls": 0, "reply": "Order 1043 is packing: 3 item(s), 96.25 CAD.", "cost_cad": "0.00000700"}
+model: gateway; 1 requests; large-model calls 0; total 0.000007 CAD; 0 misroutes logged in output/misroutes.jsonl

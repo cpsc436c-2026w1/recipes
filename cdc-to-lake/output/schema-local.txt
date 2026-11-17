@@ -1,0 +1,5 @@
+[local Iceberg table]
+columns now: trip_id, op, change_time, arrival_time, seq, status, pickup_zone, fare_quote, driver_id, payment_type
+data files before: 1; after the change and one new row: 2 (the old files were not rewritten)
+old query, same answer for the old trips: True
+payment_type per change: t-001=None, t-001=None, t-002=None, t-003=None, t-003=None, t-005=card

@@ -1,0 +1,61 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "lambda-dynamodb"
+format = "main-scenario"
+task = "A small HTTPS API (a Lambda function behind a function URL) in front of the DynamoDB trip store, with a role allowed only what the handler does"
+shapes = ["operational-first"]
+extensions = ["concurrency-correctness"]
+lectures = ["L2", "L3", "L12", "L13", "L16"]
+core = ["Lambda", "Lambda function URLs", "IAM", "DynamoDB", "CloudWatch Logs"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "well under 0.01 USD (Lambda 0.20 USD per million requests and 0.0000133334 USD per GB-second, arm64, AWS price list ca-central-1; units measured in output/main.txt)"
+summary = "AWS CLI scripts that deploy a Python Lambda handler over the dynamodb recipe's tables, with a least-privilege role and a public function URL, call it with curl and read its REPORT lines"
+depends_on = ["dynamodb: main and ext-riders-and-drivers, run with KEEP=1 and the same PREFIX"]
+
+[[practices]]
+name = "least privilege: the function's role lists the actions and tables the handler uses, nothing more"
+source = "L2-L3; AWS Well-Architected SEC03-BP02 Grant least privilege access"
+
+[[practices]]
+name = "an API's writes keep the store's conditions: conditional write, transaction all or none"
+source = "L12-L13; DynamoDB developer guide, condition expressions and transactions"
+
+[[practices]]
+name = "read the metrics AWS already keeps (REPORT lines, AWS/Lambda) before adding your own"
+source = "L16; Lambda developer guide, monitoring metrics"
+
+[instruments]
+files = ["main/handler.py", "main/run.sh", "lib.sh", "clean_up.sh", "ext-redeploy/run.sh", "ext-metrics/run.sh"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first"
+
+[scenarios]
+main = "main/run.sh"
+ext-redeploy = "ext-redeploy/run.sh"
+ext-metrics = "ext-metrics/run.sh"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "bash main/run.sh"           # in the team sandbox; KEEP=1 keeps the API up
+dry_run = "DRY=1 bash main/run.sh"
+clean = "bash clean_up.sh"
+
+[env]
+PREFIX = "first part of every name; the same as for the dynamodb recipe; default recipe"
+AWS_REGION = "ca-central-1"
+KEEP = "1 keeps the function, URL and role"
+DRY = "1 prints the commands and runs none"
+ROLE_ARN = "optional: an existing role for the function; the scripts then neither create nor delete $PREFIX-api-role"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+policy_lists_named_tables_only = true    # no "dynamodb:*", no "Resource": "*"
+no_role_creation_beyond_main = true      # the recipe makes one role, $PREFIX-api-role (unless ROLE_ARN is set); do not add CreateRole elsewhere
+url_auth_none_is_demo_only = "switch to AWS_IAM before a URL leaves the team"
+handler_stdlib_and_boto3_only = true     # it is zipped as it is; the Lambda runtime has boto3

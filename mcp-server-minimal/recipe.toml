@@ -1,0 +1,82 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "mcp-server-minimal"
+format = "main-scenario"
+task = "Give an assistant a team's tables through a small MCP server: a schema tool and a read-only query tool behind a bearer token; optionally one write tool that waits for a person's confirmation"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = ["MCP server for your system"]
+lectures = ["L15", "L17"]
+core = ["MCP (official Python SDK, MCPServer)", "DuckDB", "Parquet"]
+secondary = ["uvicorn"]
+region = "ca-central-1"
+cost_one_run = "0: runs on a laptop; no model calls and no AWS resources"
+summary = "A small MCP server over your Parquet tables with get_schema and a read-only query tool (one SELECT, 50-row cap, token auth), a client that lists and calls the tools, and an extension with one write tool that needs a person's confirmation code and applies once per request id"
+
+[[practices]]
+name = "Tools expose only what the model needs"
+source = "L17; Generative AI Lens GENSEC05-BP01 (least privilege for agentic workflows)"
+
+[[practices]]
+name = "Read tools apart from write tools; a write waits for a person"
+source = "L17; Agentic AI Lens AGENTSEC04-BP02 (human in the loop for critical decisions)"
+
+[[practices]]
+name = "Two read-only layers: the engine's parser allows one SELECT; the engine is locked against file access"
+source = "L15 (guarded text-to-SQL); Generative AI Lens GENSEC01-BP03"
+
+[[practices]]
+name = "A write is idempotent by request id"
+source = "L12-L13 (conditional writes); L17"
+
+[instruments]
+files = [
+    "main/server.py",
+    "main/engine.py",
+    "main/auth.py",
+    "main/client.py",
+    "ext-confirmed-write/confirm.py",
+    "ext-confirmed-write/store.py",
+    "ext-confirmed-write/write_server.py",
+    "ext-confirmed-write/approve.py",
+]
+
+[validates]
+command = "uv run pytest -q"
+shows = "A client lists two read-only tools and gets query rows over HTTP; a DELETE and other non-SELECT statements are refused and change nothing; a wrong or missing token gets 401; the write is refused without a person's code or with a code for another change, and applies once with the right code however often it is called"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python -m main.server"
+run_client = "uv run python -m main.client"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-confirmed-write = "uv run python ext-confirmed-write/write_server.py"
+ext-confirmed-write-walk = "uv run python ext-confirmed-write/walk.py --approver ana"
+ext-confirmed-write-approve = "uv run python ext-confirmed-write/approve.py --request-id ID --order-id N --amount X --reason TEXT --approver NAME"
+
+[env]
+MCP_SERVER_TOKEN = "bearer token clients must send; at least 16 characters; read from the environment only"
+APPROVAL_SECRET = "ext-confirmed-write only: the secret approve.py and the server share; the model never sees it"
+MCP_HOST = "default 127.0.0.1"
+MCP_PORT = "default 8765"
+DATA_DIR = "default data/: Parquet files, one per table in main/data.py TABLES"
+MAX_ROWS = "default 50: rows per query result"
+MCP_ALLOWED_ORIGINS = "only when MCP_HOST is not this machine: the sites the server answers, comma-separated"
+QUERY_TIMEOUT_S = "default 5: seconds one query may run before it is stopped"
+
+[resources]                         # what a run creates; clean_up.py removes it
+local_files = ["data/*.parquet", "output/refunds.duckdb"]
+aws = []
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"          # not used: the recipe creates no AWS resources
+read_tools_are_read_only = true     # main/engine.py: one SELECT per call, external access off, configuration locked
+no_write_tool_in_main = true        # writes only in ext-confirmed-write, behind a confirmation code
+write_needs_person_code = true      # never let the model make or skip the confirmation code
+write_idempotent_by_request_id = true
+token_never_logged = true
+tests_offline = true

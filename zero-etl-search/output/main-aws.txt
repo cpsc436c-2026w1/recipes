@@ -1,0 +1,107 @@
+# Sandbox run 2026-11-13 07:52:57-08:06:31 UTC (13.6 min, clean-up included).
+# Main scenario: complete. Index move: --setup, backfill and drop items-v1 worked; the count check right after the backfill
+# (a line of the run script, not recipe code) was refused with 403 and was not repeated.
+
+$ uv run python -m main.run --target aws
+[aws ca-central-1; function recipe-search-indexer]
+1 s after ACTIVE: refused (401; a GET of _cat/indices answers 401 X01:network-policy-deny); trying again in 10 s
+11 s after ACTIVE: refused (401; a GET of _cat/indices answers 401 X01:network-policy-deny); trying again in 10 s
+21 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+31 s after ACTIVE: refused (401; a GET of _cat/indices answers 401 X01:network-policy-deny); trying again in 10 s
+42 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+52 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+collection let you in 62 s after it was ACTIVE
+created in 129 s: table, stream, failure queue, role, collection group (min 0, max 2 OCU), collection, index items-v1, function, event source mapping
+starting items: 8 documents in items-v1, 94.9 s after the table writes; the first requests to a new or idle collection wait for capacity
+index version recorded in the mapping: 1 (source table recipe-items)
+search 'waterproof': I02 (0.47)
+INSERT I09: searchable 4.5 s; the function sent it 0.1 s after the write
+INSERT I10: searchable 8.4 s; the function sent it 0.1 s after the write
+MODIFY I04: searchable 1.7 s; the function sent it 0.4 s after the write
+MODIFY I02: searchable 3.4 s; the function sent it 0.2 s after the write
+MODIFY I09: searchable 1.1 s; the function sent it 0.1 s after the write
+REMOVE I08: gone from search 1.7 s
+REMOVE I10: gone from search 1.7 s
+lag, table write to searchable: median 1.7 s (IQR 1.7 to 3.9 s), max 8.4 s, n = 7
+search 'waterproof': I04 (0.58), I02 (0.47), I10 (0.13)
+bad record I11 (price_cad 'free'): in the index False; failure queue: 1 message(s), batch size [1], item ['I11']
+INSERT I12 written right after it: searchable 5.5 s (behind the retries)
+replayed one batch (I04, I09) twice: ['ok', 'ok']; documents 9 before, 9 after (9 items in the table that the index takes); one document each for I04 and I09: True; I04 unchanged: True
+[wall 459.93 s]
+[exit 0]
+
+# The function's log, one line per batch (UTC): every batch written on its first _bulk call, no temporary error.
+07:56:35 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:36 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:36 {"records": 3, "indexed": 3, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:36 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:42 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:49 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:56 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:56:57 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:57:00 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:57:02 {"records": 1, "indexed": 0, "deleted": 1, "refused": [], "attempts": 1, "temporary": ""}
+07:57:03 {"records": 1, "indexed": 0, "deleted": 1, "refused": [], "attempts": 1, "temporary": ""}
+07:57:05 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:05 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:05 {"records": 1, "indexed": 1, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+07:57:06 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:07 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:08 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:12 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:18 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:57:30 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:58:01 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:58:44 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+07:59:57 {"records": 1, "indexed": 0, "deleted": 0, "refused": ["I11: mapper_parsing_exception: failed to parse field [price_cad] of type [float] in document with id 'I11'. Preview of field's value: 'free'"], "attempts": 1, "temp
+08:00:29 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+08:00:29 {"records": 2, "indexed": 2, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+08:01:13 {"records": 3, "indexed": 3, "deleted": 0, "refused": [], "attempts": 1, "temporary": ""}
+
+$ INDEX_VERSION=2 uv run python -m main.run --target aws --setup
+1 s after ACTIVE: refused (403; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+11 s after ACTIVE: refused (403; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+collection let you in 21 s after it was ACTIVE
+[aws ca-central-1] function recipe-search-indexer now writes to items-v2; index version recorded: {'index_version': 2, 'writer': 'recipe-search-indexer', 'fields': ['brand', 'category', 'description', 'in_stock', 'name', 'price_cad'], 'source_table': 'recipe-items'}
+[exit 0]
+$ INDEX_VERSION=2 uv run python -m main.migrate backfill
+{'items': 10, 'gone meanwhile': 0}
+[exit 0]
+$ (count check) items-v2 against the table
+Traceback (most recent call last):
+opensearchpy.exceptions.AuthorizationException: AuthorizationException(403, 'search_phase_execution_exception', 'Bad Authorization')
+[exit 1]
+$ INDEX_VERSION=2 uv run python -m main.migrate drop items-v1
+items-v1 deleted and taken out of the data access policy of recipe-items
+[exit 0]
+
+$ INDEX_VERSION=2 uv run marimo export html --no-include-code demo/search_demo.py -o output/demo-aws.html -- --target aws
+[exit 0]
+
+$ uv run python clean_up.py
+removed  event source mapping 819c89c9-8e61-47e7-82a2-92c12e91e76f
+removed  Lambda function recipe-search-indexer
+removed  log group /aws/lambda/recipe-search-indexer
+removed  queue recipe-search-indexer-failed
+removed  collection recipe-items (its indexes go with it)
+removed  data access policy recipe-items
+removed  network policy recipe-items
+removed  encryption policy recipe-items
+removed  collection group recipe-search
+removed  DynamoDB table recipe-items (its stream goes with it)
+removed  IAM role recipe-search-indexer-role
+absent   Lambda function recipe-reembed-enqueue
+absent   log group /aws/lambda/recipe-reembed-enqueue
+absent   queue recipe-reembed
+absent   queue recipe-reembed-dlq
+absent   collection recipe-item-vectors
+absent   data access policy recipe-item-vectors
+absent   network policy recipe-item-vectors
+absent   encryption policy recipe-item-vectors
+absent   S3 bucket of ext-zero-etl
+absent   IAM role recipe-reembed-enqueue-role
+absent   IAM role recipe-search-pipeline-role
+not checked pipeline recipe-items-sync (denied by a service control policy)
+11 resources removed, 0 failed, for PREFIX=recipe in ca-central-1
+[wall 314.31 s]
+[exit 0]

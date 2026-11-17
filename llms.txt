@@ -1,0 +1,58 @@
+# CPSC 436C recipes
+
+> Recipes for CPSC 436C project teams (cloud data engineering, UBC). A recipe is a whole task a team can clone, run
+> and change: a small main scenario that runs end to end on a laptop or in an AWS sandbox in ca-central-1, plus extensions that
+> each add one capability. Every recipe runs offline first (`uv sync && uv run pytest -q`, no AWS account, no key)
+> and names the course practice and source behind each decision.
+
+## Get the repository
+
+- Repository: https://github.com/cpsc436c-2026w1/recipes (short link: ilm.wiki/436c/recipes)
+- Clone:
+  1. Clone the repository: `git clone https://github.com/cpsc436c-2026w1/recipes`.
+  2. Enter the recipe folder: `cd recipes/<recipe>`.
+  3. Install dependencies: `uv sync`.
+  4. Run the tests: `uv run pytest -q`.
+- Each recipe's top-level README.md is the recipe, under fixed headings: What you build, Use it when, Main scenario,
+  Decisions, Requirements, Run it, What you should see, Extensions, Cost and clean-up, Adapt it.
+- `index.json` lists every recipe for tools (summary, shapes, extensions, practices, files, commands, cost of one
+  run). `AGENTS.md` holds the rules for coding assistants.
+
+## Recipes
+
+- [project-skeleton](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/project-skeleton/README.md): the first project slice (live updates stored, in the lake, one number on a page) in each of the three project shapes.
+- [dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/dynamodb/README.md): a DynamoDB store keyed by the app's reads, with conditional writes, transactions and an export to the lake for Athena.
+- [lambda-dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/lambda-dynamodb/README.md): an HTTPS API (Lambda function URL) over that store, with a least-privilege role.
+- [streaming-ingestion](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/streaming-ingestion/README.md): Kinesis to Lambda to DynamoDB, each update stored once, with the lag measured; windowed aggregates and fan-out as extensions.
+- [concurrency-correctness](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/concurrency-correctness/README.md): two clients race on one item, a conditional write accepts one, and a retried write applies once.
+- [agent-agentcore](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/agent-agentcore/README.md): a Strands agent whose hooks enforce the limits and the approval before a write; its tools behind AgentCore Gateway; hosted on AgentCore Runtime; with requirements, test scenarios and an Inspect eval
+- [cdc-to-lake](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/cdc-to-lake/README.md): every DynamoDB change reaches an Iceberg table that Athena queries, with lag alarms, table maintenance and rollback as extensions.
+- [zero-etl-search](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/zero-etl-search/README.md): a search index in OpenSearch Serverless kept in step with a DynamoDB table by a Lambda function on its stream.
+- [llm-gateway](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/llm-gateway/README.md): a client for the course LLM gateway that handles budget and rate refusals, and in `ext-deploy/` a model gateway's own source and deploy. The course LLM gateway students use is deployed from the course's own version, which can differ from this recipe.
+- [llm-probes](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/llm-probes/README.md): a table of what an LLM endpoint supports, per model (tool calls, structured output, streaming, prompt cache, embeddings).
+- [dashboard-chat](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/dashboard-chat/README.md): plain-language questions over a team's table, answered by read-only SQL that app code checks, with a trace per question; also as a Shiny web page.
+- [hybrid-retrieval-eval](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/hybrid-retrieval-eval/README.md): keyword and embedding search fused by rank, with a retrieval eval per query kind.
+- [llm-state-dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/llm-state-dynamodb/README.md): chat history per signed-in user, an answer cache and traces for an LLM app, in DynamoDB.
+- [limits-and-alarms](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/limits-and-alarms/README.md): a budget, reserved concurrency and alarms on errors, latency and cost per request; an agent loop with a step cap and a deadline.
+- [mcp-server-minimal](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/mcp-server-minimal/README.md): a small MCP server with a schema tool and a read-only query tool over your tables, and a write tool that needs a person's approval.
+- [model-routing](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/model-routing/README.md): a small model labels each request and app code picks the path; the large model gets only the hard ones, with an eval of accuracy and cost.
+- [workflow-patterns](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/workflow-patterns/README.md): prompt chain, parallel calls (sectioning, voting) and evaluator-optimizer (model or code check as evaluator), one short file each; app code decides every next step and a cap bounds the model calls.
+- [prompt-optimization](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/prompt-optimization/README.md): one LLM step's instructions tuned with GEPA, reported on test questions the optimizer never saw.
+
+## Lecture demo repositories
+
+- [l18-planning-agent](https://raw.githubusercontent.com/cpsc436c-2026w1/l18-planning-agent/main/README.md): a planner over a data catalog, bounded agents and runbook-first triage. Clone: `git clone https://github.com/cpsc436c-2026w1/l18-planning-agent`.
+
+## Rules a reuse must keep
+
+- App code checks what a model returns before it acts on it: the SQL is parsed and allowed only as one read-only
+  query over known tables, a router label the app does not know sends the request to the large model, and a
+  write waits for a person's approval.
+- Limits live outside the model: the key's budget and rate limit in the course LLM gateway, step and spend caps in
+  app code, reserved concurrency, timeouts, budgets and alarms in the AWS account. A prompt cannot raise them.
+- Secrets never go in code, commits or captured output. Read the course MCP token from `KB_MCP_TOKEN` (the older
+  `COURSE_MCP_TOKEN` still works) and the gateway's address from `COURSE_GATEWAY_URL` (or `GATEWAY_URL`), both from
+  the environment. Provider keys never reach students.
+- Region `ca-central-1`; every resource name starts with `$PREFIX`; run the recipe's clean-up after every run in AWS.
+- Offline first: `uv sync && uv run pytest -q` must pass without an AWS account. When a decision changes, change the
+  README's Decisions row, its requirement and its behave scenario with it.

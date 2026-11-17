@@ -1,0 +1,18 @@
+$ uv run python ext-confirmed-write/walk.py --approver ana
+{"step": "no code", "is_error": false, "result": {"status": "needs_confirmation", "changed": false, "change": {"amount_cad": "12.50", "order_id": 1042, "reason": "arrived two days late", "request_id": "2026-11-12-late-1042"}, "ask_the_person_to_run": "uv run python ext-confirmed-write/approve.py --request-id 2026-11-12-late-1042 --order-id 1042 --amount 12.50 --reason 'arrived two days late'", "then": "call record_refund again with the same arguments and confirmation=<code>"}}
+{"step": "made-up code", "is_error": true, "result": "Error executing tool record_refund: confirmation code does not match this change; ask the person to approve it again"}
+{"step": "code for a larger amount", "is_error": true, "result": "Error executing tool record_refund: confirmation code does not match this change; ask the person to approve it again"}
+{"step": "with code", "is_error": false, "result": {"status": "applied", "request_id": "2026-11-12-late-1042", "approved_by": "ana", "applied_at": "2026-11-12T23:35:54+00:00", "changed": true}}
+{"step": "same call again", "is_error": false, "result": {"status": "already_applied", "request_id": "2026-11-12-late-1042", "approved_by": "ana", "applied_at": "2026-11-12T23:35:54+00:00", "changed": false}}
+
+# in the server terminal
+MCP server with record_refund on http://127.0.0.1:8799/mcp (Ctrl-C stops it)
+2026-11-12 16:35:51,597 mcp.server.streamable_http_manager StreamableHTTP session manager started
+2026-11-12 16:35:54,579 mcp-server-minimal {"tool": "record_refund", "status": "needs_confirmation", "ms": 30}
+2026-11-12 16:35:54,652 mcp-server-minimal {"tool": "record_refund", "status": "refused", "ms": 1}
+2026-11-12 16:35:54,652 mcp.server.mcpserver.server Tool 'record_refund' failed: 'Error executing tool record_refund: confirmation code does not match this change; ask the person to approve it again'
+2026-11-12 16:35:54,659 mcp-server-minimal {"tool": "record_refund", "status": "refused", "ms": 1}
+2026-11-12 16:35:54,659 mcp.server.mcpserver.server Tool 'record_refund' failed: 'Error executing tool record_refund: confirmation code does not match this change; ask the person to approve it again'
+2026-11-12 16:35:54,681 mcp-server-minimal {"tool": "record_refund", "status": "applied", "ms": 18, "approved_by": "ana"}
+2026-11-12 16:35:54,693 mcp-server-minimal {"tool": "record_refund", "status": "already_applied", "ms": 7, "approved_by": "ana"}
+2026-11-12 16:35:55,321 mcp.server.streamable_http_manager StreamableHTTP session manager shutting down

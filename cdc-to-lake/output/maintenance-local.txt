@@ -1,0 +1,6 @@
+[local Iceberg table: 120 commits of 5 rows, one per minute; DuckDB times]
+            data files  snapshots   data scanned   run time
+before             120        120       452745 B  1012.6 ms
+after                1          1         9937 B    53.9 ms
+same query answer before and after: True
+time travel to the first snapshot: no longer possible (expired)

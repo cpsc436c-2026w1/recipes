@@ -1,0 +1,25 @@
+$ uv run --env-file .env.example python -m main.run ask --model stub --yes --request-id req-1
+done: 4 model calls, 3 tool calls (ran: search_books, search_books, place_hold; refused: 0); approvals asked: 1
+reply: I placed a hold on Emma for you.
+holds: {"member": "sam", "holds": [{"book_id": "b02", "title": "Emma"}]}
+exit code 0
+
+$ uv run --env-file .env.example python -m main.run ask --model stub --no --request-id req-1
+done: 4 model calls, 3 tool calls (ran: search_books, search_books; refused: 1); approvals asked: 1
+reply: No hold was placed.
+holds: {"member": "sam", "holds": []}
+exit code 0
+
+$ uv run --env-file .env.example python -m main.run ask --model stub --stub runaway --yes --request-id req-1
+stopped: 8 model calls, 6 tool calls (ran: search_books, search_books, search_books, search_books, search_books, search_books; refused: 2); approvals asked: 0
+reply: Stopped by the app: cap of 8 model calls.
+holds: {"member": "sam", "holds": []}
+stopped by the app: cap of 8 model calls
+exit code 2
+
+$ uv run --env-file .env.example python -m main.run ask --model stub --stub wrong_arguments --yes --request-id req-1
+done: 5 model calls, 4 tool calls (ran: search_books, search_books, place_hold; refused: 1); approvals asked: 1
+reply: I placed a hold on Emma for you.
+holds: {"member": "sam", "holds": [{"book_id": "b02", "title": "Emma"}]}
+exit code 0
+

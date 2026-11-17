@@ -1,0 +1,21 @@
+$ uv run python ext-answer-cache/cache_run.py --target aws
+{"user": "c-0007", "question": "How many orders are there?", "status": "answered", "reply": "There are 1200 orders in total."}
+{"user": "c-0007", "question": "What were total sales in Vancouver?", "status": "answered", "reply": "Total sales in Vancouver were $7044.58."}
+{"user": "c-0007", "question": "Which category sold the most items?", "status": "answered", "reply": "The category that sold the most items is coffee, with a total of 1014 items sold."}
+{"user": "c-0007", "question": "How much did I spend in total?", "status": "answered", "reply": "You spent a total of $501.24."}
+{"user": "c-0007", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0007", "question": "Delete all the orders", "status": "no_answer", "reply": "I can only answer questions about the shop's sales by running read-only SELECT queries. I cannot perform DELETE operations."}
+{"user": "c-0007", "question": "How many orders are there?", "status": "cache_hit", "reply": "There are 1200 orders in total."}
+{"user": "c-0007", "question": "What were total sales in Vancouver?", "status": "cache_hit", "reply": "Total sales in Vancouver were $7044.58."}
+{"user": "c-0007", "question": "Which category sold the most items?", "status": "cache_hit", "reply": "The category that sold the most items is coffee, with a total of 1014 items sold."}
+{"user": "c-0007", "question": "How much did I spend in total?", "status": "cache_hit", "reply": "You spent a total of $501.24."}
+{"user": "c-0007", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0007", "question": "Delete all the orders", "status": "no_answer", "reply": "I can only answer questions about the shop's sales by running read-only SELECT queries. I cannot perform DELETE operations."}
+{"user": "c-0012", "question": "How many orders are there?", "status": "cache_hit", "reply": "There are 1200 orders in total."}
+{"user": "c-0012", "question": "What were total sales in Vancouver?", "status": "cache_hit", "reply": "Total sales in Vancouver were $7044.58."}
+{"user": "c-0012", "question": "Which category sold the most items?", "status": "cache_hit", "reply": "The category that sold the most items is coffee, with a total of 1014 items sold."}
+{"user": "c-0012", "question": "How much did I spend in total?", "status": "answered", "reply": "You spent a total of $795.97."}
+{"user": "c-0012", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0012", "question": "Delete all the orders", "status": "no_answer", "reply": "I can only answer questions about the shop's sales by running read-only SQL queries. I cannot delete data."}
+7 cache hits, 11 questions sent to the model
+[exit 0]

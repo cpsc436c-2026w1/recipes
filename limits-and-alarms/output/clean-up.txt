@@ -1,0 +1,15 @@
+# Sandbox run 2026-11-14.
+$ uv run python clean_up.py
+removed cloudwatch alarm recipe-app-errors
+removed cloudwatch alarm recipe-app-p95-latency
+removed cloudwatch alarm recipe-app-daily-cost
+removed cloudwatch alarm recipe-app-lambda-errors
+removed cloudwatch alarm recipe-app-lambda-throttles
+removed cloudwatch dashboard recipe-app
+removed lambda function recipe-app
+removed log group /aws/lambda/recipe-app
+removed budget recipe-monthly
+removed sns topic recipe-limits-alarms
+removed iam role recipe-app-role
+11 resources removed for PREFIX=recipe in ca-central-1
+[exit 0]

@@ -1,0 +1,69 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "streaming-ingestion"
+format = "main-scenario"
+task = "Live updates arrive through a Kinesis stream, a Lambda consumer stores them in DynamoDB, and the run reports their lag (median and p95)"
+shapes = ["lakehouse-first", "operational-first"]
+extensions = ["streaming-ingestion", "windowed-aggregates", "fan-out"]
+lectures = ["L14"]
+core = ["Kinesis Data Streams", "Lambda", "DynamoDB", "SNS", "SQS"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "under 0.01 USD per scenario, from the price list (Kinesis shard-hour 0.0165 USD, AWS bulk price list published 2026-11-10; DynamoDB 0.6875 USD per million writes); not measured"
+
+summary = "A Kinesis stream and a Lambda consumer store live updates in DynamoDB once each, and the run reports their lag as median and p95, split into before and after the stream"
+
+# What the recipe teaches
+[[practices]]
+name = "measure lag from the event time the update carries, as a distribution (median and p95), split by stage"
+source = "L14; DDIA 2e ch. 12 (event time against processing time); DDIA 2e ch. 2 (percentiles)"
+
+[[practices]]
+name = "a stream delivers at least once: write each update with a condition on its id"
+source = "L14; DDIA 2e ch. 12 (idempotence); REL04-BP04"
+
+[[practices]]
+name = "a bad record must not block its shard: report it, split the batch, limit retries, keep what was given up"
+source = "L14 (poison message, dead-letter queue); REL05-BP03"
+
+[[practices]]
+name = "windows by event time with a stated close delay and a rule for late records"
+source = "L14; DDIA 2e ch. 12 (windows, straggler events)"
+
+[[practices]]
+name = "fan-out through a topic, one queue per consumer, so a stopped consumer does not hold up another"
+source = "L14"
+
+[[practices]]
+name = "one least-privilege role per function"
+source = "SEC03-BP02"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["main/producer.py", "main/consumer.py", "main/infra.py", "main/lag.py",
+         "ext-windowed-aggregates/windows.py", "ext-fan-out/fanout_consumer.py", "clean_up.py"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q"
+shows = "every update is stored once even when redelivered; a bad record is reported and stops its batch; the lag summary matches the times stored; window counts plus late records equal the truth; a stopped fan-out consumer does not hold up the other; clean_up.py removes every resource with the prefix"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "uv run python main/run.py --target aws"
+run_local = "uv run python main/run.py --target local"
+clean = "uv run python clean_up.py"
+
+[scenarios]
+main = "main/run.py"
+ext-windowed-aggregates = "ext-windowed-aggregates/run.py"
+ext-fan-out = "ext-fan-out/run.py"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+names_built_in = "main/infra.py names()"         # add any new resource there, and to clean_up.py
+handlers_stdlib_and_boto3_only = true            # consumer.py, windows.py, fanout_consumer.py are zipped as they are
+writes_idempotent_by = "update_id"               # every consumer write is conditional on it; do not remove the condition
+lag_clock = "event_time from the update; arrival_ms from the consumer"
+offline_tests = "moto; local_poller.py and ext-fan-out/run.py poll_queue stand in for Lambda's pollers"

@@ -1,0 +1,9 @@
+[local stand-ins: moto, Iceberg on disk, DuckDB; buffer 2.0 s]
+rows queryable before the buffer was written: 0
+trips_current (latest state of each trip, from the change log):
+  t-001  claimed    Kitsilano        18.50  driver=d-42
+  t-002  requested  Downtown         12.00  driver=None
+changes in the log: 5 for 3 trips
+data last updated (newest change in the lake): 2026-11-12 23:59:51
+longest change-to-arrival: 1 s
+run at 2026-11-12 23:59 UTC

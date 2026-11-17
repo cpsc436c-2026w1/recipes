@@ -1,0 +1,60 @@
+$ uv run python ext-windowed-aggregates/run.py --target aws
+absent   function recipe-consumer
+absent   log group /aws/lambda/recipe-consumer
+absent   policy of role recipe-consumer-role
+absent   role recipe-consumer-role
+removed  mapping 89bdbb56-1aff-434b-9b1e-aa6dbed720bc of recipe-windows
+removed  function recipe-windows
+removed  log group /aws/lambda/recipe-windows
+removed  policy of role recipe-windows-role
+removed  role recipe-windows-role
+absent   function recipe-dashboard
+absent   log group /aws/lambda/recipe-dashboard
+absent   policy of role recipe-dashboard-role
+absent   role recipe-dashboard-role
+absent   function recipe-history
+absent   log group /aws/lambda/recipe-history
+absent   policy of role recipe-history-role
+absent   role recipe-history-role
+removed  topic recipe-updates-topic
+absent   queue recipe-consumer-failures
+removed  queue recipe-windows-failures
+absent   queue recipe-dashboard
+absent   queue recipe-dashboard-dlq
+absent   queue recipe-history
+absent   queue recipe-history-dlq
+absent   table recipe-updates
+removed  table recipe-windows
+absent   table recipe-dashboard
+absent   table recipe-history
+removed  stream recipe-updates
+target: aws, close delay: 120 s, late rule: drop
+zone  window start (UTC)   count late dropped corrections truth  state
+ 161  2026-11-13T03:55:00Z    27            1           0    28  final
+ 162  2026-11-13T03:55:00Z    26            0           0    26  final
+ 164  2026-11-13T03:55:00Z    25            0           0    25  final
+ 186  2026-11-13T03:55:00Z    20            1           0    21  final
+ 161  2026-11-13T04:00:00Z    26            0           0    26  final
+ 162  2026-11-13T04:00:00Z    27            2           0    29  final
+ 164  2026-11-13T04:00:00Z    22            0           0    22  final
+ 186  2026-11-13T04:00:00Z    21            2           0    23  final
+ 161  2026-11-13T04:05:00Z    22            0           0    22  final
+ 162  2026-11-13T04:05:00Z    24            1           0    25  final
+ 164  2026-11-13T04:05:00Z    29            0           0    29  final
+ 186  2026-11-13T04:05:00Z    23            1           0    24  final
+ 161  2026-11-13T04:10:00Z    27            1           0    28  final
+ 162  2026-11-13T04:10:00Z    19            0           0    19  final
+ 164  2026-11-13T04:10:00Z    19            1           0    20  final
+ 186  2026-11-13T04:10:00Z    33            0           0    33  final
+ 161  2026-11-13T04:15:00Z    27            0           0    27  final
+ 162  2026-11-13T04:15:00Z    29            2           0    31  final
+ 164  2026-11-13T04:15:00Z    22            0           0    22  final
+ 186  2026-11-13T04:15:00Z    20            0           0    20  final
+ 161  2026-11-13T04:20:00Z    22            0           0    22  open
+ 162  2026-11-13T04:20:00Z    25            0           0    25  open
+ 164  2026-11-13T04:20:00Z    23            0           0    23  open
+ 186  2026-11-13T04:20:00Z    30            0           0    30  open
+
+total: counted 588, late and dropped 12, late and corrected 0, truth 600 (rule: drop)
+every window: count + late dropped = truth: yes
+[exit 0]

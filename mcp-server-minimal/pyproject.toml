@@ -1,0 +1,23 @@
+[project]
+name = "recipe-mcp-server-minimal"
+version = "0.1.0"
+description = "A small MCP server over a team's data: a schema tool and a read-only query tool, token auth (CPSC 436C recipe)"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.1",
+    "mcp>=2.3,<3",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "behave>=1.3.3",
+    "pytest>=8",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = [".", "ext-confirmed-write"]
+testpaths = ["tests"]

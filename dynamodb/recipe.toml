@@ -1,0 +1,58 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "dynamodb"
+format = "main-scenario"
+task = "A DynamoDB store for a ride app's live trips: keys from the app's reads, strong reads where needed, and a conditional write so that one of two racing drivers wins"
+shapes = ["operational-first"]
+extensions = ["concurrency-correctness"]
+lectures = ["L12", "L13"]
+core = ["DynamoDB", "S3", "Athena"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "well under 0.01 USD per scenario (measured units in output/, AWS price list ca-central-1)"
+summary = "AWS CLI scripts that build a DynamoDB trip store keyed by its access patterns, race two conditional writes, add a sort key and transactions, and export the table to S3 for Athena"
+
+[[practices]]
+name = "key design from access patterns: every frequent read names a key or an index; a read with neither is a Scan"
+source = "L12; DynamoDB developer guide, access patterns (bp-general-nosql-design)"
+
+[[practices]]
+name = "conditional writes against lost updates; transactions only where items must agree; optimistic locking by version"
+source = "L12-L13; DynamoDB developer guide, condition expressions and transactions"
+
+[[practices]]
+name = "reports read an export in the lake, not the live table"
+source = "L12-L13; DynamoDB developer guide, export to S3"
+
+[instruments]
+files = ["main/run.sh", "ext-riders-and-drivers/run.sh", "ext-nightly-report/run.sh", "lib.sh", "clean_up.sh"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "every script's commands under DRY=1; with the AWS CLI installed, the real scripts against moto: one of two accepts wins, a rider's history comes back in time order, a cancelled transaction changes neither item, a stale version is refused, clean-up leaves no tables"
+
+[scenarios]
+main = "main/run.sh"
+ext-riders-and-drivers = "ext-riders-and-drivers/run.sh"
+ext-nightly-report = "ext-nightly-report/run.sh"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "bash main/run.sh"           # in the team sandbox; KEEP=1 keeps the tables for the extensions
+dry_run = "DRY=1 bash main/run.sh"
+clean = "bash clean_up.sh"         # BUCKET=<bucket> as well after ext-nightly-report
+
+[env]
+PREFIX = "first part of every table name; default recipe"
+AWS_REGION = "ca-central-1"
+KEEP = "1 keeps what the scenario made"
+DRY = "1 prints the commands and runs none"
+BUCKET = "an S3 bucket in ca-central-1; ext-nightly-report only"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+every_racing_write_conditional = true    # do not drop a ConditionExpression to make a run pass
+names_built_in = "lib.sh"                # a new table goes there and into clean_up.sh

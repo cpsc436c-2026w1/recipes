@@ -1,0 +1,14 @@
+# Real run of main/call_gateway.py against the course LLM gateway, 2026-11-12, with a throwaway key (budget 1 CAD).
+$ uv run python main/call_gateway.py
+1. models this key may call
+   qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b
+2. one chat on qwen3.6-35b-a3b, max_tokens 300
+   reply: 'ready'
+   tokens: 18 in, 2 out; request id 4dc15108-2f1f-48a1-9048-d23d009ed19e
+
+$ uv run python main/call_gateway.py --model qwen3.8-27b --ask "Name one AWS region in Canada."
+1. models this key may call
+   qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b
+2. one chat on qwen3.8-27b, max_tokens 300
+   reply: '\n\nCanada (Central) — `ca-central-1`'
+   tokens: 59 in, 73 out; request id 8e13a70c-6a28-4d83-8239-80ca1454ce5b

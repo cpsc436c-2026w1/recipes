@@ -1,0 +1,1544 @@
+{
+  "recipes": [
+    {
+      "name": "agent-agentcore",
+      "summary": "A Strands agent with example library tools: hooks keep the caps on model and tool calls, validate tool arguments against pydantic models, ask a person before a write and give the write a request key; the tools are a Lambda function behind an AgentCore Gateway, the agent runs on AgentCore Runtime, Logfire traces are behind a flag, and an Inspect eval scores requests in code, offline on a stub model",
+      "task": "Run an agent whose limits live in app code: a Strands agent with hooks for caps, tool contracts, approval before a write and a once-only write; its tools behind an AgentCore Gateway (Lambda); hosted on AgentCore Runtime; scored by an Inspect eval",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first",
+        "operational-first",
+        "lakehouse-first"
+      ],
+      "extensions": [
+        "Agent under controlled autonomy",
+        "MCP server for your system"
+      ],
+      "lectures": [
+        "L17",
+        "L18"
+      ],
+      "core": [
+        "Strands Agents (hooks, interrupts)",
+        "AgentCore Gateway",
+        "AgentCore Runtime",
+        "pydantic",
+        "Inspect AI"
+      ],
+      "secondary": [
+        "Lambda",
+        "DynamoDB",
+        "Parameter Store",
+        "Logfire",
+        "pydantic-settings"
+      ],
+      "practices": [
+        {
+          "name": "Limits in app code, not in the prompt: caps on model calls, tool calls and time in a hook",
+          "source": "L17 (bounded agent); L18 (hooks); Agentic AI Lens AGENTCOST07-BP01"
+        },
+        {
+          "name": "A write waits for a person, and is made for the signed-in member, whatever the LLM wrote",
+          "source": "L17; Agentic AI Lens AGENTSEC04-BP02 (human in the loop for critical decisions)"
+        },
+        {
+          "name": "A write is idempotent by a request key and a conditional write",
+          "source": "L12-L13 (conditional writes); Agentic AI Lens AGENTREL06-BP04"
+        },
+        {
+          "name": "Tool contracts as pydantic models: one definition for the schema the LLM sees and the check before the call",
+          "source": "Agentic AI Lens AGENTSEC02-BP02 (validate tool inputs and outputs)"
+        },
+        {
+          "name": "Settings in one frozen object read from the environment; secrets in Parameter Store, never in a Runtime's configuration",
+          "source": "Twelve-Factor App, Config; course settings standard"
+        },
+        {
+          "name": "Eval first: requests with expected tool use and outcome, scored in code, offline on a stub model",
+          "source": "Course standard stack (Inspect AI)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/hooks.py",
+          "main/contracts.py",
+          "main/agent.py",
+          "main/config.py",
+          "main/request_key.py",
+          "main/tracing.py",
+          "main/gateway_tools.py",
+          "main/infra.py",
+          "main/session.py",
+          "runtime/agent_entry.py",
+          "tools_lambda/handler.py",
+          "evals/task.py",
+          "evals/scoring.py",
+          "clean_up.py",
+          ".env.example"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "On a stub model the caps end a model that never stops, a write waits for a yes and goes to the member of the request, the same write twice adds one row, wrong tool arguments come back to the LLM; the deploy and the clean-up pass on stand-ins for AWS; the Inspect eval scores 11 requests in code; with the Logfire flag off nothing is sent"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "eval": "uv run --env-file .env.example inspect eval evals/task.py",
+        "run_offline": "uv run --env-file .env.example python -m main.run ask --model stub --yes",
+        "run": "uv run --env-file .env python -m main.run deploy",
+        "invoke": "uv run --env-file .env python -m main.invoke",
+        "clean": "uv run --env-file .env python clean_up.py"
+      },
+      "cost_one_run": "under one cent in AWS charges (assumed from the AgentCore price list, not measured); model calls count against the course LLM gateway budget, at most MAX_MODEL_CALLS per request",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "settings_only_in_env_example": true,
+        "caps_and_approval_in_hooks": true,
+        "write_needs_person_approval": true,
+        "write_idempotent_by_request_key": true,
+        "no_secret_in_runtime_environment": true,
+        "logfire_off_by_default": true,
+        "tests_offline": true
+      },
+      "folder": "agent-agentcore",
+      "readme": "agent-agentcore/README.md"
+    },
+    {
+      "name": "cdc-to-lake",
+      "summary": "Feed the lake from the operational store's change stream: DynamoDB Streams to Lambda to Firehose to an Iceberg table that Athena queries, with freshness measured and alarmed",
+      "task": "Every change to a DynamoDB table goes through DynamoDB Streams, a Lambda function and Firehose into an Iceberg change-log table in S3 (Glue Data Catalog) that Athena queries, with change time and arrival time on every row",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first"
+      ],
+      "extensions": [
+        "change data capture",
+        "lag monitoring",
+        "table maintenance",
+        "rollback"
+      ],
+      "lectures": [
+        "L11",
+        "L13"
+      ],
+      "core": [
+        "DynamoDB Streams",
+        "AWS Lambda",
+        "Amazon Data Firehose",
+        "Apache Iceberg",
+        "AWS Glue Data Catalog",
+        "Amazon Athena",
+        "Amazon CloudWatch"
+      ],
+      "secondary": [
+        "PyIceberg",
+        "DuckDB",
+        "EventBridge Scheduler"
+      ],
+      "practices": [
+        {
+          "name": "The operational store feeds the lake through its change stream; the app writes once",
+          "source": "L13; FDE ch. 5 'Change Data Capture' and DDIA 2e ch. 12 'Databases and Streams'"
+        },
+        {
+          "name": "Keep an append-only change log and derive the current state as a view",
+          "source": "L11; Data Analytics Lens BP 10.1; Firehose docs (AppendOnly)"
+        },
+        {
+          "name": "Measure freshness from change to queryable and alarm when it passes a limit",
+          "source": "L13; Data Analytics Lens BP 1.2"
+        },
+        {
+          "name": "Undo a bad load from table snapshots, keeping the good commits after it",
+          "source": "L11; Data Analytics Lens BP 2.4"
+        },
+        {
+          "name": "Compact small files and expire old snapshots on a schedule",
+          "source": "L11; Athena docs (OPTIMIZE, VACUUM); Data Analytics Lens BP 13.1"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/handler.py",
+          "main/infra.py",
+          "main/sql/create_table.sql",
+          "main/sql/current_view.sql",
+          "main/sql/freshness.sql",
+          "ext-lag-alarm/lag.py",
+          "ext-rollback-or-schema/rollback.py",
+          "ext-rollback-or-schema/schema_change.py",
+          "ext-maintenance/maintenance.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "a changed item appears in the lake query and a removed one leaves the current view; lag is reported and the alarm fires past the limit; rollback restores the earlier row count; compaction gives the same answer from fewer files and less data scanned"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --target aws",
+        "run_offline": "uv run python -m main.run",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "under 0.01 USD (assumed from the AWS bulk price lists, ca-central-1, read 2026-11-13: Firehose Direct PUT to Iceberg 0.083 USD per GB, Athena 5.50 USD per TB of Data scanned with a 10 MB minimum per query); not measured",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "roles_least_privilege": "main/infra.py role_policies",
+        "append_only_change_log": true,
+        "one_sql_text": true,
+        "columns_in_three_places": "main/handler.py ITEM_FIELDS, main/sql/create_table.sql, main/lake.py iceberg_schema (tests/test_schema.py)",
+        "tests_offline": true,
+        "schedules_removed_by_clean_up": true
+      },
+      "folder": "cdc-to-lake",
+      "readme": "cdc-to-lake/README.md"
+    },
+    {
+      "name": "concurrency-correctness",
+      "summary": "Two clients race to accept the same DynamoDB item; without a condition both are told yes, with a conditional write on a version number one wins and the other is told who holds it; a retried write applies once",
+      "task": "Two clients race to change the same DynamoDB item; a conditional write accepts one and refuses the other; a retried write applies once",
+      "format": "main-scenario",
+      "shapes": [
+        "operational-first"
+      ],
+      "extensions": [
+        "concurrency-correctness"
+      ],
+      "lectures": [
+        "L12",
+        "L13",
+        "L14",
+        "L17"
+      ],
+      "core": [
+        "DynamoDB"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "stop lost updates with a conditional write on the version the client read (optimistic concurrency)",
+          "source": "L12; DDIA 2e ch. 8 (lost updates, compare-and-set)"
+        },
+        {
+          "name": "test a race by forcing the bad interleaving with a barrier",
+          "source": "course choice"
+        },
+        {
+          "name": "make a retried write idempotent with a request id made once per user action",
+          "source": "L14; REL04-BP04"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/trips.py",
+          "main/race.py",
+          "ext-idempotent-retry/tips.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "without a condition both clients are told yes; with it exactly one wins in every round and the table holds the winner; a retry after a lost reply adds the tip once; clean_up.py removes both tables"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/run.py --target aws",
+        "run_local": "uv run python main/run.py --target local",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "under 0.001 USD, from the price list (DynamoDB on-demand 0.6875 USD per million writes, 0.1375 USD per million reads); not measured",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "names_built_in": "main/trips.py table_name(), ext-idempotent-retry/tips.py requests_table_name()",
+        "every_shared_write_conditional": "version = :seen",
+        "race_forced_by": "threading.Barrier in main/race.py",
+        "request_id_made_by": "the client, once per user action, reused on every retry",
+        "offline_tests": "moto; main/local.py serialises each call as DynamoDB serialises writes to one item"
+      },
+      "folder": "concurrency-correctness",
+      "readme": "concurrency-correctness/README.md"
+    },
+    {
+      "name": "dashboard-chat",
+      "summary": "Chat on a dashboard: the model writes one read-only SQL query through one tool, app code checks it and DuckDB computes the number, and every question leaves a trace in DynamoDB",
+      "task": "Users ask plain-language questions over a team's table; the model writes read-only SQL through one tool, app code checks and runs it in DuckDB, and each question leaves one trace item in DynamoDB",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [
+        "Chat on the dashboard",
+        "Answer or retrieval cache",
+        "Guardrails with a red-team log",
+        "Trace analysis and alarms"
+      ],
+      "lectures": [
+        "L15",
+        "L16"
+      ],
+      "core": [
+        "DuckDB",
+        "Parquet",
+        "DynamoDB",
+        "CloudWatch",
+        "SNS",
+        "course LLM gateway"
+      ],
+      "secondary": [
+        "sqlglot",
+        "Shiny Express",
+        "querychat",
+        "chatlas",
+        "ECS on Fargate"
+      ],
+      "practices": [
+        {
+          "name": "The number comes from a query the app checks and runs, never from the model's text",
+          "source": "L15 (guarded text-to-SQL); Generative AI Lens GENSEC02-BP01; Agentic AI Lens AGENTSEC02-BP02"
+        },
+        {
+          "name": "One read-only tool, the least the model needs; a locked engine as a second layer",
+          "source": "Generative AI Lens GENSEC05-BP01, GENSEC01-BP03; Agentic AI Lens AGENTREL02-BP02"
+        },
+        {
+          "name": "Who may see whose rows is enforced where the query runs: an engine that holds only the asking user's rows",
+          "source": "Agentic AI Lens AGENTREL02-BP02; Generative AI Lens GENSEC05-BP01"
+        },
+        {
+          "name": "Bounded work per question: a cap on model calls, output tokens, rows and the time of one call and one query",
+          "source": "Generative AI Lens GENCOST05-BP01, GENREL03-BP02, GENCOST03-BP01, GENCOST03-BP02"
+        },
+        {
+          "name": "Model calls through the model gateway with a per-student key; one trace per question",
+          "source": "L16 (model gateway); AI Engineering ch. 10; Generative AI Lens GENOPS03-BP02"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/sqlcheck.py",
+          "main/engine.py",
+          "main/chat.py",
+          "main/model.py",
+          "main/traces.py",
+          "ext-answer-cache/cache.py",
+          "ext-guardrails-redteam/guards.py",
+          "ext-guardrails-redteam/redteam.py",
+          "ext-trace-alarms/spans.py",
+          "ext-trace-alarms/alarms.py",
+          "ext-trace-alarms/analyze.py",
+          "ext-feedback/feedback.py",
+          "ext-shiny-app/app.py",
+          "ext-shiny-app/source.py",
+          "ext-shiny-app/client.py",
+          "ext-shiny-app/fargate/deploy.sh"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub",
+        "shows": "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --target aws",
+        "run_offline": "uv run python -m main.run --target local --model stub",
+        "app_offline": "APP_MODEL=stub uv run shiny run ext-shiny-app/app.py --port 8000",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "0.000287 CAD of gateway budget for the six questions (measured, output/main-gateway.txt); DynamoDB writes far below one cent (AWS price list); alarms 0.10 USD per alarm-month and metrics 0.30 USD per metric-month while they exist (AWS bulk price list, ca-central-1, published 2026-11-04)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "sql_is_checked_in_app_code": true,
+        "engine_is_locked": true,
+        "one_tool_read_only": true,
+        "numbers_come_from_duckdb": true,
+        "tests_offline": true
+      },
+      "folder": "dashboard-chat",
+      "readme": "dashboard-chat/README.md"
+    },
+    {
+      "name": "dynamodb",
+      "summary": "AWS CLI scripts that build a DynamoDB trip store keyed by its access patterns, race two conditional writes, add a sort key and transactions, and export the table to S3 for Athena",
+      "task": "A DynamoDB store for a ride app's live trips: keys from the app's reads, strong reads where needed, and a conditional write so that one of two racing drivers wins",
+      "format": "main-scenario",
+      "shapes": [
+        "operational-first"
+      ],
+      "extensions": [
+        "concurrency-correctness"
+      ],
+      "lectures": [
+        "L12",
+        "L13"
+      ],
+      "core": [
+        "DynamoDB",
+        "S3",
+        "Athena"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "key design from access patterns: every frequent read names a key or an index; a read with neither is a Scan",
+          "source": "L12; DynamoDB developer guide, access patterns (bp-general-nosql-design)"
+        },
+        {
+          "name": "conditional writes against lost updates; transactions only where items must agree; optimistic locking by version",
+          "source": "L12-L13; DynamoDB developer guide, condition expressions and transactions"
+        },
+        {
+          "name": "reports read an export in the lake, not the live table",
+          "source": "L12-L13; DynamoDB developer guide, export to S3"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/run.sh",
+          "ext-riders-and-drivers/run.sh",
+          "ext-nightly-report/run.sh",
+          "lib.sh",
+          "clean_up.sh"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "every script's commands under DRY=1; with the AWS CLI installed, the real scripts against moto: one of two accepts wins, a rider's history comes back in time order, a cancelled transaction changes neither item, a stale version is refused, clean-up leaves no tables"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "bash main/run.sh",
+        "dry_run": "DRY=1 bash main/run.sh",
+        "clean": "bash clean_up.sh"
+      },
+      "cost_one_run": "well under 0.01 USD per scenario (measured units in output/, AWS price list ca-central-1)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "every_racing_write_conditional": true,
+        "names_built_in": "lib.sh"
+      },
+      "folder": "dynamodb",
+      "readme": "dynamodb/README.md"
+    },
+    {
+      "name": "hybrid-retrieval-eval",
+      "summary": "Keyword (BM25) and embedding search fused by reciprocal rank fusion, with recall@5 and MRR per query kind reported apart from answer quality; OpenSearch Serverless for the production path",
+      "task": "Keyword (BM25) and embedding search over a small product set, fused by reciprocal rank fusion (k = 60), with a retrieval eval (recall@k on labelled queries) reported apart from answer quality",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first"
+      ],
+      "extensions": [
+        "Hybrid retrieval with an eval",
+        "Model routing, cheap model first"
+      ],
+      "lectures": [
+        "L17"
+      ],
+      "core": [
+        "Amazon OpenSearch Serverless",
+        "course LLM gateway"
+      ],
+      "secondary": [
+        "numpy",
+        "opensearch-py"
+      ],
+      "practices": [
+        {
+          "name": "Two retrievers over the same text, fused on ranks, not scores",
+          "source": "L17; AI Engineering ch. 6 (hybrid search); Cormack, Clarke and Buettcher, SIGIR 2009"
+        },
+        {
+          "name": "Retrieval eval on labelled queries grouped by kind, reported apart from the answer eval",
+          "source": "L17; Generative AI Lens GENPERF01-BP01, GENPERF04-BP01, GENOPS01-BP01; AI Engineering ch. 4, ch. 6"
+        },
+        {
+          "name": "Filters inside the search, before ranking",
+          "source": "L17; OpenSearch k-NN search with filters"
+        },
+        {
+          "name": "The cheapest model that passes the eval; a small model labels, app code routes",
+          "source": "AI Engineering ch. 10 (routers); Generative AI Lens GENCOST01-BP01, GENCOST03-BP02"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/bm25.py",
+          "main/vector.py",
+          "main/fusion.py",
+          "main/evaluate.py",
+          "main/answer.py",
+          "main/opensearch_store.py",
+          "data/queries.jsonl",
+          "ext-filters/filters.py",
+          "ext-model-routing/router.py",
+          "ext-model-routing/routing_eval.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q && uv run python -m main.run",
+        "shows": "a table of recall@5 and MRR per method and query kind in which hybrid is at least as good as each single method, and an answer table of correct and grounded replies"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --backend opensearch --embedder gateway --answers gateway",
+        "run_offline": "uv run python -m main.run",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "gateway: 0.000246 CAD (measured, output/eval-gateway.txt); OpenSearch Serverless: 0.266 USD per OCU-hour for indexing and for search (AWS bulk price list, ca-central-1, published 2026-11-12), at most about 0.36 USD for a 10-minute run and the 10 idle minutes before scale to zero (4 OCU, an upper bound; run length assumed)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "fusion_on_ranks": true,
+        "retrieval_eval_apart_from_answers": true,
+        "same_text_for_both_indexes": true,
+        "tests_offline": true,
+        "run_clean_up_same_day": true
+      },
+      "folder": "hybrid-retrieval-eval",
+      "readme": "hybrid-retrieval-eval/README.md"
+    },
+    {
+      "name": "lambda-dynamodb",
+      "summary": "AWS CLI scripts that deploy a Python Lambda handler over the dynamodb recipe's tables, with a least-privilege role and a public function URL, call it with curl and read its REPORT lines",
+      "task": "A small HTTPS API (a Lambda function behind a function URL) in front of the DynamoDB trip store, with a role allowed only what the handler does",
+      "format": "main-scenario",
+      "shapes": [
+        "operational-first"
+      ],
+      "extensions": [
+        "concurrency-correctness"
+      ],
+      "lectures": [
+        "L2",
+        "L3",
+        "L12",
+        "L13",
+        "L16"
+      ],
+      "core": [
+        "Lambda",
+        "Lambda function URLs",
+        "IAM",
+        "DynamoDB",
+        "CloudWatch Logs"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "least privilege: the function's role lists the actions and tables the handler uses, nothing more",
+          "source": "L2-L3; AWS Well-Architected SEC03-BP02 Grant least privilege access"
+        },
+        {
+          "name": "an API's writes keep the store's conditions: conditional write, transaction all or none",
+          "source": "L12-L13; DynamoDB developer guide, condition expressions and transactions"
+        },
+        {
+          "name": "read the metrics AWS already keeps (REPORT lines, AWS/Lambda) before adding your own",
+          "source": "L16; Lambda developer guide, monitoring metrics"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/handler.py",
+          "main/run.sh",
+          "lib.sh",
+          "clean_up.sh",
+          "ext-redeploy/run.sh",
+          "ext-metrics/run.sh"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "bash main/run.sh",
+        "dry_run": "DRY=1 bash main/run.sh",
+        "clean": "bash clean_up.sh"
+      },
+      "cost_one_run": "well under 0.01 USD (Lambda 0.20 USD per million requests and 0.0000133334 USD per GB-second, arm64, AWS price list ca-central-1; units measured in output/main.txt)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "policy_lists_named_tables_only": true,
+        "no_role_creation_beyond_main": true,
+        "url_auth_none_is_demo_only": "switch to AWS_IAM before a URL leaves the team",
+        "handler_stdlib_and_boto3_only": true
+      },
+      "folder": "lambda-dynamodb",
+      "readme": "lambda-dynamodb/README.md"
+    },
+    {
+      "name": "limits-and-alarms",
+      "summary": "An instrument set for a team's app: errors, latency and cost per request written as CloudWatch embedded-metric-format log lines, alarms on error count, p95 latency and daily cost, one dashboard, an AWS Budgets budget and Lambda reserved concurrency; an agent loop with a step cap and a deadline, stopped by the key's budget at the gateway when its own limits fail",
+      "task": "Give a team's app limits that live outside its code (AWS Budgets, Lambda reserved concurrency and timeout, the key's budget at the gateway) and observability of errors, latency and cost per request (embedded metric format logs, three CloudWatch alarms on them and two on Lambda's own errors and throttles, one dashboard), and show each alarm and limit working",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first",
+        "operational-first",
+        "lakehouse-first"
+      ],
+      "extensions": [
+        "Trace analysis and alarms",
+        "Agent under controlled autonomy"
+      ],
+      "lectures": [
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "CloudWatch",
+        "Lambda",
+        "AWS Budgets",
+        "SNS"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "Limits that live outside the code path, so a bug in the app cannot raise them",
+          "source": "L16 (controlled autonomy); Agentic AI Lens AGENTCOST07-BP01 (automated cost controls with intelligent cutoffs)"
+        },
+        {
+          "name": "Fast stop at the gateway's per-key budget, AWS Budgets as the slow backstop",
+          "source": "L16; Agentic AI Lens AGENTCOST07-BP01; AWS Billing User Guide, Budgets best practices (billing data updated at least once a day)"
+        },
+        {
+          "name": "Per-cycle, per-task and per-day limits: step cap and deadline per task, per-key budget at the gateway, daily-cost alarm",
+          "source": "Agentic AI Lens AGENTCOST07-BP01"
+        },
+        {
+          "name": "Observe errors, latency and cost on every request, from app code, and alarm on them",
+          "source": "L16; Generative AI Lens GENOPS02-BP01 (monitor all application layers)"
+        },
+        {
+          "name": "Metrics from structured logs with low-cardinality dimensions; request ids stay plain fields",
+          "source": "CloudWatch User Guide, Embedded metric format specification"
+        },
+        {
+          "name": "M of N alarms for metrics whose logs can arrive late",
+          "source": "CloudWatch User Guide, Setting alarms on metrics created with the embedded metric format"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/emf.py",
+          "main/alarms.py",
+          "main/limits.py",
+          "main/dashboard.py",
+          "main/alarm_eval.py",
+          "main/fire.py",
+          "ext-runaway-loop/agent_loop.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "the app writes one valid EMF line per request, failures included; each alarm goes to ALARM on its own synthetic traffic and stays OK on the others; the budget, reserved concurrency, timeout and dashboard exist as defined; a runaway loop is stopped by its step cap, its deadline, or, with both broken, by the gateway budget, and that spend fires the daily-cost alarm"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/run.py --target aws",
+        "run_offline": "uv run python main/run.py --target local",
+        "fire": "uv run python main/fire.py --target aws",
+        "fire_synthetic": "uv run python main/fire.py --target aws --synthetic",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "cents when cleaned up the same day: 5 standard alarms at 0.10 USD per alarm metric month and up to 12 custom metrics at 0.30 USD per metric-month, both prorated by the hour (AWS bulk price list ca-central-1, published 2026-11-04, read 2026-11-13); EMF log ingestion 0.55 USD per GB; 12 Lambda requests; a budget without actions is free (AWS Budgets pricing page); one dashboard inside the free three of up to 50 metrics (AWS bulk price list, read 2026-11-13)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway (the loop's call_model; a stand-in with the gateway's limits in this recipe)",
+        "iam_role_least_privilege": true,
+        "no_request_id_dimension": true,
+        "limits_checked_before_each_call": true,
+        "no_retry_on_gateway_refusal": true,
+        "tests_offline": true
+      },
+      "folder": "limits-and-alarms",
+      "readme": "limits-and-alarms/README.md"
+    },
+    {
+      "name": "llm-gateway",
+      "summary": "A plain-httpx client for the course LLM gateway that lists models, chats with max_tokens set, waits once on a rate limit and stops on a spent budget; ext-deploy is a model gateway's source and deploy (the course LLM gateway runs the course's own version, which can differ)",
+      "task": "Call the course LLM gateway with your course MCP token: list your models, send a chat with max_tokens, and handle budget, rate, token and model refusals",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L15",
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "course LLM gateway"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "provider keys stay central; each caller has its own key, budget and rate limit",
+          "source": "L16-L17; AI Engineering ch. 10 (gateway)"
+        },
+        {
+          "name": "limits sit outside the caller's code path: a reserve before the call, a per-key rate limit",
+          "source": "L16; AWS Well-Architected Agentic AI Lens AGENTCOST07-BP01"
+        },
+        {
+          "name": "start with the cheaper model",
+          "source": "L16-L17; AWS Well-Architected Agentic AI Lens AGENTCOST02-BP01"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/call_gateway.py",
+          "ext-deploy/src/gateway/",
+          "ext-deploy/infra/template.yaml",
+          "ext-deploy/infra/iam/"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "the client against the gateway's own code in process: models listed, a chat answered, 401 invalid_api_key and 403 model_not_allowed not retried, 429 budget_exhausted when max_tokens does not fit and success when it does, 429 rate_limit_exceeded waited once for Retry-After, the token never printed"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/call_gateway.py",
+        "clean": ""
+      },
+      "cost_one_run": "the tokens of one short chat on your key's budget: 0.000002 CAD for 18 tokens in and 2 out (measured 2026-11-12, output/main.txt); no AWS resources",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "model_calls_through": "course LLM gateway",
+        "token_never_printed": true,
+        "max_tokens_always_sent": true,
+        "no_retry_on": [
+          "budget_exhausted",
+          "invalid_api_key",
+          "key_revoked",
+          "key_expired",
+          "model_not_allowed",
+          "upstream_rejected",
+          "upstream_key_refused",
+          "model_allowance_used",
+          "model_allowance_ended"
+        ],
+        "live_course_gateway": "deployed from a separate copy outside this repository; a change in ext-deploy does not change it"
+      },
+      "folder": "llm-gateway",
+      "readme": "llm-gateway/README.md"
+    },
+    {
+      "name": "llm-probes",
+      "summary": "A probe script, one plain-httpx request per feature (models, refusals, chat, streaming, max_tokens, tool calls, JSON schema, prompt cache, embeddings), that prints a yes/no table per model",
+      "task": "Send one small request per feature to an OpenAI-compatible endpoint and print which models answer and which features work there",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L15",
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "course LLM gateway"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "test what an endpoint supports before designing on it, and again before a demo",
+          "source": "L15-L17"
+        },
+        {
+          "name": "an endpoint must refuse a wrong key and an unknown model",
+          "source": "L16"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/probe.py",
+          "main/endpoint.py",
+          "main/compare.py",
+          "ext-streaming/streaming.py",
+          "ext-reply-control/reply_control.py",
+          "ext-tool-calls/tool_calls.py",
+          "ext-structured-output/structured_output.py",
+          "ext-prompt-cache/prompt_cache.py",
+          "ext-embeddings/embeddings.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "against a fake endpoint: every probe says yes where the feature works and no where it does not, rows come in the order of output/, a wrong key stops the run with exit code 1, and the key never reaches the screen or the JSON file"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/probe.py",
+        "clean": ""
+      },
+      "cost_one_run": "15,426 input and 707 output tokens for every group on two chat models and one embedding model through the course LLM gateway; about 0.0013 CAD (output/all-probes-gateway-2026-11-14.txt, and the gateway's spend report in output/main-gateway-2026-11-14.txt)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "key_from_environment_only": true,
+        "key_masked_in_output": true,
+        "read_only": true
+      },
+      "folder": "llm-probes",
+      "readme": "llm-probes/README.md"
+    },
+    {
+      "name": "llm-state-dynamodb",
+      "summary": "Chat history, answer cache and traces for an LLM app in DynamoDB: each conversation checked against its signed-in owner before any read or write, expired items filtered before DynamoDB deletes them, cache keys that carry the index version and never share a user's answer",
+      "task": "Keep an LLM app's state in DynamoDB: chat history per signed-in user with an owner check and expiry, an exact answer cache keyed on question and index version, and one trace item per model or tool call",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first",
+        "operational-first"
+      ],
+      "extensions": [
+        "Answer or retrieval cache",
+        "Trace analysis and alarms"
+      ],
+      "lectures": [
+        "L12",
+        "L13",
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "DynamoDB"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "Memory kept per user or session; every read and write checks the owner",
+          "source": "L17 (memory); Agentic AI Lens AGENTSEC01-BP01 (memory isolation and integrity controls)"
+        },
+        {
+          "name": "Cache keys carry the version of what the answer was built from, and the user when the answer is personal",
+          "source": "L17; AI Engineering ch. 10 (exact caching; a cached answer built from one user's data must not reach another); Agentic AI Lens AGENTCOST02-BP03 (caching to reduce redundant model invocations; it prefers semantic caching, which this recipe does not build)"
+        },
+        {
+          "name": "Expiry by TTL, with readers filtering expired items themselves",
+          "source": "L12-L13; DynamoDB Developer Guide, Using time to live (TTL)"
+        },
+        {
+          "name": "Key design from access patterns: one Query returns a conversation newest first, or a request's calls in order",
+          "source": "L12-L13 (partition and sort keys)"
+        },
+        {
+          "name": "Owner check and write in one transaction",
+          "source": "L12 (all or nothing: TransactWriteItems)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/history.py",
+          "main/tables.py",
+          "ext-answer-cache/answer_cache.py",
+          "ext-traces/trace_store.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "a user reads their own newest turns; another user's read and write are refused and write nothing; expired turns and cache entries are filtered while still stored; a cache hit skips retrieval and the model, a version bump misses, a personal answer never reaches another user; a request's calls come back in order"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/run.py --target aws",
+        "run_offline": "uv run python main/run.py --target local",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "far below one cent: a few dozen DynamoDB on-demand requests for all three scripts (unchecked: counted from the code); ca-central-1 on demand 0.6875 USD per million write request units, 0.1375 USD per million read request units, first 25 GB-months of storage free (AWS bulk price list https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/ca-central-1/index.csv, published 2026-11-11, read 2026-11-13)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway (in the team's own generate function; this recipe stubs the model)",
+        "user_id_from_sign_in": true,
+        "owner_check_before_read": true,
+        "readers_filter_expired": true,
+        "cache_key_has_index_version": true,
+        "personal_answers_per_user": true,
+        "tests_offline": true
+      },
+      "folder": "llm-state-dynamodb",
+      "readme": "llm-state-dynamodb/README.md"
+    },
+    {
+      "name": "mcp-server-minimal",
+      "summary": "A small MCP server over your Parquet tables with get_schema and a read-only query tool (one SELECT, 50-row cap, token auth), a client that lists and calls the tools, and an extension with one write tool that needs a person's confirmation code and applies once per request id",
+      "task": "Give an assistant a team's tables through a small MCP server: a schema tool and a read-only query tool behind a bearer token; optionally one write tool that waits for a person's confirmation",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [
+        "MCP server for your system"
+      ],
+      "lectures": [
+        "L15",
+        "L17"
+      ],
+      "core": [
+        "MCP (official Python SDK, MCPServer)",
+        "DuckDB",
+        "Parquet"
+      ],
+      "secondary": [
+        "uvicorn"
+      ],
+      "practices": [
+        {
+          "name": "Tools expose only what the model needs",
+          "source": "L17; Generative AI Lens GENSEC05-BP01 (least privilege for agentic workflows)"
+        },
+        {
+          "name": "Read tools apart from write tools; a write waits for a person",
+          "source": "L17; Agentic AI Lens AGENTSEC04-BP02 (human in the loop for critical decisions)"
+        },
+        {
+          "name": "Two read-only layers: the engine's parser allows one SELECT; the engine is locked against file access",
+          "source": "L15 (guarded text-to-SQL); Generative AI Lens GENSEC01-BP03"
+        },
+        {
+          "name": "A write is idempotent by request id",
+          "source": "L12-L13 (conditional writes); L17"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/server.py",
+          "main/engine.py",
+          "main/auth.py",
+          "main/client.py",
+          "ext-confirmed-write/confirm.py",
+          "ext-confirmed-write/store.py",
+          "ext-confirmed-write/write_server.py",
+          "ext-confirmed-write/approve.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "A client lists two read-only tools and gets query rows over HTTP; a DELETE and other non-SELECT statements are refused and change nothing; a wrong or missing token gets 401; the write is refused without a person's code or with a code for another change, and applies once with the right code however often it is called"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.server",
+        "run_client": "uv run python -m main.client",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "0: runs on a laptop; no model calls and no AWS resources",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "read_tools_are_read_only": true,
+        "no_write_tool_in_main": true,
+        "write_needs_person_code": true,
+        "write_idempotent_by_request_id": true,
+        "token_never_logged": true,
+        "tests_offline": true
+      },
+      "folder": "mcp-server-minimal",
+      "readme": "mcp-server-minimal/README.md"
+    },
+    {
+      "name": "model-routing",
+      "summary": "A router where the small model returns one label per request and app code owns the paths: order lookups and out-of-scope requests never reach the large model, unknown labels and paths that give up go to the large model and into a misroute log, and an eval reports label accuracy and cost per request against sending everything to the large model",
+      "task": "A small model labels each request (lookup, search, hard, out_of_scope); app code runs a fixed path per label through the course LLM gateway, sends the large model only the hard requests, and logs misroutes",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first"
+      ],
+      "extensions": [
+        "Model routing, cheap model first"
+      ],
+      "lectures": [
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "course LLM gateway"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "The simplest model that passes the eval: no model, the small model or the large model, per kind of request",
+          "source": "Agentic AI Lens AGENTCOST02-BP01 (tiered model selection); L16-L17"
+        },
+        {
+          "name": "Route by request content: a small model as pre-classifier",
+          "source": "AI Engineering ch. 10, Router; AGENTCOST02-BP01"
+        },
+        {
+          "name": "App code owns the paths; the model only labels",
+          "source": "L17 (workflow: app code sets the paths)"
+        },
+        {
+          "name": "Misroutes are logged and the routing eval runs on hand-labelled requests",
+          "source": "Generative AI Lens GENPERF01-BP01 (ground truth); AGENTCOST02-BP01 (refresh routing with data)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/router.py",
+          "main/paths.py",
+          "main/app.py",
+          "main/model.py",
+          "ext-eval/routing_eval.py",
+          "ext-eval/labelled.jsonl"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "Each label runs its fixed path; out-of-scope gets the stock reply with no large-model call; unknown labels and paths that give up are logged and go to the large model; the gateway client sends the OpenAI request shape and does not retry a 429; a failed model call ends its request with path error and the run goes on; the eval computes label accuracy on 24 labelled requests, a cost table against all-large, and fails below --min-accuracy"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --model gateway",
+        "run_offline": "uv run python -m main.run",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "0.000304 CAD of gateway budget for the six main requests and 0.0035 CAD for the eval (measured 2026-11-12, output/main-gateway.txt and output/eval-gateway.md); no AWS resources",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "model_only_labels": true,
+        "unknown_label_goes_to_large_model": true,
+        "out_of_scope_makes_no_large_model_call": true,
+        "gateway_refusals_not_retried": true,
+        "tests_offline": true
+      },
+      "folder": "model-routing",
+      "readme": "model-routing/README.md"
+    },
+    {
+      "name": "project-skeleton",
+      "summary": "The checkpoint 1 slice (live updates, stored, in the lake, one number on a page) in three project shapes: lakehouse first, operational first, generative AI first",
+      "task": "Live updates arrive, are stored, reach the lake and show as one number to users (updates in the last hour)",
+      "format": "task-class",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L3",
+        "L8",
+        "L10",
+        "L11",
+        "L12",
+        "L13",
+        "L14",
+        "L15",
+        "L16",
+        "L17"
+      ],
+      "core": [
+        "Kinesis Data Streams",
+        "Amazon Data Firehose",
+        "S3",
+        "AWS Glue Data Catalog",
+        "Athena",
+        "Lambda",
+        "Lambda function URLs",
+        "DynamoDB",
+        "DynamoDB export to S3",
+        "course LLM gateway"
+      ],
+      "secondary": [
+        "static HTML page (skeleton/page.py)",
+        "DuckDB as the offline stand-in for Athena",
+        "moto as the offline stand-in for AWS"
+      ],
+      "practices": [
+        {
+          "name": "count by event time over whole minutes, so the API and the lake agree",
+          "source": "L14 (event time against processing time)"
+        },
+        {
+          "name": "make mutating operations idempotent: an event id, a conditional write, count distinct in the lake",
+          "source": "L14; REL04-BP04"
+        },
+        {
+          "name": "design DynamoDB keys for the reads you have; each read is a lookup by key",
+          "source": "L12"
+        },
+        {
+          "name": "columnar files and partitions keep Data scanned small; a workgroup scan limit caps a wrong query",
+          "source": "L10, L11; COST02-BP05"
+        },
+        {
+          "name": "least privilege: each role names its actions and resources",
+          "source": "SEC03-BP02"
+        },
+        {
+          "name": "the assistant reads current state through one read-only tool, in a bounded loop, and its reply is checked against the tool result",
+          "source": "L16, L17; AI Engineering ch. 6; Agentic AI Lens AGENTREL02-BP02, AGENTSEC02"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "skeleton/events.py",
+          "skeleton/number.py",
+          "skeleton/config.py",
+          "skeleton/aws.py",
+          "rep-lakehouse-first/lakehouse.py",
+          "rep-operational-first/handler.py",
+          "rep-operational-first/operational.py",
+          "rep-genai-first/genai.py",
+          "rep-genai-first/lake_example.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "every representative gives the same number as plain Python on the same updates; copies are not counted; the assistant's tool only reads; clean_up.py removes everything"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python rep-lakehouse-first/run.py --target aws",
+        "run_offline": "uv run python rep-lakehouse-first/run.py",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "under 0.05 USD for all three representatives (sum of AWS bulk price list rates, ca-central-1, read 2026-11-13; not measured); the Kinesis shard bills 0.0165 USD per hour until clean_up.py runs",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "region_fixed": "ca-central-1",
+        "role_override_env": [
+          "FIREHOSE_ROLE_ARN",
+          "API_ROLE_ARN"
+        ],
+        "llm_tool_read_only": true,
+        "same_number_everywhere": true,
+        "clean_up_removes_everything": true
+      },
+      "folder": "project-skeleton",
+      "readme": "project-skeleton/README.md"
+    },
+    {
+      "name": "prompt-optimization",
+      "summary": "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix.",
+      "task": "Tune the instructions of one LLM step with GEPA against a metric with feedback, choose on validation questions, and report the pass rate before and after on held-out test questions",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L15",
+        "L17"
+      ],
+      "core": [
+        "course LLM gateway",
+        "DSPy",
+        "GEPA",
+        "DuckDB"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "Tune a prompt against a metric whose feedback names the failure type",
+          "source": "L17 (evaluator-optimizer, DSPy and GEPA); AI Engineering ch. 6, Agents, Reflection and error correction"
+        },
+        {
+          "name": "Three splits: reflect on train, choose on validation, report on held-out test questions",
+          "source": "L15 demo evals/gepa (measured: test median 58% to 83%); AI Engineering ch. 4, Design Your Evaluation Pipeline"
+        },
+        {
+          "name": "Report the median of several runs with every run, and the spend",
+          "source": "L15 demo evals/gepa/results.md (the same prompt passed 33% to 75% over 8 runs)"
+        },
+        {
+          "name": "Use the simplest model that passes the eval",
+          "source": "L16-17; AGENTCOST02-BP01 (ext-eval-matrix)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/program.py",
+          "main/metric.py",
+          "main/optimize.py",
+          "main/report.py",
+          "main/models.py",
+          "main/data.py",
+          "ext-gepa-direct/optimize_direct.py",
+          "ext-eval-matrix/matrix.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --target gateway",
+        "run_offline": "uv run python -m main.run",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); capped by --max-cad",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "gateway_env": [
+          "COURSE_GATEWAY_URL",
+          "KB_MCP_TOKEN"
+        ],
+        "test_split_only_in": [
+          "main/report.py",
+          "main/run.py after optimize()",
+          "ext-gepa-direct/optimize_direct.py after optimize()",
+          "ext-eval-matrix/matrix.py"
+        ],
+        "spend_cap_flags": [
+          "--max-metric-calls",
+          "--max-reflection-calls",
+          "--max-cad"
+        ]
+      },
+      "folder": "prompt-optimization",
+      "readme": "prompt-optimization/README.md"
+    },
+    {
+      "name": "streaming-ingestion",
+      "summary": "A Kinesis stream and a Lambda consumer store live updates in DynamoDB once each, and the run reports their lag as median and p95, split into before and after the stream",
+      "task": "Live updates arrive through a Kinesis stream, a Lambda consumer stores them in DynamoDB, and the run reports their lag (median and p95)",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first"
+      ],
+      "extensions": [
+        "streaming-ingestion",
+        "windowed-aggregates",
+        "fan-out"
+      ],
+      "lectures": [
+        "L14"
+      ],
+      "core": [
+        "Kinesis Data Streams",
+        "Lambda",
+        "DynamoDB",
+        "SNS",
+        "SQS"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "measure lag from the event time the update carries, as a distribution (median and p95), split by stage",
+          "source": "L14; DDIA 2e ch. 12 (event time against processing time); DDIA 2e ch. 2 (percentiles)"
+        },
+        {
+          "name": "a stream delivers at least once: write each update with a condition on its id",
+          "source": "L14; DDIA 2e ch. 12 (idempotence); REL04-BP04"
+        },
+        {
+          "name": "a bad record must not block its shard: report it, split the batch, limit retries, keep what was given up",
+          "source": "L14 (poison message, dead-letter queue); REL05-BP03"
+        },
+        {
+          "name": "windows by event time with a stated close delay and a rule for late records",
+          "source": "L14; DDIA 2e ch. 12 (windows, straggler events)"
+        },
+        {
+          "name": "fan-out through a topic, one queue per consumer, so a stopped consumer does not hold up another",
+          "source": "L14"
+        },
+        {
+          "name": "one least-privilege role per function",
+          "source": "SEC03-BP02"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/producer.py",
+          "main/consumer.py",
+          "main/infra.py",
+          "main/lag.py",
+          "ext-windowed-aggregates/windows.py",
+          "ext-fan-out/fanout_consumer.py",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "every update is stored once even when redelivered; a bad record is reported and stops its batch; the lag summary matches the times stored; window counts plus late records equal the truth; a stopped fan-out consumer does not hold up the other; clean_up.py removes every resource with the prefix"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/run.py --target aws",
+        "run_local": "uv run python main/run.py --target local",
+        "clean": "uv run python clean_up.py"
+      },
+      "cost_one_run": "under 0.01 USD per scenario, from the price list (Kinesis shard-hour 0.0165 USD, AWS bulk price list published 2026-11-10; DynamoDB 0.6875 USD per million writes); not measured",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "names_built_in": "main/infra.py names()",
+        "handlers_stdlib_and_boto3_only": true,
+        "writes_idempotent_by": "update_id",
+        "lag_clock": "event_time from the update; arrival_ms from the consumer",
+        "offline_tests": "moto; local_poller.py and ext-fan-out/run.py poll_queue stand in for Lambda's pollers"
+      },
+      "folder": "streaming-ingestion",
+      "readme": "streaming-ingestion/README.md"
+    },
+    {
+      "name": "workflow-patterns",
+      "summary": "Prompt chain, parallel calls (sectioning, voting) and evaluator-optimizer (model or code check as evaluator), each in a file of under 80 lines where app code decides every next step and a cap bounds the model calls; runs offline on a stub",
+      "task": "Three workflow patterns as one short file each, on the course LLM gateway or an offline stub: a prompt chain with a code check between calls, parallel calls (sectioning and voting), and an evaluator-optimizer loop with a model or a code check as the evaluator",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L17",
+        "L18"
+      ],
+      "core": [
+        "course LLM gateway"
+      ],
+      "secondary": [],
+      "practices": [
+        {
+          "name": "Prompt chain: a fixed order of model calls, each reading the reply before it, with a code check between calls that can stop the chain",
+          "source": "Anthropic, Building effective agents (Workflow: Prompt chaining); AI Engineering ch. 5, Break Complex Tasks into Simpler Subtasks; L17"
+        },
+        {
+          "name": "Parallel calls: independent calls at the same time, combined by app code (sectioning), or the same task several times with a majority (voting)",
+          "source": "Anthropic, Building effective agents (Workflow: Parallelization); AI Engineering ch. 10, AI Pipeline Orchestration; L17"
+        },
+        {
+          "name": "Evaluator-optimizer: a draft, a pass or fail with feedback from a model call or a code check, and a loop with a round limit in app code",
+          "source": "Anthropic, Building effective agents (Workflow: Evaluator-optimizer); AI Engineering ch. 6, Reflection and error correction; L17"
+        },
+        {
+          "name": "A cap on model calls that the model cannot remove",
+          "source": "L17, L18 (limits outside the model)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/chain.py",
+          "main/parallel.py",
+          "main/evaluator.py",
+          "main/llm.py",
+          ".env.example"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "The chain makes its three calls in order and each reads the reply before it; a pick with an unlisted product stops the chain after two calls; the two sectioning calls and the three votes are in flight at the same time; the majority label wins and no majority is reported as such; feedback reaches the next generator call; the loop stops at three rounds; the call over the cap is not made; the gateway client sends the OpenAI chat request shape and does not retry"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python main/chain.py --model gateway",
+        "run_parallel": "uv run python main/parallel.py --model gateway",
+        "run_evaluator": "uv run python main/evaluator.py --model gateway --max-calls 4",
+        "run_offline": "uv run python main/chain.py"
+      },
+      "cost_one_run": "less than 0.004 CAD of gateway budget for the three files together: at most 12 model calls of at most 1500 output tokens each at the price of qwen3.8-27b in model-routing (an upper bound, not measured); the recipe does not create AWS resources",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "app_code_decides_next_step": true,
+        "model_calls_capped": true,
+        "tests_offline": true
+      },
+      "folder": "workflow-patterns",
+      "readme": "workflow-patterns/README.md"
+    },
+    {
+      "name": "zero-etl-search",
+      "summary": "DynamoDB stays the source of truth; a Lambda function on its stream keeps a keyword index in OpenSearch Serverless in step, one document per item key, with bad records set aside in a queue; a notebook shows a table change becoming searchable",
+      "task": "Keep an OpenSearch Serverless keyword index in step with a DynamoDB table through the table's stream and a Lambda function (document id = item key, a failure queue for a bad record, a collection that scales to zero), with an interactive search demo; extensions: re-embed changed items through SQS into a vector index, and the same sync with an OpenSearch Ingestion pipeline (zero-ETL, denied in the course sandbox)",
+      "format": "main-scenario",
+      "shapes": [
+        "genai-first",
+        "operational-first"
+      ],
+      "extensions": [
+        "hybrid retrieval with an eval"
+      ],
+      "lectures": [
+        "L14",
+        "L17"
+      ],
+      "core": [
+        "Amazon DynamoDB",
+        "DynamoDB Streams",
+        "AWS Lambda",
+        "Amazon OpenSearch Serverless",
+        "Amazon SQS"
+      ],
+      "secondary": [
+        "opensearch-py",
+        "marimo",
+        "Amazon OpenSearch Ingestion (ext-zero-etl)",
+        "course LLM gateway (ext-embeddings)",
+        "PyYAML"
+      ],
+      "practices": [
+        {
+          "name": "The source of truth stays in DynamoDB; the search index is derived from it and can be rebuilt",
+          "source": "L14; DDIA 2e ch. 12 'Databases and Streams', 'Change Data Capture'"
+        },
+        {
+          "name": "Idempotent writes: the item key is the document id, so a retried batch leaves one document per item",
+          "source": "REL04-BP04 make mutating operations idempotent"
+        },
+        {
+          "name": "One bad record does not block the stream: bisect on error, a bounded number of retries, an on-failure queue",
+          "source": "L14; AWS docs, Lambda: retain discarded records for a DynamoDB event source"
+        },
+        {
+          "name": "Temporary errors are retried with backoff and jitter inside the function, then from the earliest unwritten record (partial batch response); only refused records are set aside",
+          "source": "REL05-BP03 control and limit retry calls; AWS docs, Lambda: partial batch response with DynamoDB"
+        },
+        {
+          "name": "Capacity that scales to zero, with the smallest maximum the service allows",
+          "source": "AWS docs, OpenSearch Serverless collection group capacity limits and scale to zero; course constraint (sandbox budget)"
+        },
+        {
+          "name": "Least privilege: the function may write documents in one index of one collection; the data access policy and the IAM role name no wildcard resources",
+          "source": "SEC03-BP02 grant least privilege access; AWS docs, OpenSearch Serverless data access policies"
+        },
+        {
+          "name": "Index versions are recorded: in the index name, the mapping's _meta and every document",
+          "source": "L17; course choice"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "main/handler.py",
+          "main/infra.py",
+          "main/migrate.py",
+          "main/mappings.py",
+          "main/envs.py",
+          "main/standin.py",
+          "demo/search_demo.py",
+          "ext-embeddings/enqueue.py",
+          "ext-embeddings/worker.py",
+          "ext-zero-etl/pipeline.py",
+          "ext-zero-etl/pipeline.example.yaml",
+          "clean_up.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "inserts, updates and deletes reach the stand-in index through the real handler; a replayed batch leaves the same documents; temporary errors (6 or 30 failing calls in a row) lose no good record; a refused record ends alone in the failure queue and the next write still arrives; requests are signed for aoss; the policies name no wildcard resources; clean-up leaves nothing; the extensions' definitions validate"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python -m main.run --target aws",
+        "run_offline": "uv run python -m main.run",
+        "demo": "uv run marimo edit demo/search_demo.py",
+        "demo_aws": "uv run marimo edit demo/search_demo.py -- --target aws",
+        "clean": "uv run python clean_up.py",
+        "migrate_backfill": "uv run python -m main.migrate backfill",
+        "migrate_check": "uv run python -m main.migrate check",
+        "migrate_drop": "uv run python -m main.migrate drop items-v1",
+        "migrate_drop_principal": "uv run python -m main.migrate drop-principal <role arn>"
+      },
+      "cost_one_run": "at most about 0.24 USD for one run of about 14 minutes with the index move, create to clean-up (upper bound: 4 OCU at 0.266 USD per OCU-hour, AWS bulk price list, ca-central-1, read 2026-11-12; Lambda, DynamoDB and SQS under 0.01 USD); measured in a sandbox 2026-11-13, bill not read",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "model_calls_through": "course LLM gateway",
+        "roles_least_privilege": "main/infra.py indexer_statements and policies; ext-embeddings/worker.py setup_aws; ext-zero-etl/zero_etl.py pipeline_statements",
+        "app_writes_only_to_dynamodb": true,
+        "document_id_is_item_key": true,
+        "function_package_one_file": true,
+        "no_wildcard_aoss_resources": true,
+        "index_name_carries_version": true,
+        "pipeline_example_current": true,
+        "at_most_two_stream_readers": true,
+        "tests_offline": true,
+        "run_clean_up_same_day": true
+      },
+      "folder": "zero-etl-search",
+      "readme": "zero-etl-search/README.md"
+    }
+  ]
+}

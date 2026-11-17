@@ -1,0 +1,26 @@
+
+== Remove the URL, the function, its log group and its role
+
+$ aws lambda delete-function-url-config --function-name recipe-api
+
+$ aws lambda delete-function --function-name recipe-api
+{
+    "StatusCode": 204
+}
+
+$ aws logs delete-log-group --log-group-name /aws/lambda/recipe-api
+
+$ aws iam delete-role-policy --role-name recipe-api-role --policy-name tables-and-logs
+
+$ aws iam delete-role --role-name recipe-api-role
+
+== Check: no function, log group or role of this recipe left (each check prints "(no ... left)")
+
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-api --output text --query logGroups[?logGroupName=='/aws/lambda/recipe-api'].logGroupName
+(no log group left)
+
+$ aws iam list-roles --output text --query Roles[?RoleName=='recipe-api-role'].RoleName
+(no role left)
+
+$ aws lambda list-functions --output text --query Functions[?FunctionName=='recipe-api'].FunctionName
+(no function left)

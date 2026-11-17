@@ -1,0 +1,18 @@
+model: gateway; at most 4 model calls
+model as evaluator
+  passed: True
+  rounds: 1
+  label: Oat Milk
+1 L
+$4.50 CAD
+From a farm in Abbotsford
+  last_feedback: pass
+code check as evaluator
+  passed: True
+  rounds: 1
+  label: Oat Milk
+1 L
+$4.50 CAD
+From a farm in Abbotsford
+  last_feedback: 
+model calls: 3

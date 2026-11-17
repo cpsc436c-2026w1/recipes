@@ -1,0 +1,7 @@
+model: gateway; at most 3 model calls
+standalone: Which of your milks are dairy-free?
+pick: oat milk, almond milk
+gate: passed
+not_listed: []
+reply: Our dairy-free milks are oat milk for 4.50 CAD and almond milk for 4.80 CAD.
+model calls: 3

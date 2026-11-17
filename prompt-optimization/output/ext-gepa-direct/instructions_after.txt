@@ -1,0 +1,4 @@
+Answer the question with one DuckDB SQL query over the tables above. The app runs the query and shows its single value to the user. Reply with the query.
+A question that asks for a percentage wants a number on the 0 to 100 scale: multiply the share by 100.0.
+Return only the SQL: one SELECT statement, with no semicolon and no text after it.
+A wait asked in minutes: take epoch(ready_at - placed_at), which is in seconds, and divide by 60.0.

@@ -1,0 +1,14 @@
+$ uv run python rep-genai-first/run.py --target aws --llm gateway
+1. table recipe-updates in your sandbox (run rep-operational-first first)
+2. user message: 'How many updates arrived in the last hour?'; model: qwen3.6-35b-a3b; window 2026-11-13T03:16:00.000Z to 2026-11-13T04:16:00.000Z
+3. tool call count_updates(2026-11-13T03:16:00.000Z, 2026-11-13T04:16:00.000Z): tool result 118
+4. reply after 2 model calls (1127 tokens in, 95 out): There were 118 updates in the last hour.
+5. reply states a number the tool returned: yes
+   page for users: .local/genai-first.html
+[exit 0]
+$ uv run python rep-genai-first/lake_example.py --target aws
+1. view events over the newest export in recipe_lake (run rep-operational-first first)
+2. Athena: SELECT count(*) AS updates_last_hour FROM events WHERE event_time >= '2026-11-13T03:16:00.000Z' AND event_time < '2026-11-13T04:16:00.000Z'
+   Data scanned 9366 bytes
+updates in the last hour: lake 118, table 118
+[exit 0]

@@ -1,0 +1,60 @@
+$ uv run python clean_up.py --dry-run
+would remove event source mapping 85b9cb8e-633d-43e5-81db-30092cb707de
+would remove Lambda function recipe-search-indexer
+would remove log group /aws/lambda/recipe-search-indexer
+would remove event source mapping c7a217b2-9127-42ff-bcb0-eb0bcd0dc1b7
+would remove Lambda function recipe-reembed-enqueue
+would remove log group /aws/lambda/recipe-reembed-enqueue
+would remove alarm recipe-search-iterator-age
+would remove alarm recipe-search-failed-records
+would remove queue recipe-search-indexer-failed
+would remove queue recipe-reembed
+would remove queue recipe-reembed-dlq
+would remove collection recipe-items (its indexes go with it)
+would remove data access policy recipe-items
+would remove network policy recipe-items
+would remove encryption policy recipe-items
+would remove collection recipe-item-vectors (its indexes go with it)
+would remove data access policy recipe-item-vectors
+would remove network policy recipe-item-vectors
+would remove encryption policy recipe-item-vectors
+would remove collection group recipe-search
+would remove collection group recipe-search-vectors
+would remove bucket my-bucket-111122223333
+would remove DynamoDB table recipe-items (its stream goes with it)
+would remove IAM role recipe-search-indexer-role
+would remove IAM role recipe-reembed-enqueue-role
+would remove IAM role recipe-search-pipeline-role
+not checked pipeline recipe-items-sync (denied by a service control policy)
+26 resources would be removed, 0 failed, for PREFIX=recipe in ca-central-1
+[exit 0]
+$ uv run python clean_up.py
+removed  event source mapping 85b9cb8e-633d-43e5-81db-30092cb707de
+removed  Lambda function recipe-search-indexer
+removed  log group /aws/lambda/recipe-search-indexer
+removed  event source mapping c7a217b2-9127-42ff-bcb0-eb0bcd0dc1b7
+removed  Lambda function recipe-reembed-enqueue
+removed  log group /aws/lambda/recipe-reembed-enqueue
+removed  alarm recipe-search-iterator-age
+removed  alarm recipe-search-failed-records
+removed  queue recipe-search-indexer-failed
+removed  queue recipe-reembed
+removed  queue recipe-reembed-dlq
+removed  collection recipe-items (its indexes go with it)
+removed  data access policy recipe-items
+removed  network policy recipe-items
+removed  encryption policy recipe-items
+removed  collection recipe-item-vectors (its indexes go with it)
+removed  data access policy recipe-item-vectors
+removed  network policy recipe-item-vectors
+removed  encryption policy recipe-item-vectors
+removed  collection group recipe-search
+removed  collection group recipe-search-vectors
+removed  bucket my-bucket-111122223333
+removed  DynamoDB table recipe-items (its stream goes with it)
+removed  IAM role recipe-search-indexer-role
+removed  IAM role recipe-reembed-enqueue-role
+removed  IAM role recipe-search-pipeline-role
+not checked pipeline recipe-items-sync (denied by a service control policy)
+26 resources removed, 0 failed, for PREFIX=recipe in ca-central-1
+[exit 0]

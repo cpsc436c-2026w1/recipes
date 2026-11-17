@@ -1,0 +1,52 @@
+$ uv run python ext-fan-out/run.py --target aws --stopped-for 60
+absent   function recipe-consumer
+absent   log group /aws/lambda/recipe-consumer
+absent   policy of role recipe-consumer-role
+absent   role recipe-consumer-role
+absent   function recipe-windows
+absent   log group /aws/lambda/recipe-windows
+absent   policy of role recipe-windows-role
+absent   role recipe-windows-role
+removed  mapping bb0aaa79-bbbe-4b9b-850b-99a59ad95a55 of recipe-dashboard
+removed  function recipe-dashboard
+removed  log group /aws/lambda/recipe-dashboard
+removed  policy of role recipe-dashboard-role
+removed  role recipe-dashboard-role
+removed  mapping b8eae309-bed4-4a5d-b584-ba4e21ec94d6 of recipe-history
+removed  function recipe-history
+removed  log group /aws/lambda/recipe-history
+removed  policy of role recipe-history-role
+removed  role recipe-history-role
+removed  subscription arn:aws:sqs:ca-central-1:111122223333:recipe-history
+removed  subscription arn:aws:sqs:ca-central-1:111122223333:recipe-dashboard
+removed  topic recipe-updates-topic
+absent   queue recipe-consumer-failures
+absent   queue recipe-windows-failures
+removed  queue recipe-dashboard
+removed  queue recipe-dashboard-dlq
+removed  queue recipe-history
+removed  queue recipe-history-dlq
+absent   table recipe-updates
+absent   table recipe-windows
+removed  table recipe-dashboard
+removed  table recipe-history
+absent   stream recipe-updates
+target: aws, published: 200
+while history was stopped: dashboard stored 200, history stored 0, history queue holds 200
+
+dashboard consumer
+updates stored: 200
+
+part of the lag                             median s     p95 s
+lag: event to stored                           0.456    67.273
+event to entered (before the broker)           0.274    65.413
+entered to stored (broker and consumer)        0.133     2.627
+
+history consumer
+updates stored: 200
+
+part of the lag                             median s     p95 s
+lag: event to stored                          63.731   130.566
+event to entered (before the broker)           0.274    65.423
+entered to stored (broker and consumer)       62.322    69.940
+[exit 0]

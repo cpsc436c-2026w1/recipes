@@ -1,0 +1,41 @@
+{
+  "_note": "Written by hand to show how the measurement works offline. Not model output; run --model gateway for real replies.",
+  "router": {
+    "How much is the HX-200 charger?": "simple",
+    "Is the Trail 2 tent in stock?": "simple",
+    "Price of the Glow LED desk lamp": "simple",
+    "Do you sell a chef knife?": "simple",
+    "What does the Key quiet mouse cost?": "hard",
+    "I need to charge a laptop and a phone at once, under 60 CAD, and it must be in stock. Which charger?": "hard",
+    "Headphones for flights, but my budget is 120 CAD": "hard",
+    "Cheapest way to make coffee at my desk": "hard",
+    "Gear to sleep outside for two people, in stock, under 300 CAD in total": "hard",
+    "Bag that fits a 16 inch laptop and keeps it dry in the rain": "simple"
+  },
+  "answers": {
+    "qwen3.6-35b-a3b": {
+      "How much is the HX-200 charger?": "The Lumo HX-200 USB-C charger costs 49 CAD [P01].",
+      "Is the Trail 2 tent in stock?": "Yes, the Trail 2 tent is in stock [P16].",
+      "Price of the Glow LED desk lamp": "The Glow LED desk lamp is 39 CAD [P14].",
+      "Do you sell a chef knife?": "Yes: the Chop chef knife 20 cm [P22].",
+      "What does the Key quiet mouse cost?": "The Key quiet mouse costs 29 CAD [P27].",
+      "I need to charge a laptop and a phone at once, under 60 CAD, and it must be in stock. Which charger?": "The Volt PD-65 travel charger at 55 CAD fits [P03].",
+      "Headphones for flights, but my budget is 120 CAD": "The Hush NC-3 headphones cancel noise on flights [P06].",
+      "Cheapest way to make coffee at my desk": "The Brew pour-over coffee kit at 45 CAD [P19].",
+      "Gear to sleep outside for two people, in stock, under 300 CAD in total": "The Trail 2 tent at 189 CAD [P16].",
+      "Bag that fits a 16 inch laptop and keeps it dry in the rain": "The Pack messenger bag holds a laptop [P24]."
+    },
+    "qwen3.8-27b": {
+      "How much is the HX-200 charger?": "The Lumo HX-200 USB-C charger costs 49 CAD [P01].",
+      "Is the Trail 2 tent in stock?": "Yes, the Trail 2 tent is in stock [P16].",
+      "Price of the Glow LED desk lamp": "The Glow LED desk lamp is 39 CAD [P14].",
+      "Do you sell a chef knife?": "Yes: the Chop chef knife 20 cm [P22].",
+      "What does the Key quiet mouse cost?": "The Key quiet mouse costs 29 CAD [P27].",
+      "I need to charge a laptop and a phone at once, under 60 CAD, and it must be in stock. Which charger?": "The Lumo HX-200 at 49 CAD has two USB-C ports and is in stock [P01]; the Volt PD-65 is out of stock.",
+      "Headphones for flights, but my budget is 120 CAD": "Within 120 CAD, the Hush E2 earbuds at 99 CAD [P07]; the NC-3 is over budget.",
+      "Cheapest way to make coffee at my desk": "The Brew pour-over coffee kit at 45 CAD is the cheapest [P19].",
+      "Gear to sleep outside for two people, in stock, under 300 CAD in total": "The Trail 2 tent at 189 CAD [P16]; the pad is out of stock.",
+      "Bag that fits a 16 inch laptop and keeps it dry in the rain": "The Pack 28 L backpack has a 16 inch sleeve and a rain cover [P23]."
+    }
+  }
+}

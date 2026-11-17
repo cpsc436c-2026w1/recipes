@@ -1,0 +1,56 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "llm-probes"
+format = "main-scenario"
+task = "Send one small request per feature to an OpenAI-compatible endpoint and print which models answer and which features work there"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = []                    # serves model choice for every GenAI extension
+lectures = ["L15", "L16", "L17"]
+core = ["course LLM gateway"]
+secondary = []
+region = "ca-central-1"            # no AWS resources
+cost_one_run = "15,426 input and 707 output tokens for every group on two chat models and one embedding model through the course LLM gateway; about 0.0013 CAD (output/all-probes-gateway-2026-11-14.txt, and the gateway's spend report in output/main-gateway-2026-11-14.txt)"
+summary = "A probe script, one plain-httpx request per feature (models, refusals, chat, streaming, max_tokens, tool calls, JSON schema, prompt cache, embeddings), that prints a yes/no table per model"
+
+[[practices]]
+name = "test what an endpoint supports before designing on it, and again before a demo"
+source = "L15-L17"
+
+[[practices]]
+name = "an endpoint must refuse a wrong key and an unknown model"
+source = "L16"
+
+[instruments]
+files = ["main/probe.py", "main/endpoint.py", "main/compare.py", "ext-streaming/streaming.py", "ext-reply-control/reply_control.py",
+         "ext-tool-calls/tool_calls.py", "ext-structured-output/structured_output.py",
+         "ext-prompt-cache/prompt_cache.py", "ext-embeddings/embeddings.py"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "against a fake endpoint: every probe says yes where the feature works and no where it does not, rows come in the order of output/, a wrong key stops the run with exit code 1, and the key never reaches the screen or the JSON file"
+
+[scenarios]
+main = "uv run python main/probe.py --groups main"
+ext-streaming = "uv run python main/probe.py --groups main,streaming"
+ext-reply-control = "uv run python main/probe.py --groups main,reply-control"
+ext-tool-calls = "uv run python main/probe.py --groups main,tool-calls"
+ext-structured-output = "uv run python main/probe.py --groups main,structured-output"
+ext-prompt-cache = "uv run python main/probe.py --groups main,prompt-cache"
+ext-embeddings = "uv run python main/probe.py --groups main,embeddings"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline: a fake endpoint, no key
+scenarios = "uv run behave"        # the README's requirements, as behave scenarios; offline
+run = "uv run python main/probe.py"
+clean = ""                          # creates nothing
+
+[env]
+LLM_BASE_URL = "the endpoint's base URL, ending in /v1; for the course LLM gateway, COURSE_GATEWAY_URL (course page or team repo variable on github.students)"
+LLM_API_KEY = "the endpoint's key; for the course LLM gateway, the course MCP token; read from the environment only"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+key_from_environment_only = true    # never a command-line flag
+key_masked_in_output = true         # render() replaces it with [key]
+read_only = true                    # probes never change anything on the endpoint

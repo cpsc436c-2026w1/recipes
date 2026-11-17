@@ -1,0 +1,28 @@
+# Sandbox run 2026-11-14 05:40:20-06:02:33 UTC: the main scenario, then ext-embeddings (embeddings-aws.txt), the
+# refused ext-zero-etl attempt (zero-etl-aws-refused.txt) and the clean-up (clean-up-2026-11-14.txt).
+$ uv run python -m main.run --target aws
+[aws ca-central-1; function recipe-search-indexer]
+1 s after ACTIVE: refused (401; a GET of _cat/indices answers 401 X01:network-policy-deny); trying again in 10 s
+11 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+22 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+32 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+42 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+52 s after ACTIVE: refused (401; a GET of _cat/indices answers 200 (no hint header)); trying again in 10 s
+collection let you in 62 s after it was ACTIVE
+created in 132 s: table, stream, failure queue, role, collection group (min 0, max 2 OCU), collection, index items-v1, function, event source mapping
+starting items: 7 documents in items-v1, 87.5 s after the table writes; the first requests to a new or idle collection wait for capacity
+index version recorded in the mapping: 1 (source table recipe-items)
+search 'waterproof': I02 (0.47)
+INSERT I09: searchable 5.5 s; the function sent it 0.5 s after the write
+INSERT I10: searchable 6.5 s; the function sent it 0.2 s after the write
+MODIFY I04: searchable 3.3 s; the function sent it 0.4 s after the write
+MODIFY I02: searchable 2.7 s; the function sent it 0.3 s after the write
+MODIFY I09: searchable 2.2 s; the function sent it 0.4 s after the write
+REMOVE I08: gone from search 3.3 s
+REMOVE I10: gone from search 3.8 s
+lag, table write to searchable: median 3.3 s (IQR 3.0 to 4.7 s), max 6.5 s, n = 7
+search 'waterproof': I04 (0.49), I02 (0.47)
+bad record I11 (price_cad 'free'): in the index False; failure queue: 1 message(s), batch size [1], item ['I11']
+INSERT I12 written right after it: searchable 4.3 s (behind the retries)
+replayed one batch (I04, I09) twice: ['ok', 'ok']; documents 9 before, 9 after (9 items in the table that the index takes); one document each for I04 and I09: True; I04 unchanged: True
+[exit 0]

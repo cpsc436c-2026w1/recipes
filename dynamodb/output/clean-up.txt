@@ -1,0 +1,30 @@
+
+== 1. Delete the three tables, and wait until each is gone (a run right after this can then create them again)
+
+$ aws dynamodb delete-table --table-name recipe-trips --query TableDescription.TableStatus
+"DELETING"
+
+$ aws dynamodb delete-table --table-name recipe-rider-trips --query TableDescription.TableStatus
+"DELETING"
+
+$ aws dynamodb delete-table --table-name recipe-drivers --query TableDescription.TableStatus
+"DELETING"
+
+== 2. Delete what ext-nightly-report made: the Athena table and its database, the export and the Athena results in S3
+
+$ aws glue delete-table --database-name recipe_lake --name trips_export
+(Athena table recipe_lake.trips_export not found: already gone)
+
+$ aws glue delete-database --name recipe_lake
+(database recipe_lake not found: already gone)
+
+(BUCKET is not set, so nothing was deleted from S3. If you ran ext-nightly-report, run this again with
+ BUCKET=<your bucket>: the export under recipe/exports/ and the results under recipe/athena-results/ stay until then)
+
+== 3. Check: none of this recipe's tables and no Athena database of it left (each check prints "(no ... left)")
+
+$ aws dynamodb list-tables --output text --query TableNames[?@=='recipe-trips' || @=='recipe-rider-trips' || @=='recipe-drivers']
+(no table left)
+
+$ aws glue get-databases --output text --query DatabaseList[?Name=='recipe_lake'].Name
+(no database left)

@@ -1,0 +1,55 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "concurrency-correctness"
+format = "main-scenario"
+task = "Two clients race to change the same DynamoDB item; a conditional write accepts one and refuses the other; a retried write applies once"
+shapes = ["operational-first"]
+extensions = ["concurrency-correctness"]
+lectures = ["L12", "L13", "L14", "L17"]
+core = ["DynamoDB"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "under 0.001 USD, from the price list (DynamoDB on-demand 0.6875 USD per million writes, 0.1375 USD per million reads); not measured"
+
+summary = "Two clients race to accept the same DynamoDB item; without a condition both are told yes, with a conditional write on a version number one wins and the other is told who holds it; a retried write applies once"
+
+# What the recipe teaches
+[[practices]]
+name = "stop lost updates with a conditional write on the version the client read (optimistic concurrency)"
+source = "L12; DDIA 2e ch. 8 (lost updates, compare-and-set)"
+
+[[practices]]
+name = "test a race by forcing the bad interleaving with a barrier"
+source = "course choice"
+
+[[practices]]
+name = "make a retried write idempotent with a request id made once per user action"
+source = "L14; REL04-BP04"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["main/trips.py", "main/race.py", "ext-idempotent-retry/tips.py", "clean_up.py"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q"
+shows = "without a condition both clients are told yes; with it exactly one wins in every round and the table holds the winner; a retry after a lost reply adds the tip once; clean_up.py removes both tables"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "uv run python main/run.py --target aws"
+run_local = "uv run python main/run.py --target local"
+clean = "uv run python clean_up.py"
+
+[scenarios]
+main = "main/run.py"
+ext-idempotent-retry = "ext-idempotent-retry/run.py"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+names_built_in = "main/trips.py table_name(), ext-idempotent-retry/tips.py requests_table_name()"
+every_shared_write_conditional = "version = :seen"      # do not drop the condition to make a test pass
+race_forced_by = "threading.Barrier in main/race.py"    # keep it: without it the test proves nothing
+request_id_made_by = "the client, once per user action, reused on every retry"
+offline_tests = "moto; main/local.py serialises each call as DynamoDB serialises writes to one item"

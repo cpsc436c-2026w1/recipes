@@ -1,0 +1,10 @@
+$ uv run python clean_up.py
+removed dynamodb table recipe-chat-traces
+removed dynamodb table recipe-chat-cache
+removed dynamodb table recipe-chat-spans
+removed cloudwatch alarm recipe-chat-daily-cost
+removed cloudwatch alarm recipe-chat-errors
+removed cloudwatch alarm recipe-chat-slow-answers
+removed sns topic recipe-chat-alarms
+7 resources removed for PREFIX=recipe in ca-central-1
+[exit 0]

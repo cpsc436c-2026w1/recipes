@@ -1,0 +1,19 @@
+# Sandbox run 2026-11-14, after uv run python -m main.run --target aws with the same PREFIX (six questions through
+# the gateway; the request id is that run's second question). clean_up.py removed the table afterwards.
+$ uv run python ext-feedback/feedback_run.py --target aws mark 1acbb4cb-e1e4-4bcf-b99b-54353209377a down
+{"request_id": "1acbb4cb-e1e4-4bcf-b99b-54353209377a", "question": "What were total sales in Vancouver?", "feedback": "down", "feedback_at": "2026-11-14T06:29:23Z"}
+[exit 0]
+$ uv run python ext-feedback/feedback_run.py --target aws report
+6 answers: 0 marked up, 1 marked down, 5 not marked
+{"request_id": "1acbb4cb-e1e4-4bcf-b99b-54353209377a", "question": "What were total sales in Vancouver?", "sql": "SELECT SUM(o.amount_cad) AS total_sales FROM orders o JOIN stores s ON o.store_id = s.store_id WHERE s.city = 'Vancouver'", "reply": "Total sales in Vancouver were $7044.58.", "status": "answered"}
+[exit 0]
+$ uv run python clean_up.py
+removed dynamodb table recipe-chat-traces
+absent dynamodb table recipe-chat-cache
+absent dynamodb table recipe-chat-spans
+absent cloudwatch alarm recipe-chat-errors
+absent cloudwatch alarm recipe-chat-slow-answers
+absent cloudwatch alarm recipe-chat-daily-cost
+absent sns topic recipe-chat-alarms
+1 resources removed for PREFIX=recipe in ca-central-1
+[exit 0]

@@ -1,0 +1,11 @@
+# Sandbox run 2026-11-14.
+$ uv run python ext-answer-cache/cache_run.py --target aws
+target aws  prefix recipe  region ca-central-1
+user-ana  idx-1  miss  shared  'What is the return policy?' -> Items can be returned within 30 days with a receipt.
+user-ben  idx-1  hit   shared  'what is the  return policy' -> Items can be returned within 30 days with a receipt.
+user-ana  idx-1  miss  user    'Where is my order?' -> Order 1042 shipped yesterday.
+user-ben  idx-1  miss  user    'Where is my order?' -> Order 2077 is waiting for stock.
+user-ana  idx-1  hit   user    'Where is my order?' -> Order 1042 shipped yesterday.
+user-ben  idx-2  miss  shared  'What is the return policy?' -> Items can be returned within 30 days with a receipt.
+6 questions, 2 hits, 4 misses, 4 retrievals, 4 model calls
+[exit 0]

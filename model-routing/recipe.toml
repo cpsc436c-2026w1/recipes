@@ -1,0 +1,76 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "model-routing"
+format = "main-scenario"
+task = "A small model labels each request (lookup, search, hard, out_of_scope); app code runs a fixed path per label through the course LLM gateway, sends the large model only the hard requests, and logs misroutes"
+shapes = ["genai-first"]
+extensions = ["Model routing, cheap model first"]
+lectures = ["L16", "L17"]
+core = ["course LLM gateway"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "0.000304 CAD of gateway budget for the six main requests and 0.0035 CAD for the eval (measured 2026-11-12, output/main-gateway.txt and output/eval-gateway.md); no AWS resources"
+summary = "A router where the small model returns one label per request and app code owns the paths: order lookups and out-of-scope requests never reach the large model, unknown labels and paths that give up go to the large model and into a misroute log, and an eval reports label accuracy and cost per request against sending everything to the large model"
+
+[[practices]]
+name = "The simplest model that passes the eval: no model, the small model or the large model, per kind of request"
+source = "Agentic AI Lens AGENTCOST02-BP01 (tiered model selection); L16-L17"
+
+[[practices]]
+name = "Route by request content: a small model as pre-classifier"
+source = "AI Engineering ch. 10, Router; AGENTCOST02-BP01"
+
+[[practices]]
+name = "App code owns the paths; the model only labels"
+source = "L17 (workflow: app code sets the paths)"
+
+[[practices]]
+name = "Misroutes are logged and the routing eval runs on hand-labelled requests"
+source = "Generative AI Lens GENPERF01-BP01 (ground truth); AGENTCOST02-BP01 (refresh routing with data)"
+
+[instruments]
+files = [
+    "main/router.py",
+    "main/paths.py",
+    "main/app.py",
+    "main/model.py",
+    "ext-eval/routing_eval.py",
+    "ext-eval/labelled.jsonl",
+]
+
+[validates]
+command = "uv run pytest -q"
+shows = "Each label runs its fixed path; out-of-scope gets the stock reply with no large-model call; unknown labels and paths that give up are logged and go to the large model; the gateway client sends the OpenAI request shape and does not retry a 429; a failed model call ends its request with path error and the run goes on; the eval computes label accuracy on 24 labelled requests, a cost table against all-large, and fails below --min-accuracy"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python -m main.run --model gateway"
+run_offline = "uv run python -m main.run"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-eval = "uv run python ext-eval/routing_eval.py --model gateway"
+ext-eval-offline = "uv run python ext-eval/routing_eval.py"
+ext-eval-gate = "uv run python ext-eval/routing_eval.py --model gateway --min-accuracy 0.85"
+
+[env]
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1; GATEWAY_URL still works"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment only; COURSE_MCP_TOKEN still works"
+SMALL_MODEL = "default qwen3.6-35b-a3b: router and search path"
+LARGE_MODEL = "default qwen3.8-27b: hard path only"
+
+[resources]
+local_files = ["output/misroutes.jsonl", "output/routes.jsonl", "output/eval-misroutes.jsonl"]
+aws = []
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"                 # not used: the recipe creates no AWS resources
+model_calls_through = "course LLM gateway"
+model_only_labels = true                   # never let the model choose the path, the model or a tool
+unknown_label_goes_to_large_model = true   # a router mistake costs money, not a wrong answer
+out_of_scope_makes_no_large_model_call = true
+gateway_refusals_not_retried = true
+tests_offline = true

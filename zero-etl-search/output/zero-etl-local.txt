@@ -1,0 +1,7 @@
+[local: moto DynamoDB and Streams, stand-in pipeline and index]
+mappings and pipeline definition: valid
+initial export: 8 items -> 8 documents in items-v1
+search 'waterproof headlamp' before the update: ['I02', 'I04']
+stream: 2 changes applied; I04 in the index now: 'Headlamp HX-300', in_stock=True, index_version=1
+I08 removed from the table, in the index: False
+search 'waterproof headlamp' after the update: ['I04', 'I02']

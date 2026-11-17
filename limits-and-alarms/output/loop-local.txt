@@ -1,0 +1,6 @@
+task                               stopped by         steps  spent CAD  seconds
+finishes in 3 steps                done                   3    0.00009        3
+runaway, step cap                  step_cap               8    0.00029        8
+runaway, slow model, deadline      deadline               5    0.00016       20
+runaway, cost cap                  cost_cap             190    0.00993      190
+runaway, loop limits all off       budget_exhausted     945    0.04995      945

@@ -1,0 +1,23 @@
+$ timeout 2280 uv run python -m main.run --target aws
+Traceback (most recent call last):
+    main()
+    print(run_aws(s) if args.target == "aws" else run_local(s))
+    info = create_all(s, items)
+    create_pipeline(c("osis"), s, render(s, table_arn, endpoint, bucket))
+    check = osis.validate_pipeline(PipelineConfigurationBody=config)  # the service's own check
+    return self._make_api_call(operation_name, kwargs)
+    return func(*args, **kwargs)
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.AccessDeniedException: An error occurred (AccessDeniedException) when calling the ValidatePipeline operation: User: arn:aws:sts::111122223333:assumed-role/<role> is not authorized to perform: osis:ValidatePipeline on resource: arn:aws:osis:ca-central-1:111122223333:* with an explicit deny in a service control policy: arn:aws:organizations::444455556666:policy/o-exampleorgid/service_control_policy/p-examplepolicy
+[exit 1]
+
+$ uv run python clean_up.py
+Traceback (most recent call last):
+    main()
+    removed = clean_up(s, args.dry_run)
+    if any(p["PipelineName"] == s.pipeline for p in osis.list_pipelines()["Pipelines"]):
+    return self._make_api_call(operation_name, kwargs)
+    return func(*args, **kwargs)
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.AccessDeniedException: An error occurred (AccessDeniedException) when calling the ListPipelines operation: User: arn:aws:sts::111122223333:assumed-role/<role> is not authorized to perform: osis:ListPipelines on resource: arn:aws:osis:ca-central-1:111122223333:pipeline/* with an explicit deny in a service control policy: arn:aws:organizations::444455556666:policy/o-exampleorgid/service_control_policy/p-examplepolicy
+[exit 1]

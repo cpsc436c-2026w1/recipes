@@ -1,0 +1,11 @@
+{
+  "_note": "Router labels written by hand to show each branch of main/app.py; they are not model output. 'Where is my order?' gets lookup without a number (the path gives up and the request goes to hard); the return question gets a reply that is not a label.",
+  "router": {
+    "What is the status of order 1042?": "lookup",
+    "Do you have waterproof jackets?": "search",
+    "I run trails in the rain and have 200 CAD. Which shoe and socks should I get, and why?": "hard",
+    "What will the weather be in Whistler tomorrow?": "out_of_scope",
+    "Where is my order?": "lookup",
+    "Can I return boots I wore once on a hike?": "Policy question"
+  }
+}

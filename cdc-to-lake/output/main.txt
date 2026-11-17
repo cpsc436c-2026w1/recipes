@@ -1,0 +1,10 @@
+$ uv run python -m main.run --target aws
+[aws ca-central-1; buffer 60 s; changes queryable after about 165 s (polled every 15 s); Data scanned by the last query: 265 bytes]
+trips_current (latest state of each trip, from the change log):
+  t-001  claimed    Kitsilano        18.50  driver=d-42
+  t-002  requested  Downtown         12.00  driver=None
+changes in the log: 5 for 3 trips
+data last updated (newest change in the lake): 2026-11-13 04:28:56.000000
+longest change-to-arrival: 61 s
+run at 2026-11-13 04:31 UTC
+[exit 0]

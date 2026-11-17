@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Model gateway in front of an OpenAI-compatible endpoint. One Lambda function behind a function URL in
+  RESPONSE_STREAM mode, two DynamoDB tables (a third with TextLog On), one SNS topic. Creates nothing in IAM.
+
+Parameters:
+  FunctionRoleArn:
+    Type: String
+    Description: ARN of the function's execution role (llm-gateway-fn in the README), created before deploy.
+  SecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret that holds the upstream API key.
+  Transport:
+    Type: String
+    Default: FunctionUrl
+    AllowedValues: [FunctionUrl, ApiGatewayBuffered]
+    Description: FunctionUrl streams replies. ApiGatewayBuffered adds a REST API with a 29 s limit.
+  UpstreamBaseUrl:
+    Type: String
+    AllowedPattern: ^https://.+
+    Description: Base URL of the OpenAI-compatible endpoint, with its version path, for example https://api.example.com/v1
+  TextLog:
+    Type: String
+    Default: "Off"
+    AllowedValues: ["Off", "On"]
+    Description: >-
+      On stores each forwarded request and its reply in the table llm-gateway-texts. The function's role must
+      allow UpdateItem on that table first. Off stores no text anywhere.
+  TextLogDays:
+    Type: Number
+    Default: 180
+    MinValue: 0
+    Description: Days a stored text is kept before DynamoDB deletes it. 0 keeps it until someone deletes it.
+
+Conditions:
+  LogTexts: !Equals [!Ref TextLog, "On"]
+  UseFunctionUrl: !Equals [!Ref Transport, FunctionUrl]
+  UseApiGateway: !Equals [!Ref Transport, ApiGatewayBuffered]
+
+Resources:
+  GatewayFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: llm-gateway
+      CodeUri: ../
+      Handler: run.sh
+      Runtime: python3.13
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 300
+      Role: !Ref FunctionRoleArn
+      ReservedConcurrentExecutions: 200
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:30
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: !If [UseFunctionUrl, response_stream, buffered]
+          AWS_LWA_PORT: "8080"
+          AWS_LWA_READINESS_CHECK_PATH: /health
+          PORT: "8080"
+          TABLE_KEYS: !Ref KeysTable
+          TABLE_USAGE: !Ref UsageTable
+          TABLE_TEXTS: !If [LogTexts, !Ref TextsTable, ""]
+          TEXT_TTL_DAYS: !Ref TextLogDays
+          TOPIC_ARN: !Ref AlertsTopic
+          SECRET_ARN: !Ref SecretArn
+          UPSTREAM_BASE_URL: !Ref UpstreamBaseUrl
+          FUNCTION_NAME: llm-gateway
+
+  # Function URL only for the FunctionUrl transport, so the buffered transport has no public path
+  # around API Gateway. https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-lambda-url.html
+  GatewayFunctionUrl:
+    Type: AWS::Lambda::Url
+    Condition: UseFunctionUrl
+    Properties:
+      TargetFunctionArn: !Ref GatewayFunction
+      AuthType: NONE
+      InvokeMode: RESPONSE_STREAM
+
+  GatewayFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseFunctionUrl
+    Properties:
+      FunctionName: !Ref GatewayFunction
+      FunctionUrlAuthType: NONE
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+
+  # A public function URL needs two statements in the function's policy: InvokeFunctionUrl above and
+  # InvokeFunction here, limited to calls that come through the URL. Without both, every request gets 403.
+  # https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html
+  GatewayFunctionUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseFunctionUrl
+    Properties:
+      FunctionName: !Ref GatewayFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
+  GatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/llm-gateway
+      RetentionInDays: 90
+
+  KeysTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: llm-gateway-keys
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: key_hash, AttributeType: S}
+        - {AttributeName: key_id, AttributeType: S}
+      KeySchema:
+        - {AttributeName: key_hash, KeyType: HASH}
+      GlobalSecondaryIndexes:
+        - IndexName: by_key_id
+          KeySchema:
+            - {AttributeName: key_id, KeyType: HASH}
+          Projection:
+            ProjectionType: KEYS_ONLY
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  UsageTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: llm-gateway-usage
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: key_id, AttributeType: S}
+        - {AttributeName: sk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: key_id, KeyType: HASH}
+        - {AttributeName: sk, KeyType: RANGE}
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # One item per forwarded request, only with TextLog On. Its key is the key id and the request id of the log line.
+  # The table stays when the parameter goes back to Off or the stack is deleted: what it holds is deleted by hand.
+  TextsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: LogTexts
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: llm-gateway-texts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: key_id, AttributeType: S}
+        - {AttributeName: sk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: key_id, KeyType: HASH}
+        - {AttributeName: sk, KeyType: RANGE}
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: llm-gateway-alerts
+
+  # Buffered API Gateway path, only when Transport is ApiGatewayBuffered.
+  BufferedApi:
+    Type: AWS::Serverless::Api
+    Condition: UseApiGateway
+    Properties:
+      Name: llm-gateway-buffered
+      StageName: v1
+      EndpointConfiguration:
+        Type: REGIONAL
+      DefinitionBody:
+        openapi: "3.0.1"
+        info: {title: llm-gateway-buffered, version: "1"}
+        paths:
+          /{proxy+}:
+            x-amazon-apigateway-any-method:
+              parameters:
+                - {name: proxy, in: path, required: true, schema: {type: string}}
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                timeoutInMillis: 29000
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GatewayFunction.Arn}/invocations
+
+  BufferedApiPermission:
+    Type: AWS::Lambda::Permission
+    Condition: UseApiGateway
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GatewayFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BufferedApi}/*
+
+Outputs:
+  GatewayBaseUrl:
+    Condition: UseFunctionUrl
+    Description: base_url for the OpenAI client (function URL plus v1)
+    Value: !Sub "${GatewayFunctionUrl.FunctionUrl}v1"
+  BufferedApiBaseUrl:
+    Condition: UseApiGateway
+    Description: base_url through API Gateway, buffered, 29 s limit
+    Value: !Sub https://${BufferedApi}.execute-api.${AWS::Region}.amazonaws.com/v1/v1
+  AlertsTopicArn:
+    Description: subscribe your email to this topic after the first deploy
+    Value: !Ref AlertsTopic
+  KeysTableName:
+    Value: !Ref KeysTable
+  UsageTableName:
+    Value: !Ref UsageTable
+  TextsTableName:
+    Condition: LogTexts
+    Description: set TABLE_TEXTS to this for `gw-admin texts`
+    Value: !Ref TextsTable
+  FunctionName:
+    Value: !Ref GatewayFunction

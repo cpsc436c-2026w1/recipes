@@ -1,0 +1,69 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "hybrid-retrieval-eval"
+format = "main-scenario"
+task = "Keyword (BM25) and embedding search over a small product set, fused by reciprocal rank fusion (k = 60), with a retrieval eval (recall@k on labelled queries) reported apart from answer quality"
+shapes = ["genai-first"]
+extensions = ["Hybrid retrieval with an eval", "Model routing, cheap model first"]
+lectures = ["L17"]
+core = ["Amazon OpenSearch Serverless", "course LLM gateway"]
+secondary = ["numpy", "opensearch-py"]
+region = "ca-central-1"
+cost_one_run = "gateway: 0.000246 CAD (measured, output/eval-gateway.txt); OpenSearch Serverless: 0.266 USD per OCU-hour for indexing and for search (AWS bulk price list, ca-central-1, published 2026-11-12), at most about 0.36 USD for a 10-minute run and the 10 idle minutes before scale to zero (4 OCU, an upper bound; run length assumed)"
+
+summary = "Keyword (BM25) and embedding search fused by reciprocal rank fusion, with recall@5 and MRR per query kind reported apart from answer quality; OpenSearch Serverless for the production path"
+
+# What the recipe teaches
+[[practices]]
+name = "Two retrievers over the same text, fused on ranks, not scores"
+source = "L17; AI Engineering ch. 6 (hybrid search); Cormack, Clarke and Buettcher, SIGIR 2009"
+
+[[practices]]
+name = "Retrieval eval on labelled queries grouped by kind, reported apart from the answer eval"
+source = "L17; Generative AI Lens GENPERF01-BP01, GENPERF04-BP01, GENOPS01-BP01; AI Engineering ch. 4, ch. 6"
+
+[[practices]]
+name = "Filters inside the search, before ranking"
+source = "L17; OpenSearch k-NN search with filters"
+
+[[practices]]
+name = "The cheapest model that passes the eval; a small model labels, app code routes"
+source = "AI Engineering ch. 10 (routers); Generative AI Lens GENCOST01-BP01, GENCOST03-BP02"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["main/bm25.py", "main/vector.py", "main/fusion.py", "main/evaluate.py", "main/answer.py", "main/opensearch_store.py", "data/queries.jsonl", "ext-filters/filters.py", "ext-model-routing/router.py", "ext-model-routing/routing_eval.py"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q && uv run python -m main.run"
+shows = "a table of recall@5 and MRR per method and query kind in which hybrid is at least as good as each single method, and an answer table of correct and grounded replies"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python -m main.run --backend opensearch --embedder gateway --answers gateway"
+run_offline = "uv run python -m main.run"
+clean = "uv run python clean_up.py"
+
+[extension_commands]
+ext-filters = "uv run python ext-filters/filters_run.py --backend opensearch --embedder gateway"
+ext-model-routing = "uv run python ext-model-routing/routing_eval.py --model gateway"
+
+[env]
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1; GATEWAY_URL still works"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment only; COURSE_MCP_TOKEN still works"
+PREFIX = "first part of every AWS resource name; default recipe"
+AWS_REGION = "ca-central-1"
+
+[resources]                         # what a real run creates; clean_up.py removes all of it
+opensearch_serverless = ["collection $PREFIX-products", "collection group $PREFIX-products", "access policy $PREFIX-products", "network policy $PREFIX-products", "encryption policy $PREFIX-products"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"
+fusion_on_ranks = true              # never add BM25 scores to cosines; fuse ranks with rrf()
+retrieval_eval_apart_from_answers = true
+same_text_for_both_indexes = true   # main/config.py doc_text
+tests_offline = true                # stub embedder, stub replies, fakes for OpenSearch; no network, no key
+run_clean_up_same_day = true        # a collection bills OCU-hours while it has capacity

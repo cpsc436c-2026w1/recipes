@@ -1,0 +1,54 @@
+# Sandbox run 2026-11-13: stopped at the first request to the new collection (HTTP 401, empty body).
+# Every later request from the caller's role (index move, demo) came within the next 20 s and got the same 401: all of
+# them within about 70 s of the collection being created, before its new data access policy had reached it (assumed).
+# main/infra.py create_index now tries again for up to 5 minutes (not yet run in a sandbox). Clean-up removed everything.
+
+$ uv run python -m main.run --target aws
+Traceback (most recent call last):
+opensearchpy.exceptions.AuthenticationException: AuthenticationException(401, '')
+Command exited with non-zero status 1
+[wall 48.80 s]
+[exit 1]
+
+$ INDEX_VERSION=2 uv run python -m main.run --target aws --setup
+Traceback (most recent call last):
+opensearchpy.exceptions.AuthenticationException: AuthenticationException(401, '')
+[exit 1]
+$ INDEX_VERSION=2 uv run python -m main.migrate backfill
+{'items': 0, 'batches': 0, 'not written': []}
+[exit 0]
+$ (count check) items-v2 against the table
+Traceback (most recent call last):
+opensearchpy.exceptions.AuthenticationException: AuthenticationException(401, '')
+[exit 1]
+$ INDEX_VERSION=2 uv run python -m main.migrate drop items-v1
+Traceback (most recent call last):
+opensearchpy.exceptions.AuthenticationException: AuthenticationException(401, '')
+[exit 1]
+
+$ uv run python clean_up.py
+removed  queue recipe-search-indexer-failed
+removed  collection recipe-items (its indexes go with it)
+removed  data access policy recipe-items
+removed  network policy recipe-items
+removed  encryption policy recipe-items
+removed  collection group recipe-search
+removed  DynamoDB table recipe-items (its stream goes with it)
+removed  IAM role recipe-search-indexer-role
+absent   Lambda function recipe-search-indexer
+absent   log group /aws/lambda/recipe-search-indexer
+absent   Lambda function recipe-reembed-enqueue
+absent   log group /aws/lambda/recipe-reembed-enqueue
+absent   queue recipe-reembed
+absent   queue recipe-reembed-dlq
+absent   collection recipe-item-vectors
+absent   data access policy recipe-item-vectors
+absent   network policy recipe-item-vectors
+absent   encryption policy recipe-item-vectors
+absent   S3 bucket of ext-zero-etl
+absent   IAM role recipe-reembed-enqueue-role
+absent   IAM role recipe-search-pipeline-role
+not checked pipeline recipe-items-sync (denied by a service control policy)
+8 resources removed, 0 failed, for PREFIX=recipe in ca-central-1
+[wall 314.56 s]
+[exit 0]

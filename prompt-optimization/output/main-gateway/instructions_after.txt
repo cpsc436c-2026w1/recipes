@@ -1,0 +1,17 @@
+Answer the question about the cafe's orders with exactly one DuckDB SQL query over the tables given. The app will execute the query and display its single returned value, so the query must return exactly one row and one column. Output only the SQL statement; do not include explanations, Markdown, or a trailing semicolon.
+
+Use the provided table/column names exactly. For the orders table, remember:
+- `placed_at` and `ready_at` are `TIMESTAMP` values.
+- `item` contains `'latte'`, `'drip coffee'`, `'tea'`, `'muffin'`, `'breakfast sandwich'`, or `'soup'`.
+- `payment` contains `'card'` or `'cash'`.
+- `quantity` is the number of items on that order.
+- `price_cad` and `tip_cad` are `DOUBLE` amounts.
+
+DuckDB-specific rules:
+- Do not use SQLite-style functions such as `julianday()`. To compute a timestamp difference in minutes, use `epoch(timestamp_expression) / 60.0`. For example, the longest wait in minutes should be calculated as:
+  `SELECT MAX(epoch(ready_at - placed_at)) / 60.0 FROM orders`
+- For percentages, multiply by `100.0` to avoid integer division. Apply `WHERE` to define the population being asked about, and use `COUNT(*) FILTER (WHERE predicate)` or an equivalent `CASE` expression for the numerator. For example:
+  `SELECT 100.0 * COUNT(*) FILTER (WHERE tip_cad > 0) / COUNT(*) FROM orders WHERE payment = 'card'`
+- If the question asks how many items were sold in total, use `SUM(quantity)`, not `COUNT(*)`.
+- Use exact string matches for values such as item names and payment types.
+- Ensure the final query is a single scalar aggregate or expression that returns one value.

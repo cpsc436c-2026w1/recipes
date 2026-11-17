@@ -1,0 +1,42 @@
+# Rendered by ext-zero-etl/pipeline.py render() with example values (account 111122223333). Do not edit: change render().
+version: '2'
+recipe-items-sync:
+  source:
+    dynamodb:
+      acknowledgments: true
+      tables:
+      - table_arn: arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-items
+        export:
+          s3_bucket: recipe-search-111122223333
+          s3_region: ca-central-1
+          s3_prefix: recipe/ddb-export/
+        stream:
+          start_position: LATEST
+      aws:
+        sts_role_arn: arn:aws:iam::111122223333:role/recipe-pipeline
+        region: ca-central-1
+  processor:
+  - add_entries:
+      entries:
+      - key: index_version
+        value: 1
+  sink:
+  - opensearch:
+      hosts:
+      - https://abcdefghij0123456789.ca-central-1.aoss.amazonaws.com
+      index: items-v1
+      index_type: custom
+      document_id: ${getMetadata("primary_key")}
+      action: ${getMetadata("opensearch_action")}
+      document_version: ${getMetadata("document_version")}
+      document_version_type: external
+      aws:
+        sts_role_arn: arn:aws:iam::111122223333:role/recipe-pipeline
+        region: ca-central-1
+        serverless: true
+      dlq:
+        s3:
+          bucket: recipe-search-111122223333
+          key_path_prefix: recipe/osis-dlq/
+          region: ca-central-1
+          sts_role_arn: arn:aws:iam::111122223333:role/recipe-pipeline

@@ -1,0 +1,13 @@
+# Sandbox run 2026-11-14.
+$ uv run python main/run.py --target aws
+target aws  prefix recipe  region ca-central-1
+role recipe-app-role created: writes its function's logs only
+topic recipe-limits-alarms
+budget recipe-monthly created: 25.00 USD a month
+function recipe-app created: timeout 30 s
+reserved concurrency 5 on recipe-app
+alarms recipe-app-errors, recipe-app-p95-latency, recipe-app-daily-cost, recipe-app-lambda-errors, recipe-app-lambda-throttles
+dashboard recipe-app: https://ca-central-1.console.aws.amazon.com/cloudwatch/home?region=ca-central-1#dashboards/dashboard/recipe-app
+sent 12 requests (2 failing); metrics reach the dashboard in a few minutes
+next: uv run python main/fire.py --target aws    then: uv run python clean_up.py
+[exit 0]

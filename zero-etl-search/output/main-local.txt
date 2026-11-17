@@ -1,0 +1,16 @@
+[local: moto DynamoDB and Streams, stand-in event source mapping and index]
+starting items: 8 documents in items-v1, on the next delivery after the table writes
+index version recorded in the mapping: 1 (source table recipe-items)
+search 'waterproof': I02 (1.83)
+INSERT I09: searchable on the next delivery
+INSERT I10: searchable on the next delivery
+MODIFY I04: searchable on the next delivery
+MODIFY I02: searchable on the next delivery
+MODIFY I09: searchable on the next delivery
+REMOVE I08: gone from search on the next delivery
+REMOVE I10: gone from search on the next delivery
+lag, table write to searchable: not timed offline
+search 'waterproof': I02 (1.36), I04 (1.36)
+bad record I11 (price_cad 'free'): in the index False; failure queue: 1 message(s), batch size [1], item ['I11']
+INSERT I12 written right after it: searchable on the next delivery (behind the retries)
+replayed one batch (I04, I09) twice: ['ok', 'ok']; documents 9 before, 9 after (9 items in the table that the index takes); one document each for I04 and I09: True; I04 unchanged: True

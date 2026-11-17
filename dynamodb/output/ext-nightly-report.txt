@@ -1,0 +1,92 @@
+
+== 1. The report the slow way: Scan reads every trip through the table, and every item read is billed
+
+$ aws dynamodb scan --table-name recipe-trips --projection-expression 'pickup_zone, fare_quote' --return-consumed-capacity TOTAL --query '{items_read: ScannedCount, read_units: ConsumedCapacity.CapacityUnits}'
+{
+    "items_read": 52,
+    "read_units": 2.0
+}
+
+== 2. Exports need point-in-time recovery (PITR) switched on for the table
+
+$ aws dynamodb update-continuous-backups --table-name recipe-trips --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true --query ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus
+"ENABLED"
+
+== 3. Start a full export to S3. It does not use the table's read units
+
+$ aws dynamodb export-table-to-point-in-time --table-arn arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-trips --s3-bucket my-bucket-111122223333 --s3-prefix recipe/exports --export-format DYNAMODB_JSON --query 'ExportDescription.{status: ExportStatus, arn: ExportArn}'
+{
+    "status": "IN_PROGRESS",
+    "arn": "arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-trips/export/01792642793032-7ad3ea66"
+}
+
+== 4. Wait for it (checks every 30 seconds)
+status COMPLETED after 94 s of waiting
+
+$ aws dynamodb describe-export --export-arn arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-trips/export/01792642793032-7ad3ea66 --query 'ExportDescription.{status: ExportStatus, items: ItemCount, billed_bytes: BilledSizeBytes, start: StartTime, end: EndTime, manifest: ExportManifest}'
+{
+    "status": "COMPLETED",
+    "items": 52,
+    "billed_bytes": 0,
+    "start": "2026-10-21T21:19:53.032000-07:00",
+    "end": "2026-10-21T21:21:25.097000-07:00",
+    "manifest": "recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/manifest-summary.json"
+}
+
+== 5. What landed in S3: a manifest and gzipped JSON data files
+
+$ aws s3 ls --recursive s3://my-bucket-111122223333/recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/
+2026-10-21 21:19:55          0 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/_started
+2026-10-21 21:20:56        200 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/data/fsnipt2sym7utb3p7yskrs56gi.json.gz
+2026-10-21 21:20:56        296 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/data/gn5uk2oxva4n7n6adbixf5mmxq.json.gz
+2026-10-21 21:20:56        225 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/data/hccqhe5a2y36rfyq3mfe6fzpfq.json.gz
+2026-10-21 21:20:56        235 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/data/unicbggi2m74pmjz2ppkz44a34.json.gz
+2026-10-21 21:21:26        843 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/manifest-files.json
+2026-10-21 21:21:26         24 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/manifest-files.md5
+2026-10-21 21:21:26        646 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/manifest-summary.json
+2026-10-21 21:21:26         24 recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/manifest-summary.md5
+
+== 6. A table in Athena over the data files. Each line is {"Item": {attribute: {type: value}}}
+
+$ athena: CREATE DATABASE IF NOT EXISTS recipe_lake
+{
+    "state": "SUCCEEDED",
+    "reason": null,
+    "scanned_bytes": 0
+}
+
+$ athena: DROP TABLE IF EXISTS recipe_lake.trips_export
+{
+    "state": "SUCCEEDED",
+    "reason": null,
+    "scanned_bytes": 0
+}
+
+$ athena: CREATE EXTERNAL TABLE recipe_lake.trips_export (
+  Item struct<trip_id:struct<S:string>, status:struct<S:string>, pickup_zone:struct<S:string>,
+              fare_quote:struct<N:string>, driver_id:struct<S:string>>)
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+LOCATION 's3://my-bucket-111122223333/recipe/exports/AWSDynamoDB/01792642793032-7ad3ea66/data/'
+{
+    "state": "SUCCEEDED",
+    "reason": null,
+    "scanned_bytes": 0
+}
+
+== 7. Trips per pickup zone, from the copy (the live table is not touched)
+
+$ athena: SELECT Item.pickup_zone.S AS zone, count(*) AS trips, avg(CAST(Item.fare_quote.N AS double)) AS avg_fare
+FROM recipe_lake.trips_export GROUP BY 1 ORDER BY 1
+{
+    "state": "SUCCEEDED",
+    "reason": null,
+    "scanned_bytes": 956
+}
+zone	trips	avg_fare
+Astoria	10	24.5
+Harlem	10	23.5
+JFK	11	27.727272727272727
+Midtown	10	22.5
+SoHo	11	25.363636363636363
+
+== Done. KEEP=1: everything stays for the next recipe. Clean up later with: bash dynamodb/dynamodb-99-clean-up/run.sh

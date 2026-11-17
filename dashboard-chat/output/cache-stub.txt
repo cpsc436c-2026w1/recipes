@@ -1,0 +1,19 @@
+{"user": "c-0007", "question": "How many orders are there?", "status": "answered", "reply": "The answer is 1200."}
+{"user": "c-0007", "question": "What were total sales in Vancouver?", "status": "answered", "reply": "The answer is 7044.58."}
+{"user": "c-0007", "question": "Which category sold the most items?", "status": "answered", "reply": "The answer is coffee."}
+{"user": "c-0007", "question": "How much did I spend in total?", "status": "answered", "reply": "The answer is 501.24."}
+{"user": "c-0007", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0007", "question": "Delete all the orders", "status": "no_answer", "reply": "I could not run a query for that question."}
+{"user": "c-0007", "question": "How many orders are there?", "status": "cache_hit", "reply": "The answer is 1200."}
+{"user": "c-0007", "question": "What were total sales in Vancouver?", "status": "cache_hit", "reply": "The answer is 7044.58."}
+{"user": "c-0007", "question": "Which category sold the most items?", "status": "cache_hit", "reply": "The answer is coffee."}
+{"user": "c-0007", "question": "How much did I spend in total?", "status": "cache_hit", "reply": "The answer is 501.24."}
+{"user": "c-0007", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0007", "question": "Delete all the orders", "status": "no_answer", "reply": "I could not run a query for that question."}
+{"user": "c-0012", "question": "How many orders are there?", "status": "cache_hit", "reply": "The answer is 1200."}
+{"user": "c-0012", "question": "What were total sales in Vancouver?", "status": "cache_hit", "reply": "The answer is 7044.58."}
+{"user": "c-0012", "question": "Which category sold the most items?", "status": "cache_hit", "reply": "The answer is coffee."}
+{"user": "c-0012", "question": "How much did I spend in total?", "status": "answered", "reply": "The answer is 795.97."}
+{"user": "c-0012", "question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales."}
+{"user": "c-0012", "question": "Delete all the orders", "status": "no_answer", "reply": "I could not run a query for that question."}
+7 cache hits, 11 questions sent to the model

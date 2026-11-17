@@ -1,0 +1,40 @@
+$ uv run python main/run.py --target aws
+creating recipe-updates, recipe-updates, recipe-consumer in ca-central-1 ...
+sent 300 updates in 29.0 s; waiting for the consumer ...
+removed  mapping bc5ffe0b-b3f7-44c5-a760-916bc1c3f4f5 of recipe-consumer
+removed  function recipe-consumer
+removed  log group /aws/lambda/recipe-consumer
+removed  policy of role recipe-consumer-role
+removed  role recipe-consumer-role
+absent   function recipe-windows
+absent   log group /aws/lambda/recipe-windows
+absent   policy of role recipe-windows-role
+absent   role recipe-windows-role
+absent   function recipe-dashboard
+absent   log group /aws/lambda/recipe-dashboard
+absent   policy of role recipe-dashboard-role
+absent   role recipe-dashboard-role
+absent   function recipe-history
+absent   log group /aws/lambda/recipe-history
+absent   policy of role recipe-history-role
+absent   role recipe-history-role
+removed  topic recipe-updates-topic
+removed  queue recipe-consumer-failures
+absent   queue recipe-windows-failures
+absent   queue recipe-dashboard
+absent   queue recipe-dashboard-dlq
+absent   queue recipe-history
+absent   queue recipe-history-dlq
+removed  table recipe-updates
+absent   table recipe-windows
+absent   table recipe-dashboard
+absent   table recipe-history
+removed  stream recipe-updates
+target: aws, prefix: recipe, sent: 300, retried by the producer: 0
+updates stored: 300
+
+part of the lag                             median s     p95 s
+lag: event to stored                          63.864   134.632
+event to entered (before the broker)           0.248    75.820
+entered to stored (broker and consumer)       62.211    72.490
+[exit 0]

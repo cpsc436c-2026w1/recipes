@@ -1,0 +1,19 @@
+$ CHAT_MODEL=qwen3.8-27b uv run python -m main.run --target local --model gateway
+{"question": "How many orders are there?", "status": "answered", "reply": "There are 1,200 orders in total.", "sql": "SELECT COUNT(*) AS order_count FROM orders", "rows": [[1200]], "model_calls": 2, "latency_ms": 4289.3, "request_id": "2b03ee51-5efb-42e3-896b-ec24113db144"}
+{"question": "What were total sales in Vancouver?", "status": "answered", "reply": "Total sales in Vancouver were $7,044.58 CAD.", "sql": "SELECT SUM(o.amount_cad) AS total_sales\nFROM orders o\nJOIN stores s ON o.store_id = s.store_id\nWHERE s.city = 'Vancouver'", "rows": [[7044.58]], "model_calls": 2, "latency_ms": 2779.0, "request_id": "6d9be257-8a6f-400d-834f-83ad94180c82"}
+{"question": "Which category sold the most items?", "status": "answered", "reply": "Coffee sold the most items, with a total of 1,014 units sold.", "sql": "SELECT category, SUM(quantity) AS total_items\nFROM orders\nGROUP BY category\nORDER BY total_items DESC\nLIMIT 1", "rows": [["coffee", 1014]], "model_calls": 2, "latency_ms": 3279.7, "request_id": "50be9f51-33fb-46d1-805b-f1d80f5eadff"}
+{"question": "How much did I spend in total?", "status": "answered", "reply": "You spent a total of $501.24 CAD across all your orders.", "sql": "SELECT SUM(amount_cad) AS total_spent FROM orders WHERE customer_id = 'c-0007'", "rows": [[501.24]], "model_calls": 2, "latency_ms": 2649.9, "request_id": "a9e9716b-e02e-478f-9390-318e3b8a9f7d"}
+{"question": "What is the weather today?", "status": "no_answer", "reply": "I can only answer questions about the shop's sales.", "sql": "", "rows": [], "model_calls": 1, "latency_ms": 1419.6, "request_id": "835b1622-1ed8-44a6-9c9c-f357050e5805"}
+{"question": "Delete all the orders", "status": "no_answer", "reply": "I can only answer questions about the shop's sales using read-only queries, so I can't delete orders.", "sql": "", "rows": [], "model_calls": 1, "latency_ms": 2173.8, "request_id": "3d840776-9526-4fc4-9330-af6f5fe2c0cc"}
+model: gateway; total 0.000719 CAD; traces in output/traces.jsonl
+[exit 0]
+
+# Completion tokens per model call, from output/traces.jsonl of the same run (the recipe sends max_tokens 600 for this model, R35):
+#   answered  'How many orders are there?': 58, 36
+#   answered  'What were total sales in Vancouver?': 106, 45
+#   answered  'Which category sold the most items?': 153, 45
+#   answered  'How much did I spend in total?': 95, 60
+#   no_answer 'What is the weather today?': 87
+#   no_answer 'Delete all the orders': 162
+# 10 model calls, 847 completion tokens in all, the most in one call 162; no reply stopped at the cap.
+# The gateway's own count for the key of this run: 10 requests, 5501 tokens in, 847 out, 0.000729 CAD.

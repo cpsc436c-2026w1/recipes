@@ -1,0 +1,20 @@
+[project]
+name = "recipe-llm-probes"
+version = "0.1.0"
+description = "CPSC 436C recipe: test what an OpenAI-compatible LLM endpoint supports before designing on it"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",                # every probe is one plain HTTP request
+]
+
+[dependency-groups]
+dev = [
+    "behave>=1.3.3",
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+package = false

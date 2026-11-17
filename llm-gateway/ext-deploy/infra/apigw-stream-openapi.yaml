@@ -1,0 +1,28 @@
+# NOT WIRED. API Gateway REST API with response streaming to the gateway function.
+# Deploy only after a hello route proves that API Gateway accepts the Lambda Web
+# Adapter's streaming prelude. Transfer mode STREAM and the
+# response-streaming-invocations URI are from
+# https://docs.aws.amazon.com/apigateway/latest/developerguide/response-streaming-lambda-configure.html
+# The function would run with AWS_LWA_INVOKE_MODE=response_stream.
+openapi: "3.0.1"
+info:
+  title: llm-gateway-stream
+  version: "1"
+paths:
+  /{proxy+}:
+    x-amazon-apigateway-any-method:
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        responseTransferMode: STREAM
+        timeoutInMillis: 300000
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2021-11-15/functions/${GatewayFunction.Arn}/response-streaming-invocations
+x-amazon-apigateway-endpoint-configuration:
+  disableExecuteApiEndpoint: false

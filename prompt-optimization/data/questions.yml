@@ -1,0 +1,63 @@
+# Questions the optimizer may use: train (GEPA reads the feedback) and val (GEPA reads only the scores).
+# The test questions are in test.yml and only main/report.py loads them (README, Decisions: "Three splits").
+# Each question: id, split, the question, and the reference SQL whose result is the correct answer.
+- id: t01
+  split: train
+  question: How many orders were placed?
+  sql: SELECT COUNT(*) FROM orders
+- id: t02
+  split: train
+  question: What percentage of orders were paid in cash?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE payment = 'cash') / COUNT(*) FROM orders
+- id: t03
+  split: train
+  question: What is the average wait, in minutes, from placing an order to its being ready?
+  sql: SELECT AVG(epoch(ready_at - placed_at)) / 60.0 FROM orders
+- id: t04
+  split: train
+  question: How many lattes were sold, counting the quantity of each order?
+  sql: SELECT SUM(quantity) FROM orders WHERE item = 'latte'
+- id: t05
+  split: train
+  question: What percentage of card orders left a tip above zero?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE tip_cad > 0) / COUNT(*) FROM orders WHERE payment = 'card'
+- id: t06
+  split: train
+  question: What is the longest wait, in minutes, for any order?
+  sql: SELECT MAX(epoch(ready_at - placed_at)) / 60.0 FROM orders
+- id: t07
+  split: train
+  question: What is the total of all tips, in dollars?
+  sql: SELECT SUM(tip_cad) FROM orders
+- id: t08
+  split: train
+  question: How many orders were placed before 9 in the morning?
+  sql: SELECT COUNT(*) FROM orders WHERE hour(placed_at) < 9
+- id: t09
+  split: train
+  question: What is the average amount paid per order, in dollars, counting the quantity and leaving out tips?
+  sql: SELECT AVG(quantity * price_cad) FROM orders
+- id: v01
+  split: val
+  question: How many orders were for soup?
+  sql: SELECT COUNT(*) FROM orders WHERE item = 'soup'
+- id: v02
+  split: val
+  question: What percentage of orders were for a latte?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE item = 'latte') / COUNT(*) FROM orders
+- id: v03
+  split: val
+  question: What is the average wait, in minutes, for soup orders?
+  sql: SELECT AVG(epoch(ready_at - placed_at)) / 60.0 FROM orders WHERE item = 'soup'
+- id: v04
+  split: val
+  question: What is the highest price on the menu, in dollars?
+  sql: SELECT MAX(price_cad) FROM orders
+- id: v05
+  split: val
+  question: What percentage of the money paid, leaving out tips, came from card orders?
+  sql: SELECT 100.0 * SUM(quantity * price_cad) FILTER (WHERE payment = 'card') / SUM(quantity * price_cad) FROM orders
+- id: v06
+  split: val
+  question: What is the total amount paid for all orders, in dollars, counting the quantity and leaving out tips?
+  sql: SELECT SUM(quantity * price_cad) FROM orders

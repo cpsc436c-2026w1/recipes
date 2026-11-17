@@ -1,0 +1,28 @@
+[project]
+name = "recipe-llm-gateway"
+version = "0.1.0"
+description = "CPSC 436C recipe: call the course LLM gateway with your course MCP token, and handle its budget and rate refusals"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",              # main/call_gateway.py writes every request out in full with httpx
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    # The offline tests run the client against the gateway's own code (ext-deploy/) in this process,
+    # with moto for AWS and a fake upstream for the model, so the refusals they see are the real ones.
+    "gateway",
+    "moto[dynamodb,secretsmanager,sns]>=5.2.5",
+    "uvicorn>=0.54.0",
+    "behave>=1.3.3",
+]
+
+[tool.uv.sources]
+gateway = { path = "ext-deploy", editable = true }
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]          # ext-deploy has its own: cd ext-deploy && uv run pytest -q

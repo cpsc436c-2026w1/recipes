@@ -1,0 +1,6 @@
+How many orders are there?
+What were total sales in Vancouver?
+Which category sold the most items?
+How much did I spend in total?
+What is the weather today?
+Delete all the orders

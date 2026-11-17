@@ -1,0 +1,62 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "workflow-patterns"
+format = "main-scenario"
+task = "Three workflow patterns as one short file each, on the course LLM gateway or an offline stub: a prompt chain with a code check between calls, parallel calls (sectioning and voting), and an evaluator-optimizer loop with a model or a code check as the evaluator"
+shapes = ["genai-first"]
+extensions = []
+lectures = ["L17", "L18"]
+core = ["course LLM gateway"]
+secondary = []
+region = "ca-central-1"
+cost_one_run = "less than 0.004 CAD of gateway budget for the three files together: at most 12 model calls of at most 1500 output tokens each at the price of qwen3.8-27b in model-routing (an upper bound, not measured); the recipe does not create AWS resources"
+summary = "Prompt chain, parallel calls (sectioning, voting) and evaluator-optimizer (model or code check as evaluator), each in a file of under 80 lines where app code decides every next step and a cap bounds the model calls; runs offline on a stub"
+
+[[practices]]
+name = "Prompt chain: a fixed order of model calls, each reading the reply before it, with a code check between calls that can stop the chain"
+source = "Anthropic, Building effective agents (Workflow: Prompt chaining); AI Engineering ch. 5, Break Complex Tasks into Simpler Subtasks; L17"
+
+[[practices]]
+name = "Parallel calls: independent calls at the same time, combined by app code (sectioning), or the same task several times with a majority (voting)"
+source = "Anthropic, Building effective agents (Workflow: Parallelization); AI Engineering ch. 10, AI Pipeline Orchestration; L17"
+
+[[practices]]
+name = "Evaluator-optimizer: a draft, a pass or fail with feedback from a model call or a code check, and a loop with a round limit in app code"
+source = "Anthropic, Building effective agents (Workflow: Evaluator-optimizer); AI Engineering ch. 6, Reflection and error correction; L17"
+
+[[practices]]
+name = "A cap on model calls that the model cannot remove"
+source = "L17, L18 (limits outside the model)"
+
+[instruments]
+files = ["main/chain.py", "main/parallel.py", "main/evaluator.py", "main/llm.py", ".env.example"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "The chain makes its three calls in order and each reads the reply before it; a pick with an unlisted product stops the chain after two calls; the two sectioning calls and the three votes are in flight at the same time; the majority label wins and no majority is reported as such; feedback reaches the next generator call; the loop stops at three rounds; the call over the cap is not made; the gateway client sends the OpenAI chat request shape and does not retry"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no key
+scenarios = "uv run behave"
+run = "uv run python main/chain.py --model gateway"
+run_parallel = "uv run python main/parallel.py --model gateway"
+run_evaluator = "uv run python main/evaluator.py --model gateway --max-calls 4"
+run_offline = "uv run python main/chain.py"
+
+[env]
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1; GATEWAY_URL still works"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment or .env only; LLM_API_KEY and COURSE_MCP_TOKEN are read when it is not set"
+LLM_MODEL = "default qwen3.8-27b"
+
+[resources]
+local_files = []
+aws = []
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"                 # not used: the recipe creates no AWS resources
+model_calls_through = "course LLM gateway"
+app_code_decides_next_step = true          # in a workflow the model fills a step; it never chooses one
+model_calls_capped = true
+tests_offline = true

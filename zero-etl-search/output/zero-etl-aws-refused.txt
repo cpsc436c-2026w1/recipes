@@ -1,0 +1,26 @@
+# Sandbox run 2026-11-14: the course sandbox's service control policy denies osis:ValidatePipeline, the first
+# OpenSearch Ingestion call of the script. The table and the collection were those of the main scenario; the bucket
+# and the pipeline role were created before the refusal and removed by clean_up.py (clean-up-2026-11-14.txt).
+$ uv run python ext-zero-etl/zero_etl.py --target aws
+collection let you in 0 s after it was ACTIVE
+Traceback (most recent call last):
+  File "zero-etl-search/ext-zero-etl/zero_etl.py", line 200, in <module>
+    main()
+  File "zero-etl-search/ext-zero-etl/zero_etl.py", line 196, in main
+    print(run_aws(s) if args.target == "aws" else run_local(s))
+          ^^^^^^^^^^
+  File "zero-etl-search/ext-zero-etl/zero_etl.py", line 170, in run_aws
+    create_pipeline(c("osis"), s, render(s, table_arn, endpoint, bucket))
+  File "zero-etl-search/ext-zero-etl/zero_etl.py", line 85, in create_pipeline
+    check = osis.validate_pipeline(PipelineConfigurationBody=config)  # the service's own check
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "zero-etl-search/.venv/lib/python3.12/site-packages/botocore/client.py", line 606, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "zero-etl-search/.venv/lib/python3.12/site-packages/botocore/context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "zero-etl-search/.venv/lib/python3.12/site-packages/botocore/client.py", line 1094, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.AccessDeniedException: An error occurred (AccessDeniedException) when calling the ValidatePipeline operation: User: arn:aws:sts::111122223333:assumed-role/<role> is not authorized to perform: osis:ValidatePipeline on resource: arn:aws:osis:ca-central-1:111122223333:* with an explicit deny in a service control policy: arn:aws:organizations::444455556666:policy/o-exampleorgid/service_control_policy/p-examplepolicy
+[exit 1]

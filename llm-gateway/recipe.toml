@@ -1,0 +1,60 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "llm-gateway"
+format = "main-scenario"
+task = "Call the course LLM gateway with your course MCP token: list your models, send a chat with max_tokens, and handle budget, rate, token and model refusals"
+shapes = ["genai-first"]
+extensions = []                    # serves every GenAI extension: every model call goes through the gateway
+lectures = ["L15", "L16", "L17"]
+core = ["course LLM gateway"]      # ext-deploy: Lambda function URLs, DynamoDB, SNS, Secrets Manager, AWS SAM
+secondary = []
+region = "ca-central-1"
+cost_one_run = "the tokens of one short chat on your key's budget: 0.000002 CAD for 18 tokens in and 2 out (measured 2026-11-12, output/main.txt); no AWS resources"
+summary = "A plain-httpx client for the course LLM gateway that lists models, chats with max_tokens set, waits once on a rate limit and stops on a spent budget; ext-deploy is a model gateway's source and deploy (the course LLM gateway runs the course's own version, which can differ)"
+
+[[practices]]
+name = "provider keys stay central; each caller has its own key, budget and rate limit"
+source = "L16-L17; AI Engineering ch. 10 (gateway)"
+
+[[practices]]
+name = "limits sit outside the caller's code path: a reserve before the call, a per-key rate limit"
+source = "L16; AWS Well-Architected Agentic AI Lens AGENTCOST07-BP01"
+
+[[practices]]
+name = "start with the cheaper model"
+source = "L16-L17; AWS Well-Architected Agentic AI Lens AGENTCOST02-BP01"
+
+[instruments]
+files = ["main/call_gateway.py", "ext-deploy/src/gateway/", "ext-deploy/infra/template.yaml", "ext-deploy/infra/iam/"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "the client against the gateway's own code in process: models listed, a chat answered, 401 invalid_api_key and 403 model_not_allowed not retried, 429 budget_exhausted when max_tokens does not fit and success when it does, 429 rate_limit_exceeded waited once for Retry-After, the token never printed"
+
+[scenarios]
+main = "main/call_gateway.py"
+ext-deploy = "ext-deploy/README.md"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline: no token, no AWS account
+scenarios = "uv run behave"        # the README's requirements, as behave scenarios; offline
+run = "uv run python main/call_gateway.py"
+clean = ""                          # main creates nothing; ext-deploy: see its README, "Clean up"
+
+[extension_commands]
+ext-deploy-test = "cd ext-deploy && uv sync && uv run pytest -q"
+ext-deploy-local = "cd ext-deploy && uv run python tests/local_run.py"
+
+[env]
+COURSE_GATEWAY_URL = "base URL of the course LLM gateway, ending in /v1 (on the course page, or a repository variable in the team repo on github.students); never hard-coded"
+KB_MCP_TOKEN = "the student's course MCP token; read from the environment only. COURSE_MCP_TOKEN (and GATEWAY_URL for the address) still work when the new name is not set"
+CHAT_MODEL = "default qwen3.6-35b-a3b"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+model_calls_through = "course LLM gateway"
+token_never_printed = true
+max_tokens_always_sent = true
+no_retry_on = ["budget_exhausted", "invalid_api_key", "key_revoked", "key_expired", "model_not_allowed", "upstream_rejected", "upstream_key_refused", "model_allowance_used", "model_allowance_ended"]
+live_course_gateway = "deployed from a separate copy outside this repository; a change in ext-deploy does not change it"

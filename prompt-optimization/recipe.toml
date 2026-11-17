@@ -1,0 +1,53 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "prompt-optimization"
+format = "main-scenario"
+task = "Tune the instructions of one LLM step with GEPA against a metric with feedback, choose on validation questions, and report the pass rate before and after on held-out test questions"
+shapes = ["genai-first"]
+extensions = []                    # part of the generative-AI-first shape; not an extension on the proposal page
+lectures = ["L15", "L17"]
+core = ["course LLM gateway", "DSPy", "GEPA", "DuckDB"]
+secondary = []
+region = "ca-central-1"            # no AWS resources; the course LLM gateway runs in ca-central-1
+cost_one_run = "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); capped by --max-cad"
+summary = "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix."
+
+# What the recipe teaches
+[[practices]]
+name = "Tune a prompt against a metric whose feedback names the failure type"
+source = "L17 (evaluator-optimizer, DSPy and GEPA); AI Engineering ch. 6, Agents, Reflection and error correction"
+
+[[practices]]
+name = "Three splits: reflect on train, choose on validation, report on held-out test questions"
+source = "L15 demo evals/gepa (measured: test median 58% to 83%); AI Engineering ch. 4, Design Your Evaluation Pipeline"
+
+[[practices]]
+name = "Report the median of several runs with every run, and the spend"
+source = "L15 demo evals/gepa/results.md (the same prompt passed 33% to 75% over 8 runs)"
+
+[[practices]]
+name = "Use the simplest model that passes the eval"
+source = "L16-17; AGENTCOST02-BP01 (ext-eval-matrix)"
+
+[instruments]
+files = ["main/program.py", "main/metric.py", "main/optimize.py", "main/report.py", "main/models.py", "main/data.py", "ext-gepa-direct/optimize_direct.py", "ext-eval-matrix/matrix.py"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account, no token
+scenarios = "uv run behave"        # the README's requirements, as behave scenarios; offline
+run = "uv run python -m main.run --target gateway"
+run_offline = "uv run python -m main.run"
+clean = "uv run python clean_up.py"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"          # unused: the recipe creates no named resources
+model_calls_through = "course LLM gateway"
+gateway_env = ["COURSE_GATEWAY_URL", "KB_MCP_TOKEN"]   # GATEWAY_URL and COURSE_MCP_TOKEN still work when these are not set
+test_split_only_in = ["main/report.py", "main/run.py after optimize()", "ext-gepa-direct/optimize_direct.py after optimize()", "ext-eval-matrix/matrix.py"]
+spend_cap_flags = ["--max-metric-calls", "--max-reflection-calls", "--max-cad"]

@@ -1,0 +1,65 @@
+# Fixed replies of the offline stub model (main/stub.py). Not used with the course LLM gateway.
+# For each question the stub writes `sql`, unless one of its habits applies and the system prompt
+# does not carry the rule that stops that habit:
+#   share_sql    the "share" habit: a share from 0 to 1 where a percentage was asked
+#   seconds_sql  the "seconds" habit: seconds where minutes were asked
+#   chatty       the "chatty" habit: a sentence after the query, so the query does not parse
+# A question with only `sql` that is wrong stays wrong whatever the prompt says (t09, q06).
+- question: How many orders were placed?
+  sql: SELECT COUNT(*) AS n FROM orders
+  chatty: true
+- question: What percentage of orders were paid in cash?
+  sql: SELECT 100.0 * SUM(CASE WHEN payment = 'cash' THEN 1 ELSE 0 END) / COUNT(*) AS pct FROM orders
+  share_sql: SELECT SUM(CASE WHEN payment = 'cash' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS pct FROM orders
+- question: What is the average wait, in minutes, from placing an order to its being ready?
+  sql: SELECT AVG(epoch(ready_at - placed_at) / 60.0) AS minutes FROM orders
+  seconds_sql: SELECT AVG(epoch(ready_at - placed_at)) AS minutes FROM orders
+- question: How many lattes were sold, counting the quantity of each order?
+  sql: SELECT SUM(quantity) AS lattes FROM orders WHERE item = 'latte'
+- question: What percentage of card orders left a tip above zero?
+  sql: SELECT 100.0 * AVG(CASE WHEN tip_cad > 0 THEN 1 ELSE 0 END) AS pct FROM orders WHERE payment = 'card'
+  share_sql: SELECT AVG(CASE WHEN tip_cad > 0 THEN 1 ELSE 0 END) AS pct FROM orders WHERE payment = 'card'
+  chatty: true
+- question: What is the longest wait, in minutes, for any order?
+  sql: SELECT MAX(epoch(ready_at - placed_at)) / 60.0 AS minutes FROM orders
+  seconds_sql: SELECT MAX(epoch(ready_at - placed_at)) AS minutes FROM orders
+- question: What is the total of all tips, in dollars?
+  sql: SELECT SUM(tip_cad) AS tips FROM orders
+  chatty: true
+- question: How many orders were placed before 9 in the morning?
+  sql: SELECT COUNT(*) AS n FROM orders WHERE extract('hour' FROM placed_at) < 9
+- question: What is the average amount paid per order, in dollars, counting the quantity and leaving out tips?
+  sql: SELECT AVG(price_cad) AS avg_paid FROM orders
+- question: How many orders were for soup?
+  sql: SELECT COUNT(*) AS n FROM orders WHERE item = 'soup'
+  chatty: true
+- question: What percentage of orders were for a latte?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE item = 'latte') / COUNT(*) AS pct FROM orders
+  share_sql: SELECT COUNT(*) FILTER (WHERE item = 'latte') * 1.0 / COUNT(*) AS pct FROM orders
+- question: What is the average wait, in minutes, for soup orders?
+  sql: SELECT AVG(epoch(ready_at - placed_at)) / 60.0 AS minutes FROM orders WHERE item = 'soup'
+  seconds_sql: SELECT AVG(epoch(ready_at - placed_at)) AS minutes FROM orders WHERE item = 'soup'
+- question: What is the highest price on the menu, in dollars?
+  sql: SELECT MAX(price_cad) AS top_price FROM orders
+- question: What percentage of the money paid, leaving out tips, came from card orders?
+  sql: SELECT 100.0 * SUM(CASE WHEN payment = 'card' THEN quantity * price_cad ELSE 0 END) / SUM(quantity * price_cad) AS pct FROM orders
+  share_sql: SELECT SUM(CASE WHEN payment = 'card' THEN quantity * price_cad ELSE 0 END) / SUM(quantity * price_cad) AS pct FROM orders
+- question: What is the total amount paid for all orders, in dollars, counting the quantity and leaving out tips?
+  sql: SELECT SUM(quantity * price_cad) AS paid FROM orders
+- question: How many orders were paid by card?
+  sql: SELECT COUNT(*) AS n FROM orders WHERE payment = 'card'
+  chatty: true
+- question: What percentage of orders were for tea?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE item = 'tea') / COUNT(*) AS pct FROM orders
+  share_sql: SELECT COUNT(*) FILTER (WHERE item = 'tea') * 1.0 / COUNT(*) AS pct FROM orders
+- question: What is the shortest wait, in minutes, for any order?
+  sql: SELECT MIN(epoch(ready_at - placed_at)) / 60.0 AS minutes FROM orders
+  seconds_sql: SELECT MIN(epoch(ready_at - placed_at)) AS minutes FROM orders
+- question: What is the average tip, in dollars, on cash orders?
+  sql: SELECT AVG(tip_cad) AS avg_tip FROM orders WHERE payment = 'cash'
+- question: What percentage of all tips came from latte orders?
+  sql: SELECT 100.0 * SUM(CASE WHEN item = 'latte' THEN tip_cad ELSE 0 END) / SUM(tip_cad) AS pct FROM orders
+  share_sql: SELECT SUM(CASE WHEN item = 'latte' THEN tip_cad ELSE 0 END) / SUM(tip_cad) AS pct FROM orders
+  chatty: true
+- question: What is the average amount paid per card order, in dollars, counting the quantity and leaving out tips?
+  sql: SELECT AVG(price_cad) AS avg_paid FROM orders WHERE payment = 'card'

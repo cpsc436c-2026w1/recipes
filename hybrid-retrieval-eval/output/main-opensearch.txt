@@ -1,0 +1,20 @@
+# Sandbox run 2026-11-14, 05:31:30 to 05:32:49 UTC, from the start of the command to its end (79 s): policies, collection group, collection, index, queries.
+$ timeout 1320 uv run python -m main.run --backend opensearch --embedder gateway --answers gateway
+Retrieval (16 labelled queries, opensearch indexes, gateway embeddings)
+
+| method | recall@5 | MRR | exact code | other words | plain words | typo |
+|---|---:|---:|---:|---:|---:|---:|
+| keyword | 0.81 | 0.78 | 1.00 | 0.60 | 1.00 | 0.67 |
+| embedding | 0.88 | 0.81 | 1.00 | 0.80 | 1.00 | 0.67 |
+| hybrid | 0.94 | 0.91 | 1.00 | 0.80 | 1.00 | 1.00 |
+
+Answers (gateway answerer, from the hybrid top 5)
+
+| correct | grounded | retrieval hit, answer wrong | retrieval missed |
+|---:|---:|---:|---:|
+| 0.94 | 0.94 | 0 | 1 |
+
+gateway: 2 embedding requests, 838 tokens; 16 chat calls, 3803 input and 496 output tokens; 0.000248 CAD at the gateway's prices
+
+rows per query: output/eval-opensearch-gateway-gateway.json
+[exit 0]

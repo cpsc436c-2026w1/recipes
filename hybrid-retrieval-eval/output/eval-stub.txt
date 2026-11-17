@@ -1,0 +1,15 @@
+Retrieval (16 labelled queries, local indexes, stub embeddings)
+
+| method | recall@5 | MRR | exact code | other words | plain words | typo |
+|---|---:|---:|---:|---:|---:|---:|
+| keyword | 0.81 | 0.77 | 1.00 | 0.60 | 1.00 | 0.67 |
+| embedding | 1.00 | 0.85 | 1.00 | 1.00 | 1.00 | 1.00 |
+| hybrid | 1.00 | 0.92 | 1.00 | 1.00 | 1.00 | 1.00 |
+
+Answers (stub answerer, from the hybrid top 5)
+
+| correct | grounded | retrieval hit, answer wrong | retrieval missed |
+|---:|---:|---:|---:|
+| 0.88 | 1.00 | 2 | 0 |
+
+rows per query: output/eval-local-stub-stub.json

@@ -1,0 +1,8 @@
+{"id": "I01", "name": "Trail running shoe", "description": "Light shoe with a grippy sole for muddy forest paths", "category": "footwear", "brand": "Northline", "price_cad": 139.0, "in_stock": true}
+{"id": "I02", "name": "Rain shell jacket", "description": "Waterproof jacket that packs into its own pocket", "category": "outerwear", "brand": "Northline", "price_cad": 189.0, "in_stock": true}
+{"id": "I03", "name": "Insulated water bottle", "description": "Steel bottle that keeps drinks cold for a day", "category": "gear", "brand": "Cascade", "price_cad": 34.0, "in_stock": true}
+{"id": "I04", "name": "Headlamp HX-200", "description": "Rechargeable headlamp, 400 lumens, red night mode", "category": "gear", "brand": "Cascade", "price_cad": 59.0, "in_stock": false}
+{"id": "I05", "name": "Wool hiking sock", "description": "Cushioned merino sock for long days on the trail", "category": "footwear", "brand": "Fernwood", "price_cad": 24.0, "in_stock": true}
+{"id": "I06", "name": "Two-person tent", "description": "Freestanding tent with two doors and a rain fly", "category": "shelter", "brand": "Fernwood", "price_cad": 329.0, "in_stock": true}
+{"id": "I07", "name": "Down sleeping bag", "description": "Warm bag rated to minus five degrees, packs small", "category": "shelter", "brand": "Northline", "price_cad": 279.0, "in_stock": true}
+{"id": "I08", "name": "Trekking poles", "description": "Folding aluminium poles with cork grips", "category": "gear", "brand": "Cascade", "price_cad": 89.0, "in_stock": true}

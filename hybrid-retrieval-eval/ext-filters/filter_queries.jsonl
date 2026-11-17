@@ -1,0 +1,7 @@
+{"id": "f01", "query": "speaker", "filter": {"price_cad": {"lte": 100}}, "relevant": ["P04"]}
+{"id": "f02", "query": "two", "filter": {"category": ["outdoor"]}, "relevant": ["P16"]}
+{"id": "f03", "query": "light", "filter": {"price_cad": {"lte": 20}}, "relevant": ["P15"]}
+{"id": "f04", "query": "wireless", "filter": {"category": ["accessories"]}, "relevant": ["P26", "P27"]}
+{"id": "f05", "query": "coffee", "filter": {"price_cad": {"lte": 60}}, "relevant": ["P19", "P20"]}
+{"id": "f06", "query": "desk", "filter": {"category": ["lighting"]}, "relevant": ["P14"]}
+{"id": "f07", "query": "charger", "filter": {"in_stock": true}, "relevant": ["P01", "P02", "P28"]}

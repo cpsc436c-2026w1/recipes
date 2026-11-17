@@ -1,0 +1,12 @@
+model: stub; at most 9 model calls
+model as evaluator
+  passed: True
+  rounds: 2
+  label: Oat milk 1 L, Abbotsford farm, 4.50 CAD
+  last_feedback: pass
+code check as evaluator
+  passed: True
+  rounds: 2
+  label: Oat milk 1 L, Abbotsford farm, 4.50 CAD
+  last_feedback: 
+model calls: 6

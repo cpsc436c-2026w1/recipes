@@ -1,0 +1,7 @@
+model: stub; at most 3 model calls
+standalone: Which of oat milk, whole milk and almond milk have no dairy?
+pick: oat milk, almond milk
+gate: passed
+not_listed: []
+reply: Oat milk (4.50 CAD) and almond milk (4.80 CAD) have no dairy.
+model calls: 3

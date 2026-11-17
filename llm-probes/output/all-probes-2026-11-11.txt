@@ -1,0 +1,36 @@
+Endpoint the course's model provider (LTIC), 2026-11-11 04:45 UTC, 45 s timeout per request
+
+| probe | model | works | seconds | note |
+|---|---|---|---:|---|
+| list models |  | yes | 0.20 | qwen3-embedding-0.6b, qwen3.6-35b-a3b, qwen3.8-27b |
+| wrong key is refused |  | yes | 0.08 | HTTP 401: LiteLLM Virtual Key expected. Received=not-****-key, expected to start with 'sk-'. |
+| unknown model is refused |  | yes | 0.07 | HTTP 403: The requested model 'no-such-model' is not available for this API key, or the model name is invalid. Check the... |
+| embeddings | qwen3-embedding-0.6b | yes | 0.47 | 1024 dimensions; similar pair 0.61, unrelated pair 0.21 |
+| chat | qwen3.6-35b-a3b | yes | 0.31 | replied 'ready'; 29 tokens in, 2 out |
+| streaming | qwen3.6-35b-a3b | yes | 0.27 | first token after 0.27 s |
+| usage in the stream | qwen3.6-35b-a3b | yes | 0.27 | 29 tokens in, 2 out |
+| same reply on repeat | qwen3.6-35b-a3b | yes | 0.59 | temperature 0, two calls |
+| max_tokens stops the reply | qwen3.6-35b-a3b | yes | 0.30 | finish_reason length, 5 tokens out |
+| tool call | qwen3.6-35b-a3b | yes | 0.38 | run_sql('SELECT COUNT(*) FROM trips') |
+| tool result used | qwen3.6-35b-a3b | yes | 0.32 | replied 'The trips table has 48,213 rows.' |
+| output fits a JSON schema | qwen3.6-35b-a3b | yes | 0.36 | replied '{ "city": "Vancouver", "population": 660000 }' |
+| schema wins over the prompt | qwen3.6-35b-a3b | yes | 0.37 | replied '{ "city": "Vancouver", "population": 660000 }' |
+| prompt cache reported | qwen3.6-35b-a3b | yes | 0.83 | second call: 3168 of 3309 input tokens cached; 0.47 s then 0.36 s |
+| chat | qwen3.8-27b | yes | 0.57 | replied 'ready'; 65 tokens in, 30 out, 26 of them reasoning |
+| streaming | qwen3.8-27b | yes | 0.57 | first token after 0.55 s; 26 reasoning chunks came first |
+| usage in the stream | qwen3.8-27b | yes | 0.57 | 65 tokens in, 30 out, 26 of them reasoning |
+| same reply on repeat | qwen3.8-27b | yes | 1.17 | temperature 0, two calls |
+| max_tokens stops the reply | qwen3.8-27b | yes | 0.44 | finish_reason length, 5 tokens out, all of them reasoning: the reply text is empty |
+| tool call | qwen3.8-27b | yes | 0.95 | run_sql('SELECT COUNT(*) AS row_count FROM trips') |
+| tool result used | qwen3.8-27b | yes | 0.62 | replied 'The **trips** table has **48,213 rows**.' |
+| output fits a JSON schema | qwen3.8-27b | yes | 1.45 | replied '{"city": "Vancouver", "population": 660000}' |
+| schema wins over the prompt | qwen3.8-27b | yes | 1.79 | replied '{ "city": "Vancouver", "population": 660000 }' |
+| prompt cache reported | qwen3.8-27b | yes | 1.71 | second call: 3136 of 3345 input tokens cached; 0.86 s then 0.85 s |
+
+Headers on the last replies:
+  x-litellm-attempted-fallbacks: 0
+  x-litellm-attempted-retries: 0
+  x-litellm-key-max-budget: <provider budget>
+  x-litellm-key-spend: 0.007723260000000002
+  x-litellm-response-cost: 0.00034550000000000005
+  x-litellm-version: 1.106.5

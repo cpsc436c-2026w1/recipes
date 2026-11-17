@@ -1,0 +1,6 @@
+[
+  {"ParameterKey": "FunctionRoleArn", "ParameterValue": "arn:aws:iam::111122223333:role/llm-gateway-fn"},
+  {"ParameterKey": "SecretArn", "ParameterValue": "arn:aws:secretsmanager:ca-central-1:111122223333:secret:llm-gateway/upstream-key-AbCdEf"},
+  {"ParameterKey": "UpstreamBaseUrl", "ParameterValue": "https://api.example.com/v1"},
+  {"ParameterKey": "Transport", "ParameterValue": "FunctionUrl"}
+]

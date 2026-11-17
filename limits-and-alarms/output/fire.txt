@@ -1,0 +1,8 @@
+# Sandbox run 2026-11-14.
+$ uv run python main/fire.py --target aws
+recipe-app-errors                state ALARM  SNS action sent
+recipe-app-p95-latency           state ALARM  SNS action sent
+recipe-app-daily-cost            state ALARM  SNS action sent
+recipe-app-lambda-errors         state ALARM  SNS action sent
+recipe-app-lambda-throttles      state ALARM  SNS action sent
+[exit 0]

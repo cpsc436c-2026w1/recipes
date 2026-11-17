@@ -1,0 +1,17 @@
+# Gateway run 2026-11-14, with every answer capped at 150 tokens (the stronger model now gets 600); no AWS in this run.
+$ uv run python ext-model-routing/routing_eval.py --model gateway
+10 requests, gateway replies
+
+| policy | accuracy | cost (CAD) | of which router | share sent to the stronger model |
+|---|---:|---:|---:|---:|
+| all-cheap | 0.80 | 0.000153 | 0.000000 | 0.00 |
+| all-strong | 0.50 | 0.000550 | 0.000000 | 1.00 |
+| routed | 0.60 | 0.000416 | 0.000047 | 0.50 |
+
+router label agrees with the hand label on 1.00 of the requests
+[exit 0]
+
+# Why all-strong scores below all-cheap in this run. One request of the same kind sent to qwen3.8-27b the way
+# router.py sends its answers (max_tokens 150): finish_reason length, 0 characters of reply, 150 completion tokens,
+# all of them reasoning. The same request with max_tokens 600: finish_reason stop, 214 characters of reply, 330
+# completion tokens, 277 of them reasoning. (Checked by hand on 2026-11-14 with the same key; not part of the script.)

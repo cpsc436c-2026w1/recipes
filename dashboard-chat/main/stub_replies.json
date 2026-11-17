@@ -1,0 +1,8 @@
+{
+  "How many orders are there?": {"sql": "SELECT COUNT(*) AS orders FROM orders"},
+  "What were total sales in Vancouver?": {"sql": "SELECT ROUND(SUM(o.amount_cad), 2) AS sales_cad FROM orders o JOIN stores s USING (store_id) WHERE s.city = 'Vancouver'"},
+  "Which category sold the most items?": {"sql": "SELECT category, SUM(quantity) AS items FROM orders GROUP BY category ORDER BY items DESC LIMIT 1"},
+  "How much did I spend in total?": {"sql": "SELECT ROUND(SUM(amount_cad), 2) AS spent_cad FROM orders WHERE customer_id = '{customer_id}'"},
+  "What is the weather today?": {"reply": "I can only answer questions about the shop's sales."},
+  "Delete all the orders": {"sql": "DELETE FROM orders"}
+}

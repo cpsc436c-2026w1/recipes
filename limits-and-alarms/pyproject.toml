@@ -1,0 +1,22 @@
+[project]
+name = "recipe-limits-and-alarms"
+version = "0.1.0"
+description = "Limits outside the code path and alarms on errors, latency and cost (CPSC 436C recipe)"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.35",
+]
+
+[dependency-groups]
+dev = [
+    "behave>=1.3.3",
+    "moto[budgets,cloudwatch,lambda,logs,sns,iam,sts]>=5.0",
+    "pytest>=8",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["main", "ext-runaway-loop", "."]
+testpaths = ["tests"]

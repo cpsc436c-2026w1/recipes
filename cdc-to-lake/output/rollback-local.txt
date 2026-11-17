@@ -1,0 +1,6 @@
+[local Iceberg table]
+before the load   snapshot 5695533566951543510: 5 changes, average fare 15.9
+after the load    snapshot 6252148321195427173 and later commits: 9 changes, average fare 518.25   <- fares 100 times too high
+time travel to 5695533566951543510: 5 changes (the earlier table is still there)
+rolled back to 5695533566951543510, good rows from later commits appended again: 1
+after restore: 6 changes, average fare 14.88

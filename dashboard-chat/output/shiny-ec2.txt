@@ -1,0 +1,86 @@
+# Sandbox run 2026-11-14 06:13:53-06:26:11 UTC: the web page on an EC2 instance (README part 5), from the security
+# group to the clean-up. Lines that start with "$" are the commands; "(on the instance)" marks those typed there.
+# A first attempt the same day, with the commands as the README then had them, failed twice:
+#   aws ec2 create-security-group without --vpc-id:
+#     An error occurred (VPCIdNotSpecified) when calling the CreateSecurityGroup operation: No default VPC for this user
+#   uv run --no-dev shiny run ... on the instance (uv chose CPython 3.15.2; no compiler on Amazon Linux 2023):
+#     Building libsass==0.23.0 ... error: [Errno 2] No such file or directory: 'cc'
+# This run names the sandbox's VPC and a public subnet, installs gcc on the instance and runs with Python 3.12.
+# The recipes repository is private, so the folder was copied to the instance in place of git clone.
+# The sandbox's network, read the same day (ids left out; the first column of the second command is the subnet id):
+#   $ aws ec2 describe-vpcs --query 'Vpcs[].[VpcId,IsDefault]' --output text
+#   vpc-EXAMPLE	False                         (one VPC, tagged Name=cpsc436c-vpc, not a default VPC)
+#   $ aws ec2 describe-subnets --query 'Subnets[].[SubnetId,MapPublicIpOnLaunch,Tags[?Key==`Name`]|[0].Value]' --output text
+#   subnet-EXAMPLE	True	cpsc436c-public-a
+#   subnet-EXAMPLE	True	cpsc436c-public-b
+#   subnet-EXAMPLE	False	cpsc436c-private-a
+#   subnet-EXAMPLE	False	cpsc436c-private-b
+# Resource ids are masked as sg-EXAMPLE, i-EXAMPLE and ami-EXAMPLE.
+# start 06:13:53
+$ VPC=$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)
+$ SUBNET=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC Name=map-public-ip-on-launch,Values=true --query 'Subnets[0].SubnetId' --output text)
+$ SG=$(aws ec2 create-security-group --group-name $PREFIX-chat-app-ec2 --vpc-id $VPC --description "dashboard-chat page on EC2" --query GroupId --output text)
+sg-EXAMPLE
+$ aws ec2 authorize-security-group-ingress --group-id sg-EXAMPLE --protocol tcp --port 22 --cidr <your address>/32 --query Return --output text
+True
+$ aws ec2 authorize-security-group-ingress --group-id sg-EXAMPLE --protocol tcp --port 8000 --cidr <your address>/32 --query Return --output text
+True
+ami-EXAMPLE
+$ INSTANCE=$(aws ec2 run-instances --image-id $AMI --instance-type t4g.small --key-name YOUR-KEY-PAIR --subnet-id $SUBNET --security-group-ids $SG --tag-specifications ... --query Instances[0].InstanceId --output text)
+i-EXAMPLE
+$ aws ec2 wait instance-running --instance-ids i-EXAMPLE
+# instance running 06:14:23, address <the address>
+# ssh answers 06:14:24
+$ curl -LsSf https://astral.sh/uv/install.sh | sh && source ~/.bashrc     (on the instance)
+  uv
+  uvx
+everything's installed!
+$ sudo dnf install -y gcc gcc-c++     (on the instance: libsass has no wheel for Linux on arm64 and is built there)
+  make-1:4.3-5.amzn2023.0.2.aarch64
+
+$ uv run --no-dev --python 3.12 shiny run ext-shiny-app/app.py --host 0.0.0.0 --port 8000     (on the instance, GATEWAY_URL exported, COURSE_MCP_TOKEN read with read -s)
+# page answers 06:18:54
+$ curl -s -o /dev/null -m 10 -w HTTP %{http_code}, %{size_download} bytes, %{time_total} s\n http://<the address>:8000/
+HTTP 200, 14326 bytes, 0.004337 s
+# one question typed into the page from a headless browser on the laptop side
+{
+ "question": "Show the cake orders",
+ "before": {
+  "Orders shown": "1,200",
+  "Their amount": "27,594.01 CAD"
+ },
+ "after": {
+  "Orders shown": "285",
+  "Their amount": "6,820.99 CAD"
+ },
+ "boxes_changed": true,
+ "title": "Cake orders",
+ "sql": "SELECT * FROM orders WHERE category = 'cake'",
+ "rows_in_table": 30,
+ "chat": "Ask about the shop's orders. For example:\n\nShow the cake orders\nShow the orders of more than 40 dollars\nWhat were total sales by category?\n\nShow the cake orders\n\nFetch schemas\n: orders\n7 columns\nCake orders\nSELECT * FROM orders WHERE category = 'cake'\n\n\nApply Filter\n\nThe dashboard now shows only the cake orders. You can see details like order date, store, quantity, amount, and customer ID for each cake order.\n\nShow me the total revenue from cake orders\nWhich store has the most cake orders?\nShow cake orders by month\n\n\nHandoff\n\n\n\n"
+}
+# what the instance printed (downloads and the page's file requests left out)
+Using CPython 3.12.16
+Creating virtual environment at: .venv
+   Building libsass==0.23.0
+      Built libsass==0.23.0
+Installed 83 packages in 363ms
+INFO:     Started server process [26582]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     <your address>:39584 - "GET / HTTP/1.1" 200 OK
+INFO:     <your address>:39594 - "GET / HTTP/1.1" 200 OK
+INFO:     <your address>:39602 - "GET / HTTP/1.1" 200 OK
+INFO:     <your address>:39668 - "WebSocket /websocket/" [accepted]
+INFO:     connection open
+# clean-up 06:25:34
+$ aws ec2 terminate-instances --instance-ids i-EXAMPLE --query TerminatingInstances[0].CurrentState.Name --output text
+shutting-down
+$ aws ec2 wait instance-terminated --instance-ids i-EXAMPLE
+$ aws ec2 delete-security-group --group-id sg-EXAMPLE
+{
+    "Return": true,
+    "GroupId": "sg-EXAMPLE"
+}
+# done 06:26:11

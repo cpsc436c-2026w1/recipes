@@ -1,0 +1,6 @@
+[local: moto DynamoDB, Streams and SQS; stub embedder]
+initial items                      queued 8, skipped 0; worker {'embedded': 7, 'failed': 3}
+price change on I03                queued 0, skipped 1; worker {}
+description change on I05          queued 1, skipped 0; worker {'embedded': 1}
+vectors in the index: 7 of 8 items; model calls 11
+dead-letter queue: ['I08'] (the stub model fails on it; 3 tries, then moved)

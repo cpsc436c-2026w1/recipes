@@ -1,0 +1,52 @@
+c7adb7f5-4085-48b9-ac42-1af18469ca51  3 calls      35.4 ms  answered   How many orders are there?
+4ce68239-1d5a-406b-a0bf-d4891b8d2532  3 calls       5.9 ms  answered   What were total sales in Vancouver?
+5cac216c-d279-460c-ae1d-7b129022374c  3 calls       5.4 ms  answered   Which category sold the most items?
+e15d3ed2-70b5-4141-b700-849aea16b380  3 calls       4.2 ms  answered   How much did I spend in total?
+9ec756e3-b63d-4feb-aedb-3ff189c91afb  1 calls       1.7 ms  no_answer  What is the weather today?
+03aee79d-f320-49c2-9c73-884a283a9b2c  3 calls       1.9 ms  no_answer  Delete all the orders
+
+per request
+┌──────────┬───────────┬────────┬────────┬──────────┐
+│ requests │ median_ms │ p90_ms │ errors │ cost_cad │
+│  int64   │  double   │ double │ int128 │  double  │
+├──────────┼───────────┼────────┼────────┼──────────┤
+│        6 │       5.0 │   21.0 │      0 │ 0.000148 │
+└──────────┴───────────┴────────┴────────┴──────────┘
+
+
+time by kind of call
+┌────────────┬───────┬──────────┬────────┐
+│    kind    │ calls │ total_ms │  pct   │
+│  varchar   │ int64 │  double  │ double │
+├────────────┼───────┼──────────┼────────┤
+│ tool_call  │     5 │     43.0 │   97.0 │
+│ model_call │    11 │      1.0 │    3.0 │
+└────────────┴───────┴──────────┴────────┘
+
+
+calls per request
+┌─────────┬──────────┐
+│ n_calls │ requests │
+│  int64  │  int64   │
+├─────────┼──────────┤
+│       1 │        1 │
+│       3 │        5 │
+└─────────┴──────────┘
+
+
+slowest requests, with their calls
+┌─────────────────────────────────────┬────────────┬─────────┬────────────┬─────────────────┬─────────────┬─────────┐
+│              question               │ request_ms │ span_id │    kind    │      name       │ duration_ms │ status  │
+│               varchar               │   double   │ varchar │  varchar   │     varchar     │   double    │ varchar │
+├─────────────────────────────────────┼────────────┼─────────┼────────────┼─────────────────┼─────────────┼─────────┤
+│ How many orders are there?          │       35.4 │ 0001    │ model_call │ qwen3.6-35b-a3b │        0.27 │ ok      │
+│ How many orders are there?          │       35.4 │ 0002    │ tool_call  │ run_sql         │       33.17 │ ok      │
+│ How many orders are there?          │       35.4 │ 0003    │ model_call │ qwen3.6-35b-a3b │        0.14 │ ok      │
+│ What were total sales in Vancouver? │        5.9 │ 0001    │ model_call │ qwen3.6-35b-a3b │        0.12 │ ok      │
+│ What were total sales in Vancouver? │        5.9 │ 0002    │ tool_call  │ run_sql         │        3.72 │ ok      │
+│ What were total sales in Vancouver? │        5.9 │ 0003    │ model_call │ qwen3.6-35b-a3b │         0.1 │ ok      │
+│ Which category sold the most items? │        5.4 │ 0001    │ model_call │ qwen3.6-35b-a3b │         0.1 │ ok      │
+│ Which category sold the most items? │        5.4 │ 0002    │ tool_call  │ run_sql         │         3.5 │ ok      │
+│ Which category sold the most items? │        5.4 │ 0003    │ model_call │ qwen3.6-35b-a3b │        0.09 │ ok      │
+└─────────────────────────────────────┴────────────┴─────────┴────────────┴─────────────────┴─────────────┴─────────┘
+

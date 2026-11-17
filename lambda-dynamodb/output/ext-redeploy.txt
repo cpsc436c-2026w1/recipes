@@ -1,0 +1,23 @@
+
+== 1. Package: a zip with handler.py at its top level (boto3 is already in the Lambda Python runtime)
+
+$ python3 -c import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w'); z.write(sys.argv[2],'handler.py'); z.close() /tmp/recipe-api.zip lambda-dynamodb/main/handler.py
+
+== 2. The function exists: replace its code
+
+$ aws lambda update-function-code --function-name recipe-api --zip-file fileb:///tmp/recipe-api.zip --query {state: State, update: LastUpdateStatus}
+{
+    "state": "Active",
+    "update": "InProgress"
+}
+
+$ aws lambda wait function-updated-v2 --function-name recipe-api
+
+== 3. Call it directly once (an event, the way another AWS service would call it)
+
+$ aws lambda invoke --function-name recipe-api --cli-binary-format raw-in-base64-out --payload {"action":"get","trip_id":"t-0042","strong":true} /tmp/recipe-api-out.json --query {status: StatusCode, error: FunctionError}
+{
+    "status": 200,
+    "error": null
+}
+{"statusCode": 200, "body": "{\"item\": {\"driver_id\": \"d-7\", \"fare_quote\": 24, \"pickup_zone\": \"Astoria\", \"status\": \"accepted\", \"trip_id\": \"t-0042\"}, \"read_units\": 1.0}"}

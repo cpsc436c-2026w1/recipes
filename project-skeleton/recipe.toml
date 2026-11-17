@@ -1,0 +1,73 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "project-skeleton"
+format = "task-class"             # rep-*/ folders, one per representative
+task = "Live updates arrive, are stored, reach the lake and show as one number to users (updates in the last hour)"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = []                   # the checkpoint 1 base; every extension recipe starts from one rep-*/ folder
+lectures = ["L3", "L8", "L10", "L11", "L12", "L13", "L14", "L15", "L16", "L17"]
+core = ["Kinesis Data Streams", "Amazon Data Firehose", "S3", "AWS Glue Data Catalog", "Athena", "Lambda",
+        "Lambda function URLs", "DynamoDB", "DynamoDB export to S3", "course LLM gateway"]
+secondary = ["static HTML page (skeleton/page.py)", "DuckDB as the offline stand-in for Athena",
+             "moto as the offline stand-in for AWS"]
+region = "ca-central-1"
+cost_one_run = "under 0.05 USD for all three representatives (sum of AWS bulk price list rates, ca-central-1, read 2026-11-13; not measured); the Kinesis shard bills 0.0165 USD per hour until clean_up.py runs"
+summary = "The checkpoint 1 slice (live updates, stored, in the lake, one number on a page) in three project shapes: lakehouse first, operational first, generative AI first"
+
+# What the recipe teaches
+[[practices]]
+name = "count by event time over whole minutes, so the API and the lake agree"
+source = "L14 (event time against processing time)"
+
+[[practices]]
+name = "make mutating operations idempotent: an event id, a conditional write, count distinct in the lake"
+source = "L14; REL04-BP04"
+
+[[practices]]
+name = "design DynamoDB keys for the reads you have; each read is a lookup by key"
+source = "L12"
+
+[[practices]]
+name = "columnar files and partitions keep Data scanned small; a workgroup scan limit caps a wrong query"
+source = "L10, L11; COST02-BP05"
+
+[[practices]]
+name = "least privilege: each role names its actions and resources"
+source = "SEC03-BP02"
+
+[[practices]]
+name = "the assistant reads current state through one read-only tool, in a bounded loop, and its reply is checked against the tool result"
+source = "L16, L17; AI Engineering ch. 6; Agentic AI Lens AGENTREL02-BP02, AGENTSEC02"
+
+[instruments]                     # the reusable files a team copies; paths inside this folder
+files = ["skeleton/events.py", "skeleton/number.py", "skeleton/config.py", "skeleton/aws.py",
+         "rep-lakehouse-first/lakehouse.py", "rep-operational-first/handler.py",
+         "rep-operational-first/operational.py", "rep-genai-first/genai.py", "rep-genai-first/lake_example.py",
+         "clean_up.py"]
+
+[validates]                       # how a team shows it works
+command = "uv run pytest -q"
+shows = "every representative gives the same number as plain Python on the same updates; copies are not counted; the assistant's tool only reads; clean_up.py removes everything"
+
+[representatives]
+lakehouse-first = "rep-lakehouse-first/"     # Kinesis -> Firehose (Parquet) -> S3 -> Athena
+operational-first = "rep-operational-first/" # function URL -> DynamoDB -> export -> Athena; GET /number
+genai-first = "rep-genai-first/"             # gateway model -> count_updates (read-only, DynamoDB) -> reply; lake_example.py over the export
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"          # offline, no AWS account
+scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
+run = "uv run python rep-lakehouse-first/run.py --target aws"   # likewise rep-operational-first/run.py, rep-genai-first/run.py --llm gateway
+run_offline = "uv run python rep-lakehouse-first/run.py"        # no account, no token
+clean = "uv run python clean_up.py"
+
+[constraints]                       # what an assistant must keep when it changes this recipe
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+model_calls_through = "course LLM gateway"   # COURSE_GATEWAY_URL and KB_MCP_TOKEN from the environment (GATEWAY_URL and COURSE_MCP_TOKEN still work)
+region_fixed = "ca-central-1"
+role_override_env = ["FIREHOSE_ROLE_ARN", "API_ROLE_ARN"]   # optional: the scripts create their own roles otherwise
+llm_tool_read_only = true            # rep-genai-first: one tool, BatchGetItem only (tool_policy()); the lake example has no model
+same_number_everywhere = true        # tests compare every representative with plain Python on the same updates
+clean_up_removes_everything = true   # a new resource needs a step in clean_up.py and in tests/test_clean_up.py

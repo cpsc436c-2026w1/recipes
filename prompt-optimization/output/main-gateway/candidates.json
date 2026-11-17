@@ -1,0 +1,34 @@
+[
+ {
+  "idx": 0,
+  "val_score": 0.6667,
+  "parents": [
+   null
+  ],
+  "instructions": "Answer the question about the cafe's orders with one DuckDB SQL query over the tables given.\nThe app runs the query and shows its single value to the user."
+ },
+ {
+  "idx": 1,
+  "val_score": 1.0,
+  "parents": [
+   0
+  ],
+  "instructions": "Answer the question about the cafe's orders with exactly one DuckDB SQL query over the tables given. The app will execute the query and display its single returned value, so the query must return exactly one row and one column. Output only the SQL statement; do not include explanations, Markdown, or a trailing semicolon.\n\nUse the provided table/column names exactly. For the orders table, remember:\n- `placed_at` and `ready_at` are `TIMESTAMP` values.\n- `item` contains `'latte'`, `'drip coffee'`, `'tea'`, `'muffin'`, `'breakfast sandwich'`, or `'soup'`.\n- `payment` contains `'card'` or `'cash'`.\n- `quantity` is the number of items on that order.\n- `price_cad` and `tip_cad` are `DOUBLE` amounts.\n\nDuckDB-specific rules:\n- Do not use SQLite-style functions such as `julianday()`. To compute a timestamp difference in minutes, use `epoch(timestamp_expression) / 60.0`. For example, the longest wait in minutes should be calculated as:\n  `SELECT MAX(epoch(ready_at - placed_at)) / 60.0 FROM orders`\n- For percentages, multiply by `100.0` to avoid integer division. Apply `WHERE` to define the population being asked about, and use `COUNT(*) FILTER (WHERE predicate)` or an equivalent `CASE` expression for the numerator. For example:\n  `SELECT 100.0 * COUNT(*) FILTER (WHERE tip_cad > 0) / COUNT(*) FROM orders WHERE payment = 'card'`\n- If the question asks how many items were sold in total, use `SUM(quantity)`, not `COUNT(*)`.\n- Use exact string matches for values such as item names and payment types.\n- Ensure the final query is a single scalar aggregate or expression that returns one value."
+ },
+ {
+  "idx": 2,
+  "val_score": 0.6667,
+  "parents": [
+   1
+  ],
+  "instructions": "Answer the question about the cafe's orders with exactly one DuckDB SQL query over the tables given. The app will execute the query and display its single returned value, so the query must return exactly one row and one column. Output only the SQL statement; do not include explanations, Markdown, or a trailing semicolon.\n\nUse the provided table/column names exactly. For the orders table, remember:\n- `placed"
+ },
+ {
+  "idx": 3,
+  "val_score": 1.0,
+  "parents": [
+   1
+  ],
+  "instructions": "Answer the question about the cafe's orders with exactly one DuckDB SQL query over the tables given. The app will execute the query and display its single returned value, so the query must return exactly one row and one column. Output only the SQL statement; do not include explanations, Markdown, or a trailing semicolon.\n\nUse the provided table/column names exactly. Table orders contains: order_id INTEGER, placed_at TIMESTAMP, ready_at TIMESTAMP, item VARCHAR, quantity INTEGER, price_cad DOUBLE, payment VARCHAR, tip_cad DOUBLE. item contains 'latte', 'drip coffee', 'tea', 'muffin', 'breakfast sandwich', or 'soup'. payment contains 'card' or 'cash'. quantity is the number of items on that order. price_cad is the price of one item, in dollars. tip_cad is the tip on the order, in dollars.\n\nDuckDB-specific rules:\n- Do not use SQLite-style functions such as julianday(). To compute a timestamp difference in minutes, use `epoch(ready_at - placed_at) / 60.0`. For example, the longest wait in minutes should be: SELECT MAX(epoch(ready_at - placed_at)) / 60.0 FROM orders.\n- For clock-time conditions, do not compare a TIMESTAMP to a bare time string like '09:00:00'. Use time extraction. For before 9 in the morning, use `hour(placed_at) < 9`. For other times, use `hour(placed_at)`, `minute(placed_at)`, `second(placed_at)`, or `CAST(placed_at AS TIME)` as appropriate.\n- For percentages, multiply by 100.0 only when the requested result is a percentage. Do not multiply dollar amounts by 100. Apply WHERE to define the population, and use COUNT(*) FILTER (WHERE predicate) or an equivalent CASE expression for the numerator. Example: SELECT 100.0 * COUNT(*) FILTER (WHERE tip_cad > 0) / COUNT(*) FROM orders WHERE payment = 'card'.\n- If the question asks how many items were sold in total, use SUM(quantity), not COUNT(*). If it asks how many orders, use COUNT(*).\n- Use exact string matches for values such as item names and payment types.\n- For amounts paid excluding tips, use `quantity * price_cad` as the order amount. If the question asks for the average amount paid per order, use AVG(quantity * price_cad) so each order is averaged once; do not use SUM(quantity * price_cad) / SUM(quantity) unless the question explicitly asks for an average per item, and do not multiply by 100.\n- If the question asks for a total dollar amount, use SUM(quantity * price_cad) (add tip_cad only if tips are included).\n- Ensure the final query is a single scalar aggregate or expression that returns one value."
+ }
+]
