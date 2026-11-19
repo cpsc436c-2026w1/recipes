@@ -2,13 +2,13 @@
 
 ## What you build
 
-Build Checkpoint 1's slice end to end: live updates arrive, are stored, reach the lake and show as one number to users
+Build the first slice end to end, due at Checkpoint 2: live updates arrive, are stored, reach the lake and show as one number to users
 (updates in the last hour). Use the shape your team chose: lakehouse first, operational first or generative AI first.
 Each has its own folder, and you build over the same data and the same number.
 
 ## Use it when
 
-- Your team needs the checkpoint 1 slice and wants a working start in its project shape.
+- Your team needs the first slice (due at Checkpoint 2) and wants a working start in its project shape.
 - You want to compare the shapes on one job before your proposal's design is fixed.
 
 For an extension such as windowed aggregates, change data capture, concurrency races, chat on the

@@ -1,7 +1,7 @@
 [project]
 name = "project-skeleton"
 version = "0.1.0"
-description = "CPSC 436C recipe: the checkpoint 1 slice in three project shapes"
+description = "CPSC 436C recipe: the first slice in three project shapes"
 requires-python = ">=3.11"
 dependencies = [
     "boto3>=1.35",

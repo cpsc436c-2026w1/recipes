@@ -4,7 +4,7 @@ name = "project-skeleton"
 format = "task-class"             # rep-*/ folders, one per representative
 task = "Live updates arrive, are stored, reach the lake and show as one number to users (updates in the last hour)"
 shapes = ["lakehouse-first", "operational-first", "genai-first"]
-extensions = []                   # the checkpoint 1 base; every extension recipe starts from one rep-*/ folder
+extensions = []                   # the first slice (Checkpoint 2); every extension recipe starts from one rep-*/ folder
 lectures = ["L3", "L8", "L10", "L11", "L12", "L13", "L14", "L15", "L16", "L17"]
 core = ["Kinesis Data Streams", "Amazon Data Firehose", "S3", "AWS Glue Data Catalog", "Athena", "Lambda",
         "Lambda function URLs", "DynamoDB", "DynamoDB export to S3", "course LLM gateway"]
@@ -12,7 +12,7 @@ secondary = ["static HTML page (skeleton/page.py)", "DuckDB as the offline stand
              "moto as the offline stand-in for AWS"]
 region = "ca-central-1"
 cost_one_run = "under 0.05 USD for all three representatives (sum of AWS bulk price list rates, ca-central-1, read 2026-11-13; not measured); the Kinesis shard bills 0.0165 USD per hour until clean_up.py runs"
-summary = "The checkpoint 1 slice (live updates, stored, in the lake, one number on a page) in three project shapes: lakehouse first, operational first, generative AI first"
+summary = "The first slice, due at Checkpoint 2 (live updates, stored, in the lake, one number on a page), in three project shapes: lakehouse first, operational first, generative AI first"
 
 # What the recipe teaches
 [[practices]]

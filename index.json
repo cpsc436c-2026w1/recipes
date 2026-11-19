@@ -1073,7 +1073,7 @@
     },
     {
       "name": "project-skeleton",
-      "summary": "The checkpoint 1 slice (live updates, stored, in the lake, one number on a page) in three project shapes: lakehouse first, operational first, generative AI first",
+      "summary": "The first slice, due at Checkpoint 2 (live updates, stored, in the lake, one number on a page), in three project shapes: lakehouse first, operational first, generative AI first",
       "task": "Live updates arrive, are stored, reach the lake and show as one number to users (updates in the last hour)",
       "format": "task-class",
       "shapes": [
