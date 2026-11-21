@@ -47,7 +47,7 @@ that match a condition while the index is searched.
 | writes (R73) | one `update-item` per trip with `--return-consumed-capacity INDEXES` | `INDEXES` is the level at which a write reports `VectorWriteRequestBytes`. An update keeps the status, driver and fare that `main/` gave the trip; a batch Put would replace the item | [Monitoring vector index capacity](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/VectorSearchMonitoring.html) |
 | cost (R76) | the run prints the bytes DynamoDB reported and multiplies them by the ca-central-1 prices, each request billed at 1 KB at least | vector writes and searches are billed in bytes, separately from read and write units. AWS says not to estimate the bill from the number of dimensions: measure the bytes of a sample of your own data | same page, "Per-request metering minimum"; AWS bulk price list, ca-central-1 |
 | AWS CLI (R75) | the run stops before it changes anything when the CLI does not know `search-vectors` | the command needs AWS CLI v2 2.36.16 or later. The pip package `awscli` (version 1, 1.46.3 on 2026-11-21) does not have it | developer guide, "Filtering with SearchConditionExpression" |
-| ceiling | the table's ceiling of 100 write units per second (`MAX_UNITS`) also bounds the vector writes; a vector index has no ceiling of its own | every vector write is a write to the table. Searches do not have a ceiling: a loop that searches without end bills about 2 KB per search, about 0.004 USD a million (assumed: a search of this size) | [on-demand maximum throughput](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode-max-throughput.html); the vector index parameters of `update-table` have no throughput field |
+| ceiling | the table's ceiling of 100 write units per second (`MAX_UNITS`) also bounds the vector writes; a vector index has no ceiling of its own | every vector write is a write to the table. Searches do not have a ceiling: a loop that searches without end bills about 30 KB per search, about 0.07 USD a million (measured: 30,208 bytes per search on 2026-11-21) | [on-demand maximum throughput](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode-max-throughput.html); the vector index parameters of `update-table` have no throughput field |
 
 ## Requirements
 
@@ -72,9 +72,10 @@ The scenarios are in `features/vector_search.feature`.
 
 ## Run it
 
-Not yet run by us in AWS. The dry run and the scenarios pass offline; the vectors in `vectors.json` were made through
-the course LLM gateway on 2026-11-21. From your sandbox terminal, sign in and check that the account is the one you
-expect. The recipe README explains what a sandbox terminal is:
+Run by us on 2026-11-21 in a course sandbox, with a course staff role (`../output/ext-vector-search.txt`); a run with
+the student role is still to be done. The vectors in `vectors.json` were made through the course LLM gateway the same
+day. From your sandbox terminal, sign in and check that the account is the one you expect. The recipe README explains
+what a sandbox terminal is:
 
 ```bash
 aws sso login                                 # or the sign-in your team uses; not needed in CloudShell
@@ -97,30 +98,35 @@ A run without `KEEP=1` ends with clean-up. Otherwise, run `bash clean_up.sh` in 
 
 ## What you should see
 
-Step 1 prints `dimensions: 1024`. Step 2 prints `"CREATING"`, then the index's states until `ACTIVE`. In step 3,
-each trip's line has its write units and `vector_write_bytes`.
+Captured: [../output/ext-vector-search.txt](../output/ext-vector-search.txt) (2026-11-21, run with `KEEP=1`). Step 1
+prints `dimensions: 1024`. In step 2 the index was `CREATING`, then backfilling from 33 s, and `ACTIVE` after 514 s,
+for a table of 50 small items. The first search succeeded at once. In step 3 each write used 5.0 write units and
+4,203 to 4,263 vector write bytes.
 
-The nearest messages below were computed offline from `vectors.json`, by exact cosine distance. DynamoDB's search is
-approximate, so its order and scores can differ a little:
-
-| Step | Nearest 5 (trip, zone, fare quote) |
-|---|---|
-| 4, lost item | t-0047 headphones (Astoria, 29), t-0007 phone (Astoria, 19), t-0032 wallet (Astoria, 14), t-0025 laptop bag (Midtown, 37), t-0038 sunglasses (SoHo, 20) |
-| 5, fare question | t-0000 (Midtown, 12), t-0039 (JFK, 21), t-0013 (SoHo, 25), t-0044 (JFK, 26), t-0018 (SoHo, 30) |
-| 6, same, fare 20 to 30, JFK or SoHo | t-0039, t-0013, t-0044, t-0018, t-0009 (JFK, 21: a waiting fee) |
+| Step | Nearest 5 (trip, zone, fare quote), cosine distance | Search bytes |
+|---|---|---|
+| 4, lost item | t-0047 headphones (Astoria, 29) 0.265, t-0007 phone (Astoria, 19), t-0032 wallet (Astoria, 14), t-0025 laptop bag (Midtown, 37), t-0038 sunglasses (SoHo, 20) 0.298 | 30,197 |
+| 5, fare question | t-0000 (Midtown, 12) 0.278, t-0039 (JFK, 21), t-0013 (SoHo, 25), t-0044 (JFK, 26), t-0018 (SoHo, 30) 0.335 | 30,213 |
+| 6, same, fare 20 to 30, JFK or SoHo | t-0039 0.299, t-0013, t-0044, t-0018, t-0009 (JFK, 21: a waiting fee) 0.436 | 30,213 |
 
 These relations hold on every run. Step 6 returns only trips from JFK or SoHo with a fare quote from 20 to 30, and
 still returns 5: t-0000 (Midtown, 12) drops out and the next matching trip comes in. The fifth match is about a fee,
 not the quote: a search returns the K nearest that match, however far they are, so an app shows the score or
-sets a cut-off.
+sets a cut-off. The filter did not change the search bytes. The index's item count and size printed 0 in step 7:
+DynamoDB updates them from time to time, not after every write.
 
 ## Cost
 
-Estimated from the price list, not yet measured (`assumed`): about 4,100 vector write bytes per trip (1,024 numbers of
-4 bytes, plus the projected attributes), about 0.0001 USD for the 50 writes at 0.572 USD per GB; each search at
-least 1 KB at 0.0022 USD per GB; the writes to the table, about 6 to 7 write units per trip for an item with its vector (assumed,
-from DynamoDB's item-size rule for numbers; 0.6875 USD per million write units). The run is well under one cent. The 52 texts of step 1 are about 700 tokens on
-the course LLM gateway. Step 7 prints the measured bytes and price of your run.
+Measured on 2026-11-21 (step 7), ca-central-1 prices from the AWS bulk price list:
+
+| Request | Bytes | Price | USD |
+|---|---|---|---|
+| 50 vector writes | 211,387 (4,228 per write) | 0.572 per GB | 0.00012 |
+| 3 searches | 90,623 (30,208 per search) | 0.0022 per GB | 0.0000002 |
+| 50 table writes for the messages and vectors | 250 write units | 0.6875 per million | 0.00017 |
+
+The run is well under one cent. The 52 texts of step 1 are 694 tokens on the course LLM gateway. A search's bytes are
+what DynamoDB examined and returned, not the 4 KB query vector: here about 7 times the size of one stored vector.
 
 The index is stored and billed per GB-month the same way as table storage, in addition to the table
 ([on-demand pricing](https://aws.amazon.com/dynamodb/pricing/on-demand/)); the ca-central-1 price list has no line of
@@ -128,6 +134,6 @@ its own for it, so it is the table storage price, 0.275 USD per GB-month beyond 
 
 Estimate it for your data:
 
-1. Run this extension's steps on a sample of your own items and searches, with your model, dimensions and projection.
-2. Load: items × the `vector_write_bytes` of one write × 0.572 USD per GB, again for each changed vector. Searches: searches × the search bytes × 0.0022 USD per GB, 1 KB at least each.
-3. Search bytes grow by a small constant each time the items double, not in proportion; storage is the index size × 0.275 USD per GB-month.
+1. Run these steps on a sample of your own items, with your model, dimensions, projection and TopK; step 7 prints your bytes.
+2. Load: items × your bytes per write (4,228 here, 1,024-number vectors) × 0.572 USD per GB; 100,000 such items ≈ 0.24 USD, again for each changed vector.
+3. Searches: searches × your bytes per search (30,208 here) × 0.0022 USD per GB; 1 million ≈ 0.07 USD, a little more each time the items double.

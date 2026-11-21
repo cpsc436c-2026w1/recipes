@@ -251,7 +251,7 @@ with the same `PREFIX`. One run is well under one cent ([Cost and clean-up](#cos
 
 Follow each extension's README for sign-in, commands, expected output, clean-up and cost: [riders and drivers](ext-riders-and-drivers/README.md#run-it), run by us on 2026-10-21;
 [nightly report](ext-nightly-report/README.md#run-it), run by us on 2026-10-21;
-[vector search](ext-vector-search/README.md#run-it), not yet run by us in AWS. All three start from
+[vector search](ext-vector-search/README.md#run-it), run by us on 2026-11-21. All three start from
 `KEEP=1 bash main/run.sh`.
 
 ## What you should see

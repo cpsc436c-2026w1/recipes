@@ -1,0 +1,478 @@
+
+== 1. No course token set: use the vectors shipped in ext-vector-search/vectors.json (qwen3-embedding-0.6b, made through the course LLM gateway)
+dimensions: 1024
+
+== 2. Add the vector index trip-messages to recipe-vec-trips: the vector in message_vector (1024 numbers), cosine distance, pickup_zone and fare_quote as inline filters
+
+$ aws dynamodb update-table --table-name recipe-vec-trips --attribute-definitions AttributeName=pickup_zone,AttributeType=S AttributeName=fare_quote,AttributeType=N --vector-index-updates [{"Create":{"IndexName":"trip-messages","VectorAttribute":{"AttributeName":"message_vector"},"SearchSchema":[{"AttributeName":"pickup_zone","SearchSchemaElementType":"INLINE_FILTER"},{"AttributeName":"fare_quote","SearchSchemaElementType":"INLINE_FILTER"}],"Projection":{"ProjectionType":"ALL"},"Dimensions":1024,"DistanceFunction":"COSINE"}}] --query TableDescription.VectorIndexes[?IndexName=='trip-messages'] | [0].IndexStatus
+"CREATING"
+(1 s: index CREATING False)
+(33 s: index CREATING True)
+(514 s: index ACTIVE None)
+(index trip-messages is ACTIVE after 514 s)
+
+== 3. Write each trip's message and its vector: 50 update-item calls, each printing its write units and its vector write bytes
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0000"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0000.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4240.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0001"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0001.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4216.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0002"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0002.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4238.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0003"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0003.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4230.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0004"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0004.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4238.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0005"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0005.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4222.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0006"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0006.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4208.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0007"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0007.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4239.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0008"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0008.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4234.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0009"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0009.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4240.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0010"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0010.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4234.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0011"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0011.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4243.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0012"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0012.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4210.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0013"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0013.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4225.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0014"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0014.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4235.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0015"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0015.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4231.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0016"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0016.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4216.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0017"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0017.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4236.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0018"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0018.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4209.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0019"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0019.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4224.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0020"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0020.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4232.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0021"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0021.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4236.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0022"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0022.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4234.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0023"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0023.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4237.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0024"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0024.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4224.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0025"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0025.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4226.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0026"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0026.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4245.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0027"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0027.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4223.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0028"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0028.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4232.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0029"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0029.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4222.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0030"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0030.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4221.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0031"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0031.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4224.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0032"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0032.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4226.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0033"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0033.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4226.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0034"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0034.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4225.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0035"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0035.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4223.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0036"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0036.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4203.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0037"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0037.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4226.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0038"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0038.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4210.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0039"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0039.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4240.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0040"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0040.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4217.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0041"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0041.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4245.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0042"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0042.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4263.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0043"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0043.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4232.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0044"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0044.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4225.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0045"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0045.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4222.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0046"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0046.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4214.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0047"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0047.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4222.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0048"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0048.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4227.0
+}
+
+$ aws dynamodb update-item --table-name recipe-vec-trips --key {"trip_id":{"S":"t-0049"}} --update-expression SET message = :m, message_vector = :v --expression-attribute-values file:///tmp/recipe-vec-vector/t-0049.json --return-consumed-capacity INDEXES --query {write_units: ConsumedCapacity.CapacityUnits, vector_write_bytes: ConsumedCapacity.VectorIndexes."trip-messages".VectorWriteRequestBytes}
+{
+    "write_units": 5.0,
+    "vector_write_bytes": 4217.0
+}
+
+== 4. A rider writes "I think I left something in the car." The 5 messages nearest in meaning, from every zone and fare
+
+$ aws dynamodb search-vectors --table-name recipe-vec-trips --index-name trip-messages --search-vector file:///tmp/recipe-vec-vector/q-lost-item.json --top-k 5 --projection-expression trip_id, pickup_zone, fare_quote, message --return-consumed-capacity TOTAL --query {results: SearchResults[].[Item.trip_id.S, Item.pickup_zone.S, Item.fare_quote.N, Score, Item.message.S], search_bytes: ConsumedCapacity.VectorSearchRequestBytes}
+{
+    "results": [
+        [
+            "t-0047",
+            "Astoria",
+            "29",
+            0.265350878238678,
+            "My headphones fell out of my pocket in the car."
+        ],
+        [
+            "t-0007",
+            "Astoria",
+            "19",
+            0.2700871229171753,
+            "My phone is still in the car. I think it fell between the seats."
+        ],
+        [
+            "t-0032",
+            "Astoria",
+            "14",
+            0.28474265336990356,
+            "My wallet might be in the car. It is brown leather."
+        ],
+        [
+            "t-0025",
+            "Midtown",
+            "37",
+            0.29703572392463684,
+            "I left a laptop bag on the floor behind the driver."
+        ],
+        [
+            "t-0038",
+            "SoHo",
+            "20",
+            0.2975212037563324,
+            "I left my sunglasses on the back seat."
+        ]
+    ],
+    "search_bytes": 30197.0
+}
+
+== 5. Another rider asks "Why did I pay more than the price I was quoted?" The 5 nearest, with no filter
+
+$ aws dynamodb search-vectors --table-name recipe-vec-trips --index-name trip-messages --search-vector file:///tmp/recipe-vec-vector/q-fare-question.json --top-k 5 --projection-expression trip_id, pickup_zone, fare_quote, message --return-consumed-capacity TOTAL --query {results: SearchResults[].[Item.trip_id.S, Item.pickup_zone.S, Item.fare_quote.N, Score, Item.message.S], search_bytes: ConsumedCapacity.VectorSearchRequestBytes}
+{
+    "results": [
+        [
+            "t-0000",
+            "Midtown",
+            "12",
+            0.27835673093795776,
+            "The app charged me more than the quote it showed before the ride."
+        ],
+        [
+            "t-0039",
+            "JFK",
+            "21",
+            0.2986469864845276,
+            "The fare was higher than the quote because of traffic. Is that right?"
+        ],
+        [
+            "t-0013",
+            "SoHo",
+            "25",
+            0.30857059359550476,
+            "The final price was eight dollars above the estimate."
+        ],
+        [
+            "t-0044",
+            "JFK",
+            "26",
+            0.32651010155677795,
+            "I was charged for a larger car than the one that came."
+        ],
+        [
+            "t-0018",
+            "SoHo",
+            "30",
+            0.3345652222633362,
+            "I was billed twice for the same trip."
+        ]
+    ],
+    "search_bytes": 30213.0
+}
+
+== 6. The same question, for trips with a fare quote from 20 to 30 picked up at JFK or SoHo: the filter applies during the search
+
+$ aws dynamodb search-vectors --table-name recipe-vec-trips --index-name trip-messages --search-vector file:///tmp/recipe-vec-vector/q-fare-question.json --top-k 5 --projection-expression trip_id, pickup_zone, fare_quote, message --search-condition-expression fare_quote BETWEEN :lo AND :hi AND pickup_zone IN (:z1, :z2) --expression-attribute-values {":lo":{"N":"20"},":hi":{"N":"30"},":z1":{"S":"JFK"},":z2":{"S":"SoHo"}} --return-consumed-capacity TOTAL --query {results: SearchResults[].[Item.trip_id.S, Item.pickup_zone.S, Item.fare_quote.N, Score, Item.message.S], search_bytes: ConsumedCapacity.VectorSearchRequestBytes}
+{
+    "results": [
+        [
+            "t-0039",
+            "JFK",
+            "21",
+            0.2986469864845276,
+            "The fare was higher than the quote because of traffic. Is that right?"
+        ],
+        [
+            "t-0013",
+            "SoHo",
+            "25",
+            0.30857059359550476,
+            "The final price was eight dollars above the estimate."
+        ],
+        [
+            "t-0044",
+            "JFK",
+            "26",
+            0.32651010155677795,
+            "I was charged for a larger car than the one that came."
+        ],
+        [
+            "t-0018",
+            "SoHo",
+            "30",
+            0.3345652222633362,
+            "I was billed twice for the same trip."
+        ],
+        [
+            "t-0009",
+            "JFK",
+            "21",
+            0.43621182441711426,
+            "I was charged a waiting fee, but my flight was only ten minutes late."
+        ]
+    ],
+    "search_bytes": 30213.0
+}
+
+== 7. What this run's vector requests cost: the bytes DynamoDB reported, each request billed at 1 KB at least, times the ca-central-1 prices
+{
+    "write": {
+        "requests": 50,
+        "bytes_reported": 211387.0,
+        "bytes_billed": 211387.0,
+        "bytes_per_request": 4228,
+        "usd": 0.0001209134
+    },
+    "search": {
+        "requests": 3,
+        "bytes_reported": 90623.0,
+        "bytes_billed": 90623.0,
+        "bytes_per_request": 30208,
+        "usd": 1.994e-07
+    }
+}
+
+Estimate for your data, from these bytes (measure your own: the bytes depend on your dimensions, projection and TopK):
+  load:     items x 4228 bytes x 0.572 USD per GB, once, and again for every changed vector
+  searches: searches x 30208 bytes x 0.0022 USD per GB; the bytes of a search grow by a small constant each time the items double
+  storage:  index size x 0.275 USD per GB-month beyond the free 25 GB-months of the account
+
+$ aws dynamodb describe-table --table-name recipe-vec-trips --query Table.VectorIndexes[?IndexName=='trip-messages'] | [0].{items: ItemCount, index_bytes: IndexSizeBytes}
+{
+    "items": 0,
+    "index_bytes": 0
+}
+(DynamoDB updates the index's item count and size from time to time, not after every write: a new index can show 0)
+
+== Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh
