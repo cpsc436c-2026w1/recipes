@@ -51,7 +51,7 @@ and `ext-*`, and its README compares them in one table.
 | Recipe | What you build | Lakehouse first | Operational first | Generative AI first | Lectures |
 |---|---|:---:|:---:|:---:|---|
 | [project-skeleton](project-skeleton/) | live updates arrive, are stored, reach the lake and show as one number, with representatives of the three project shapes | yes | yes | yes | L3, L8, L10–L17 |
-| [dynamodb](dynamodb/) | a DynamoDB store keyed by the app's reads, with conditional writes, transactions and an export to the lake | | yes | | L10–L13 |
+| [dynamodb](dynamodb/) | a DynamoDB store keyed by the app's reads, with conditional writes, transactions, an export to the lake, and vector search over messages in the same table | | yes | yes | L10–L13, L17 |
 | [lambda-dynamodb](lambda-dynamodb/) | an HTTPS API (Lambda function URL) over that store, with a least-privilege role | | yes | | L2–L3, L12–L13, L16 |
 | [streaming-ingestion](streaming-ingestion/) | Kinesis → Lambda → DynamoDB with the lag measured | yes | yes | | L14 |
 | [concurrency-correctness](concurrency-correctness/) | two clients race on one item, a conditional write accepts one, and a retried write applies once | | yes | | L12–L14, L17 |
@@ -87,7 +87,7 @@ and `ext-*`, and its README compares them in one table.
 | Guardrails with a red-team log | [dashboard-chat](dashboard-chat/) `ext-guardrails-redteam/` |
 | Trace analysis and alarms | [dashboard-chat](dashboard-chat/) `ext-trace-alarms/`; [llm-state-dynamodb](llm-state-dynamodb/) `ext-traces/`; [limits-and-alarms](limits-and-alarms/) `main/`; [lambda-dynamodb](lambda-dynamodb/) `ext-metrics/` |
 | Agent under controlled autonomy | [limits-and-alarms](limits-and-alarms/) `ext-runaway-loop/` |
-| Hybrid retrieval with an eval | [hybrid-retrieval-eval](hybrid-retrieval-eval/) `main/`, `ext-filters/`; [zero-etl-search](zero-etl-search/) `main/`, `demo/`, `ext-embeddings/` |
+| Hybrid retrieval with an eval | [hybrid-retrieval-eval](hybrid-retrieval-eval/) `main/`, `ext-filters/`; [zero-etl-search](zero-etl-search/) `main/`, `demo/`, `ext-embeddings/`; vector search with filters in DynamoDB itself: [dynamodb](dynamodb/) `ext-vector-search/` |
 | Model routing, cheap model first | [model-routing](model-routing/) `main/`, `ext-eval/`; [hybrid-retrieval-eval](hybrid-retrieval-eval/) `ext-model-routing/` |
 | MCP server | [mcp-server-minimal](mcp-server-minimal/) `main/`, `ext-confirmed-write/` |
 | Prompt optimisation, with an eval example (part of the generative-AI-first shape, not an extension on the proposal page) | [prompt-optimization](prompt-optimization/) `main/`, `ext-gepa-direct/`, `ext-eval-matrix/` |

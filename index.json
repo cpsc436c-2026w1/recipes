@@ -380,7 +380,7 @@
     },
     {
       "name": "dynamodb",
-      "summary": "AWS CLI scripts that build a DynamoDB trip store keyed by its access patterns, race two conditional writes, add a sort key and transactions, and export the table to S3 for Athena",
+      "summary": "AWS CLI scripts that build a DynamoDB trip store keyed by its access patterns, race two conditional writes, add a sort key and transactions, export the table to S3 for Athena, and search riders' messages with a vector index",
       "task": "A DynamoDB store for a ride app's live trips: keys from the app's reads, strong reads where needed, and a conditional write so that one of two racing drivers wins",
       "format": "main-scenario",
       "shapes": [
@@ -391,7 +391,8 @@
       ],
       "lectures": [
         "L12",
-        "L13"
+        "L13",
+        "L17"
       ],
       "core": [
         "DynamoDB",
@@ -411,6 +412,10 @@
         {
           "name": "reports read an export in the lake, not the live table",
           "source": "L12-L13; DynamoDB developer guide, export to S3"
+        },
+        {
+          "name": "vector search where the data already is: an index added to the table, filters applied during the search, the bill measured in bytes on a sample",
+          "source": "L17; DynamoDB developer guide, vector search (VectorSearchWorkingWith, VectorSearchMonitoring)"
         }
       ],
       "instruments": {
@@ -418,13 +423,16 @@
           "main/run.sh",
           "ext-riders-and-drivers/run.sh",
           "ext-nightly-report/run.sh",
+          "ext-vector-search/run.sh",
+          "ext-vector-search/vectors.py",
+          "ext-vector-search/vectors.json",
           "lib.sh",
           "clean_up.sh"
         ]
       },
       "validates": {
         "command": "uv run pytest -q",
-        "shows": "every script's commands under DRY=1; with the AWS CLI installed, the real scripts against moto: one of two accepts wins, a rider's history comes back in time order, a cancelled transaction changes neither item, a stale version is refused, clean-up leaves no tables"
+        "shows": "every script's commands under DRY=1 (ext-vector-search only so: moto does not have SearchVectors); with the AWS CLI installed, the real scripts against moto: one of two accepts wins, a rider's history comes back in time order, a cancelled transaction changes neither item, a stale version is refused, clean-up leaves no tables"
       },
       "commands": {
         "setup": "uv sync",

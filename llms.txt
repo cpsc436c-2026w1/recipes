@@ -21,7 +21,7 @@
 ## Recipes
 
 - [project-skeleton](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/project-skeleton/README.md): the first project slice (live updates stored, in the lake, one number on a page) in each of the three project shapes.
-- [dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/dynamodb/README.md): a DynamoDB store keyed by the app's reads, with conditional writes, transactions and an export to the lake for Athena.
+- [dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/dynamodb/README.md): a DynamoDB store keyed by the app's reads, with conditional writes, transactions and an export to the lake for Athena; in `ext-vector-search/`, vector search over riders' messages in the same table, filtered by fare and zone during the search, with the bytes and price of each vector write and search.
 - [lambda-dynamodb](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/lambda-dynamodb/README.md): an HTTPS API (Lambda function URL) over that store, with a least-privilege role.
 - [streaming-ingestion](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/streaming-ingestion/README.md): Kinesis to Lambda to DynamoDB, each update stored once, with the lag measured; windowed aggregates and fan-out as extensions.
 - [concurrency-correctness](https://raw.githubusercontent.com/cpsc436c-2026w1/recipes/main/concurrency-correctness/README.md): two clients race on one item, a conditional write accepts one, and a retried write applies once.
