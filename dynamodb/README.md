@@ -212,7 +212,7 @@ DRY=1 bash main/run.sh
 What you should see, line by line:
 
 1. `uv sync` installs pytest, behave and moto (a library that stands in for AWS inside the test process).
-2. `pytest` ends with a line like `27 passed`. With the AWS CLI installed, two of the tests run the real scripts
+2. `pytest` ends with a line like `29 passed`. With the AWS CLI installed, two of the tests run the real scripts
    against moto and take about a minute; without it they are skipped.
 3. `behave` ends with `0 failed`. The features that run the scripts against moto are skipped without the AWS CLI.
 4. The dry run prints the nine steps with every `aws` command under them, then the clean-up's commands, and

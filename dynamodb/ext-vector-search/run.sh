@@ -93,7 +93,8 @@ for i in $(seq 0 49); do
 done
 
 # $1 step, $2 question, the rest: the filter, if any. Search results are eventually consistent, and a newly ACTIVE
-# index can answer ValidationException for a short while (developer guide): the first search is tried again, up to
+# index can answer ValidationException, or ResourceNotFoundException before it is ACTIVE (API reference), for a
+# short while (developer guide): the first search is tried again, up to
 # 20 times, 15 s apart. Any other error stops the run.
 READY=""
 search() {
@@ -106,8 +107,8 @@ search() {
   [ -n "${DRY:-}" ] && return 0
   err=$(mktemp)
   until out=$("${cmd[@]}" 2>"$err"); do
-    if [ -z "$READY" ] && grep -q ValidationException "$err" && [ "$try" -lt 20 ]; then
-      echo "(the index is not searchable yet: $(grep -o 'ValidationException.*' "$err" | head -1); trying again in 15 s, try $((try + 1)) of 20)"
+    if [ -z "$READY" ] && grep -q -e ValidationException -e ResourceNotFoundException "$err" && [ "$try" -lt 20 ]; then
+      echo "(the index is not searchable yet: $(grep -o -E '(ValidationException|ResourceNotFoundException).*' "$err" | head -1); trying again in 15 s, try $((try + 1)) of 20)"
       sleep 15; try=$((try + 1))
     else
       cat "$err" >&2; rm -f "$err"

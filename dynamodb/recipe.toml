@@ -3,7 +3,7 @@
 name = "dynamodb"
 format = "main-scenario"
 task = "A DynamoDB store for a ride app's live trips: keys from the app's reads, strong reads where needed, and a conditional write so that one of two racing drivers wins"
-shapes = ["operational-first"]
+shapes = ["operational-first", "genai-first"]
 extensions = ["concurrency-correctness"]
 lectures = ["L12", "L13", "L17"]
 core = ["DynamoDB", "S3", "Athena"]

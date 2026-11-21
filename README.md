@@ -87,7 +87,7 @@ and `ext-*`, and its README compares them in one table.
 | Guardrails with a red-team log | [dashboard-chat](dashboard-chat/) `ext-guardrails-redteam/` |
 | Trace analysis and alarms | [dashboard-chat](dashboard-chat/) `ext-trace-alarms/`; [llm-state-dynamodb](llm-state-dynamodb/) `ext-traces/`; [limits-and-alarms](limits-and-alarms/) `main/`; [lambda-dynamodb](lambda-dynamodb/) `ext-metrics/` |
 | Agent under controlled autonomy | [limits-and-alarms](limits-and-alarms/) `ext-runaway-loop/` |
-| Hybrid retrieval with an eval | [hybrid-retrieval-eval](hybrid-retrieval-eval/) `main/`, `ext-filters/`; [zero-etl-search](zero-etl-search/) `main/`, `demo/`, `ext-embeddings/`; vector search with filters in DynamoDB itself: [dynamodb](dynamodb/) `ext-vector-search/` |
+| Hybrid retrieval with an eval | [hybrid-retrieval-eval](hybrid-retrieval-eval/) `main/`, `ext-filters/`; [zero-etl-search](zero-etl-search/) `main/`, `demo/`, `ext-embeddings/` |
 | Model routing, cheap model first | [model-routing](model-routing/) `main/`, `ext-eval/`; [hybrid-retrieval-eval](hybrid-retrieval-eval/) `ext-model-routing/` |
 | MCP server | [mcp-server-minimal](mcp-server-minimal/) `main/`, `ext-confirmed-write/` |
 | Prompt optimisation, with an eval example (part of the generative-AI-first shape, not an extension on the proposal page) | [prompt-optimization](prompt-optimization/) `main/`, `ext-gepa-direct/`, `ext-eval-matrix/` |

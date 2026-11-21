@@ -384,7 +384,8 @@
       "task": "A DynamoDB store for a ride app's live trips: keys from the app's reads, strong reads where needed, and a conditional write so that one of two racing drivers wins",
       "format": "main-scenario",
       "shapes": [
-        "operational-first"
+        "operational-first",
+        "genai-first"
       ],
       "extensions": [
         "concurrency-correctness"
