@@ -1,5 +1,6 @@
 #!/bin/bash
-# dynamodb: delete everything main/ and the extensions created. Deleting a table also ends its PITR charges.
+# dynamodb: delete everything main/ and the extensions created. Deleting a table also ends its PITR charges, and
+# deletes its indexes with it: the vector index of ext-vector-search goes with $PREFIX-trips.
 #   BUCKET=<your bucket> bash clean_up.sh
 # Only names built from $PREFIX are deleted, so a teammate's tables with another prefix stay (README, Decisions: names).
 # Every step is attempted, also after one fails. A step that AWS refused is printed as FAILED and the script then

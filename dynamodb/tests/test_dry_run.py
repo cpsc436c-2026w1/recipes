@@ -78,3 +78,26 @@ def test_clean_up_touches_only_prefixed_names(dry):
     s3 = [c for c in cmds if c.startswith("aws s3 rm")]
     assert s3 == ["aws s3 rm --recursive --quiet s3://my-bucket/recipe/exports/",
                   "aws s3 rm --recursive --quiet s3://my-bucket/recipe/athena-results/"]
+
+
+def test_vector_search_adds_the_index_then_writes_then_searches(dry):
+    cmds = commands(dry("ext-vector-search/run.sh", KEEP="1").stdout)
+    # Decision (index on the trips table): UpdateTable on the table main/ made; no new table.
+    update = [i for i, c in enumerate(cmds) if c.startswith("aws dynamodb update-table --table-name recipe-trips")]
+    writes = [i for i, c in enumerate(cmds) if c.startswith("aws dynamodb update-item")]
+    searches = [i for i, c in enumerate(cmds) if c.startswith("aws dynamodb search-vectors")]
+    assert len(update) == 1 and len(writes) == 50 and len(searches) == 3
+    assert update[0] < writes[0] and writes[-1] < searches[0]
+    assert not any("create-table" in c for c in cmds)
+    # Decision (filters): BETWEEN on the fare, IN on the zone, in the last search only.
+    assert "fare_quote BETWEEN :lo AND :hi AND pickup_zone IN (:z1, :z2)" in cmds[searches[-1]]
+    assert not any("--search-condition-expression" in cmds[i] for i in searches[:-1])
+
+
+def test_shipped_vectors_match_the_messages():
+    v = json.loads((RECIPE / "ext-vector-search" / "vectors.json").read_text())
+    m = json.loads((RECIPE / "ext-vector-search" / "messages.json").read_text())
+    assert v["model"] == "qwen3-embedding-0.6b"
+    assert sorted(v["trips"]) == sorted(m["messages"]) == [f"t-{i:04d}" for i in range(50)]
+    assert sorted(v["questions"]) == sorted(m["questions"])
+    assert {len(x) for x in [*v["trips"].values(), *v["questions"].values()]} == {v["dimensions"]}
