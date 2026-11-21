@@ -12,6 +12,8 @@ accept one trip. Each DynamoDB call prints the read or write units it used, whic
   milliseconds.
 - Your project takes the **concurrency correctness** extension (2 points): two users may change the same record
   at once.
+- Your project is **generative AI first** and its texts are already in DynamoDB: `ext-vector-search` searches them
+  by meaning in the same table.
 - Not for reports over the whole table: those belong in the lake. The extension `ext-nightly-report` shows how the
   table reaches it. A team that wants Python instead of the AWS CLI starts from
   [lambda-dynamodb](../lambda-dynamodb/), which runs the same reads and writes from a Lambda function.
@@ -76,7 +78,8 @@ after a requirement's number names its EARS form, one of the forms in this table
 Each requirement has one or more scenarios in [`features/`](features/), tagged with its number. `uv run behave`
 runs them offline. The requirements of an extension are in its own README, and their numbers go on from here:
 [riders and drivers](ext-riders-and-drivers/README.md#requirements) from 50,
-[nightly report](ext-nightly-report/README.md#requirements) from 60. When you change what the recipe does, change
+[nightly report](ext-nightly-report/README.md#requirements) from 60,
+[vector search](ext-vector-search/README.md#requirements) from 70. When you change what the recipe does, change
 the requirement and its scenario with it: `python3 tools/check_requirements.py` (repo root) fails when they do not
 match.
 
@@ -153,6 +156,7 @@ match.
 
 - 50 to 55, riders and drivers: [`ext-riders-and-drivers/README.md`](ext-riders-and-drivers/README.md#requirements)
 - 60 to 65, nightly report: [`ext-nightly-report/README.md`](ext-nightly-report/README.md#requirements)
+- 70 to 76, vector search: [`ext-vector-search/README.md`](ext-vector-search/README.md#requirements)
 
 ## Run it
 
@@ -171,6 +175,7 @@ are services AWS runs.
 | Main scenario | `main/run.sh`, `lib.sh` | `DRY=1` prints the commands | yes: creates `$PREFIX-trips` and reads and writes it | no |
 | Riders and drivers | `ext-riders-and-drivers/run.sh` | `DRY=1` | yes: two more tables | no |
 | Nightly report | `ext-nightly-report/run.sh` | `DRY=1` | yes: starts the export and the Athena queries, then waits for them | no: DynamoDB writes the export and Athena runs the queries |
+| Vector search | `ext-vector-search/run.sh`, `vectors.py` | `DRY=1` | yes: adds a vector index to `$PREFIX-trips`, writes the vectors, searches; with a course token, one call to the course LLM gateway | no |
 | Clean-up | `clean_up.sh` | `DRY=1` | yes, with the `PREFIX` (and `BUCKET`) of the run | no |
 | Tests and scenarios | `tests/`, `features/` | yes, and in CI: dry runs, and the real scripts with the AWS CLI against moto on localhost | never against AWS | no |
 
@@ -188,6 +193,7 @@ Your sign-in needs these IAM actions to run the scripts and the clean-up. Each A
 | Main scenario and clean-up | `dynamodb:BatchWriteItem`, `dynamodb:CreateTable`, `dynamodb:DeleteTable`, `dynamodb:DescribeTable`, `dynamodb:GetItem`, `dynamodb:ListTables`, `dynamodb:Query`, `dynamodb:Scan`, `dynamodb:UpdateItem`, `glue:DeleteDatabase`, `glue:DeleteTable`, `glue:GetDatabases`, `s3:DeleteObject`, `s3:ListBucket` |
 | `ext-nightly-report/` adds | `athena:GetQueryExecution`, `athena:GetQueryResults`, `athena:StartQueryExecution`, `dynamodb:DescribeExport`, `dynamodb:ExportTableToPointInTime`, `dynamodb:ListExports`, `dynamodb:UpdateContinuousBackups`, `s3:AbortMultipartUpload`, `s3:PutObject`, `s3:PutObjectAcl` |
 | `ext-riders-and-drivers/` adds | `dynamodb:DeleteItem`, `dynamodb:PutItem` |
+| `ext-vector-search/` adds | `dynamodb:SearchVectors` (on the index, `table/$PREFIX-trips/index/trip-messages`), `dynamodb:UpdateTable` |
 
 ### 1. Laptop, offline: the dry run
 
@@ -244,7 +250,8 @@ with the same `PREFIX`. One run is well under one cent ([Cost and clean-up](#cos
 ### 3. Sandbox terminal: the extensions
 
 Follow each extension's README for sign-in, commands, expected output, clean-up and cost: [riders and drivers](ext-riders-and-drivers/README.md#run-it), run by us on 2026-10-21;
-[nightly report](ext-nightly-report/README.md#run-it), run by us on 2026-10-21. Both start from
+[nightly report](ext-nightly-report/README.md#run-it), run by us on 2026-10-21;
+[vector search](ext-vector-search/README.md#run-it), not yet run by us in AWS. All three start from
 `KEEP=1 bash main/run.sh`.
 
 ## What you should see
@@ -286,6 +293,7 @@ nightly report stops with a `FAILED` line when an Athena query does not succeed.
 |---|---|---|---|
 | riders and drivers | a second access pattern (a rider's trips in time order) with a sort key; a transaction that keeps a trip and its driver in agreement; optimistic locking with a version number | [`ext-riders-and-drivers/`](ext-riders-and-drivers/) | two more tables; runs after `KEEP=1 bash main/run.sh` |
 | nightly report | a report that Athena queries from an export of the table to S3, instead of a Scan of the live table | [`ext-nightly-report/`](ext-nightly-report/) | turns on point-in-time recovery; needs `BUCKET`; runs after `KEEP=1 bash main/run.sh` |
+| vector search | riders' messages searched by meaning with a vector index on the trips table, filtered by fare and pickup zone during the search, with the bytes and price of each vector write and search | [`ext-vector-search/`](ext-vector-search/) | adds the index `trip-messages` and two attributes to each trip; runs after `KEEP=1 bash main/run.sh` |
 
 ## Cost and clean-up
 
@@ -300,7 +308,7 @@ The extensions state their own cost. From your sandbox terminal for the AWS run,
 everything the recipe made:
 
 ```bash
-bash clean_up.sh                          # the tables, and the Athena table of ext-nightly-report
+bash clean_up.sh                          # the tables (with the vector index of ext-vector-search), and the Athena table of ext-nightly-report
 BUCKET=my-report-bucket bash clean_up.sh  # instead, if you ran ext-nightly-report: your bucket's name
 ```
 

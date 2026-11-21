@@ -7,6 +7,8 @@
 #   BUCKET       an S3 bucket you own, in ca-central-1 (ext-nightly-report only)
 #   DRY=1        print the commands without running them
 #   MAX_UNITS    the most read and write request units per second each table takes, default 100
+#   WAIT_MINUTES how long ext-vector-search waits for its vector index to become ACTIVE, default 30
+#   KB_MCP_TOKEN, COURSE_GATEWAY_URL  ext-vector-search only: set both to make the vectors through the course LLM gateway
 set -euo pipefail
 export AWS_REGION=${AWS_REGION:-ca-central-1} AWS_PAGER=""
 PREFIX=${PREFIX:-recipe}
