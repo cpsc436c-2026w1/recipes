@@ -24,8 +24,9 @@ MODEL = "qwen3-embedding-0.6b"
 # Decisions: cost.
 USD_PER_GB_SEARCHED = 0.0022       # DDB-VectorSearch
 USD_PER_GB_WRITTEN = 0.572         # DDB-VectorWriteRequest
-USD_PER_GB_MONTH = 0.275           # table storage beyond the free 25 GB-months; the vector index is billed the same way
-GB = 10**9                         # the price list says GB; 10^9 bytes is the higher of the two readings of it
+USD_PER_MILLION_WRITE_UNITS = 0.6875  # table write units, on demand, Standard table class
+USD_PER_GB_MONTH = 0.275           # table storage; assumed for the vector index too (README, Cost)
+GB = 2**30                         # DynamoDB sizes are binary: 1 GB = 2^30 bytes (developer guide, Quotas)
 MIN_BYTES = 1024                   # DynamoDB meters each vector request at 1 KB at least
 
 
@@ -82,7 +83,8 @@ def record(kind: str, log: str) -> None:
     reply = json.loads(text) if text else {}
     with open(log, "a") as f:
         f.write(json.dumps({"kind": kind, "bytes": reply.get("vector_write_bytes") if kind == "write"
-                            else reply.get("search_bytes")}) + "\n")
+                            else reply.get("search_bytes"),
+                            "units": reply.get("write_units") if kind == "write" else None}) + "\n")
 
 
 def cost(log: str) -> None:
@@ -94,18 +96,23 @@ def cost(log: str) -> None:
         out[kind] = {"requests": len(measured), "bytes_reported": sum(measured), "bytes_billed": billed,
                      "bytes_per_request": round(sum(measured) / len(measured)) if measured else None,
                      "usd": round(billed / GB * price, 10)}
+    units = [r.get("units") for r in rows if r["kind"] == "write" and r.get("units") is not None]
+    out["table_write_units"] = {"units": sum(units), "units_per_write": round(sum(units) / len(units), 1) if units else None,
+                                "usd": round(sum(units) / 1e6 * USD_PER_MILLION_WRITE_UNITS, 10)}
     print(json.dumps(out, indent=4))
     w, s = out["write"]["bytes_per_request"], out["search"]["bytes_per_request"]
+    u = out["table_write_units"]["units_per_write"]
     if w and s:
         print(f"\nEstimate for your data, from these bytes (measure your own: the bytes depend on your dimensions,"
-              f" projection and TopK):\n"
+              f" projection and TopK; 1 GB = 2^30 bytes):\n"
+              f"  table writes: items x {u} write units x {USD_PER_MILLION_WRITE_UNITS} USD per million, once,"
+              f" and again for every changed item\n"
               f"  load:     items x {max(MIN_BYTES, w)} bytes x {USD_PER_GB_WRITTEN} USD per GB, once,"
               f" and again for every changed vector\n"
-              f"  searches: searches x {max(MIN_BYTES, s)} bytes x {USD_PER_GB_SEARCHED} USD per GB; the bytes of a"
-              f" search grow by a small constant each time the items double\n"
-              f"  storage:  index size x {USD_PER_GB_MONTH} USD per GB-month beyond the free 25 GB-months of the"
-              f" account")
-
+              f"  searches: searches x {max(MIN_BYTES, s)} bytes x {USD_PER_GB_SEARCHED} USD per GB; measure the bytes"
+              f" again with an index of your own size, your TopK, filters and projection\n"
+              f"  storage:  index size x {USD_PER_GB_MONTH} USD per GB-month (assumed: the table storage price;"
+              f" check the DynamoDB pricing page)")
 
 if __name__ == "__main__":
     cmd, *args = sys.argv[1:]
