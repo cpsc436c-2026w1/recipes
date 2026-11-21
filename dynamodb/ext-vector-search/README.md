@@ -176,5 +176,6 @@ at the end of [../output/ext-vector-search.txt](../output/ext-vector-search.txt)
 table and its index are gone:
 
 ```bash
-aws dynamodb describe-table --table-name "$PREFIX-trips"   # ResourceNotFoundException: gone
+: "${PREFIX:?set the prefix used for this run, e.g. PREFIX=recipe-vec}"
+aws dynamodb describe-table --table-name "${PREFIX}-trips"   # ResourceNotFoundException: gone
 ```

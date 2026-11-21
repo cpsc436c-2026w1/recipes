@@ -97,16 +97,18 @@ def cost(log: str) -> None:
                      "bytes_per_request": round(sum(measured) / len(measured)) if measured else None,
                      "usd": round(billed / GB * price, 10)}
     units = [r.get("units") for r in rows if r["kind"] == "write" and r.get("units") is not None]
-    out["table_write_units"] = {"units": sum(units), "units_per_write": round(sum(units) / len(units), 1) if units else None,
-                                "usd": round(sum(units) / 1e6 * USD_PER_MILLION_WRITE_UNITS, 10)}
+    out["table_write_units"] = ({"units": sum(units), "units_per_write": round(sum(units) / len(units), 1),
+                                 "usd": round(sum(units) / 1e6 * USD_PER_MILLION_WRITE_UNITS, 10)} if units else
+                                "unavailable: this log has no write units; run the writes again to measure them")
     print(json.dumps(out, indent=4))
     w, s = out["write"]["bytes_per_request"], out["search"]["bytes_per_request"]
-    u = out["table_write_units"]["units_per_write"]
+    u = out["table_write_units"]["units_per_write"] if units else None
     if w and s:
         print(f"\nEstimate for your data, from these bytes (measure your own: the bytes depend on your dimensions,"
               f" projection and TopK; 1 GB = 2^30 bytes):\n"
-              f"  table writes: items x {u} write units x {USD_PER_MILLION_WRITE_UNITS} USD per million, once,"
-              f" and again for every changed item\n"
+              + (f"  table writes: items x {u} write units x {USD_PER_MILLION_WRITE_UNITS} USD per million, once,"
+                 f" and again for every changed item\n" if u else
+                 "  table writes: not measured in this log; run the writes again to measure them\n") +
               f"  load:     items x {max(MIN_BYTES, w)} bytes x {USD_PER_GB_WRITTEN} USD per GB, once,"
               f" and again for every changed vector\n"
               f"  searches: searches x {max(MIN_BYTES, s)} bytes x {USD_PER_GB_SEARCHED} USD per GB; measure the bytes"
