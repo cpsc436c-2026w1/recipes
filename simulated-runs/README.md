@@ -194,8 +194,12 @@ uv sync                                  # installs the dependencies; it should 
 uv run pytest -q                         # every test should pass
 uv run behave                            # the scenarios of the Requirements section; none should fail
 uv run python sim/generate.py --all      # writes SIM01 to SIM04 into sim/data/
-uv run python sim/replay.py SIM01 --speed 0 --run-id try1 --to local    # into the stand-in pipeline, in this process
+uv run python sim/replay.py SIM01 --speed 0 --run-id try1 --to local --target replay:discard    # nothing is stored
 ```
+
+The plain `--to local` target sends into this recipe's stand-in pipeline, which stores events in a DynamoDB table
+(`<PREFIX>-sim-events`): with AWS credentials active it creates that table in your account. Keep
+`--target replay:discard` for a run that calls no AWS service.
 
 The local replay writes `evidence/try1/sent.jsonl`, one line per delivery; speed 0 sends without waiting.
 
