@@ -53,7 +53,7 @@ itself; use this recipe to feed it and check it.
 
 | Decision | What we chose | Why | Constraint or best practice (source) |
 |---|---|---|---|
-| One definition of the events (R50) | Pydantic models in `src/rides/events.py`, `extra="forbid"`, an aware time for every time; the generator, the replayer, the stand-in pipeline and the steps import them | a field renamed in one place fails everywhere at once; a line with an unknown field or a time without a zone is refused with its file, line and field, not passed over | course constraint: offline first; DDIA 2e ch. 5 (schemas and their evolution) |
+| One definition of the events (R50) | Pydantic models in `src/rides/events.py`, `extra="forbid"`, an aware time for every time; the generator, the stand-in pipeline and the steps import them; the replayer does not (it needs only `event_id` and `received_time`, so it also sends a team's own lines) | a field renamed in one place fails everywhere at once; a line of `_truth/` with an unknown field or a time without a zone is refused with its file, line and field, not passed over; the stand-in pipeline refuses a delivery that does not match, and the replay writes its batch as failed in `sent.jsonl` | course constraint: offline first; DDIA 2e ch. 5 (schemas and their evolution) |
 | `event_id` on every event, the completion too (R30, R40) | an id per event, kept by every copy of a delivery | `twice` and `changed` are counted by event id; a completion without an id cannot be told from its repeat | L14 (at-least-once delivery, idempotent writes) |
 | What the answer counts (R40) | each event once, late ones included, `never` left out, a corrected trip's latest values | a late or repeated delivery changes what the system receives, not what happened; only an event that never arrives cannot be in the system's answer | DDIA 2e ch. 12 (event time against processing time) |
 | Four kinds of fault (R30) | `twice`, `late`, `never`, `changed` (a later event of the same kind with a new id) | twice, late and never are what a stream does; a correction with a later `event_time` lets a merge order it | L14 |
@@ -109,9 +109,9 @@ pipeline shape. The numbers are this recipe's own.
   Data gives.
 - **R40** (ubiquitous) The recipe shall compute the answers the scenarios state from `_truth/events.jsonl` and
   `_truth/faults.jsonl`, with each event counted once, late events included and `never` events left out.
-- **R50** (unwanted) If a line of `_truth/events.jsonl` or of a `deliveries.jsonl` does not match its model (an unknown field, a
-  time without a time zone, a missing field), then the recipe shall stop with an error that names the file, the line
-  and the field.
+- **R50** (unwanted) If a line of `_truth/events.jsonl` does not match its model (an unknown field, a time without a
+  time zone, a missing field), or a line of a `deliveries.jsonl` has no `event_id` or no `received_time` with a time
+  zone, then the recipe shall stop with an error that names the file and the line (and, for `_truth/`, the field).
 - **R60** (event) When the replayer sends a data set at speed k with a run id, the recipe shall send each delivery
   (its received_time minus the first received_time) / k after the start, within 1 s (for `s3`: each slot file when
   its last delivery is due), with the run id in front of every `event_id`, `trip_id` and `delivery_id`, to the
@@ -247,6 +247,37 @@ pipeline has stored the probe counts fewer trips and reports the day as failed.
 
 A replay of SIM01 at speed 1 takes about 2 hours 17 minutes (its completions run past the hour: 137 s at speed 60, measured); run it from a laptop terminal, not CloudShell (a
 CloudShell session ends after 20 to 30 minutes without keyboard input).
+
+### Replay your own SIM01
+
+The replayer sends any data set laid out as `sim/data/<SIM>/<source>/dt=<day>/hour=<hour>/deliveries.jsonl`, with
+your own event types and your own name for `<source>`. Each line needs `event_id` and `received_time` (ISO 8601 with
+a time zone); the other fields are sent as they are. A line without `delivery_id` is given one from its file and
+line (`line-2026-11-23-09-000001`) in `sent.jsonl`, and is sent without it. The replayer does not check your fields
+against your models, so run your own check of the data set first. The default `--to local` target, this recipe's
+stand-in pipeline, takes only this recipe's rides events: replay your own lines to `--target replay:discard`, which
+keeps nothing, so `sent.jsonl` is the record of the order and the send times.
+
+For example, the SIM01 of tutorial B5T2, cloned into your home folder:
+
+```bash
+git clone https://github.com/cpsc436c-2026w1/b5-t2-behave-sim ~/b5-t2-behave-sim
+(cd ~/b5-t2-behave-sim && uv sync && uv run python -m sim.generate)    # writes SIM01 to SIM03 into its sim/data/
+uv run python sim/replay.py SIM01 --run-id b5t2-try1 --to local --target replay:discard --data-dir ~/b5-t2-behave-sim/sim/data
+```
+
+The replay should end with `2515 sent, 0 failed` and write `evidence/b5t2-try1/sent.jsonl`. The tutorial's delivery
+files are under `trip-events/`, its only folder besides `_truth/`, so the replayer finds them without `--source`.
+Where your SIM01 has more than one such folder, the replayer stops and names them; name the one to send:
+
+```bash
+uv run python sim/replay.py SIM01 --run-id team-try1 --to local --target replay:discard --data-dir ~/your-team-repo/sim/data --source orders
+```
+
+To send your lines into your own system, run the same command with your lease's credentials active (as for the AWS
+commands above), with `--to kinesis --target <your stream>` or `--to s3 --target <your bucket>` in place of
+`--to local --target replay:discard`. The `s3` target writes under `raw/trip-events/`, whatever your source folder
+is called.
 
 ### AWS permissions
 

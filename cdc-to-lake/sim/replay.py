@@ -3,29 +3,39 @@
     uv run python sim/replay.py SIM01 --speed 10 --run-id 20261123T0900-SIM01 --to kinesis [--target <stream>]
     uv run python sim/replay.py SIM01 --speed 0 --run-id r3 --to s3 [--slot-min 1] [--shift-to now]
     uv run python sim/replay.py SIM01 --speed 0 --run-id r1 --to local [--target rides.pipeline:handle]
+    uv run python sim/replay.py SIM01 --run-id t1 --to local --target replay:discard --data-dir ../team/sim/data
 
-Each delivery of `sim/data/<id>/trip-events/dt=<day>/hour=<hour>/deliveries.jsonl` (the files in the order
+Each delivery of `sim/data/<id>/<source>/dt=<day>/hour=<hour>/deliveries.jsonl` (the files in the order
 received) is sent (its received_time minus the first received_time) / speed after the start; speed 0 sends as fast
 as the target takes them. The run id goes in front of every `event_id`, `trip_id` and `delivery_id` (`r1-t-0001`), so
-a second replay into the same system is not taken for repeats of the first. `--shift-to now` moves every time by one offset, so the first received_time is the start of the replay.
+a second replay into the same system is not taken for repeats of the first. `--shift-to now` moves every time by
+one offset, so the first received_time is the start of the replay.
+
+`<source>` is `--source`, or else the one folder of the data set that is not `_truth/` (`trip-events` here; a team's
+own SIM01 may name it otherwise). A line needs only `event_id` and `received_time` (ISO 8601 with a time zone);
+every other field is sent as it is, so the replayer also sends a team's own event types. A line without a
+`delivery_id` is given one from its file and line (`line-2026-11-23-09-000012`, the same in every replay) for
+sent.jsonl, and is sent without it. The replayer does not check the event fields against a model: the generator,
+the check of a data set and the handler that receives the lines do.
 
 Targets (`--target` names it; the default is in brackets):
 
-    kinesis  PutRecords calls of up to 500 records, keyed by trip_id; refused records retried   [<PREFIX>-trip-events]
+    kinesis  PutRecords calls of up to 500 records, keyed by trip_id (event_id where a line has none); refused
+             records retried                                                            [<PREFIX>-trip-events]
     sqs      SendMessageBatch calls of up to 10; refused entries retried             [queue <PREFIX>-trip-events]
     url      SigV4-signed POSTs of {"deliveries": [...]} up to 100, to a function URL (AWS_IAM)       [required]
     s3       one JSON Lines object per slot of --slot-min minutes, all of a slot's deliveries at once, at
              raw/trip-events/dt=<UTC day>/<slot start>-<run id>.jsonl, when the slot's last delivery is due
                                                                                         [<PREFIX>-lake-<account>]
     local    calls a function in this process with each batch of up to 500 deliveries   [rides.pipeline:handle]
+             (`replay:discard` takes every batch and keeps none: sent.jsonl is then the record)
 
 Every send goes to `evidence/<run-id>/sent.jsonl`, one line per delivery: delivery_id, event_id (both with the run
 id in front), sent_time, target, result (`ok`, or the error of a send that failed for good). Data latency is
 measured from sent_time, not from the simulated received_time.
 
-This file is a shared helper (tools/shared_helpers.toml): copy it unchanged into `sim/replay.py`. It needs boto3
-and, to read the data files, the models of `src/rides/events.py`; senders and `replay()` need only boto3, so a
-Lambda function can carry this file alone.
+This file is a shared helper (tools/shared_helpers.toml): copy it unchanged into `sim/replay.py`. It needs only
+boto3, and only for the cloud targets, so a Lambda function can carry this file alone.
 """
 from __future__ import annotations
 
@@ -45,6 +55,7 @@ REGION = "ca-central-1"
 ROOT = Path(__file__).resolve().parent.parent
 MAX_ATTEMPTS = 5          # refused records are sent again at most this many times in all (REL05-BP03)
 TARGETS = ("kinesis", "sqs", "url", "s3", "local")
+DERIVED = "_derived_delivery_id"   # marks a delivery_id the replayer made up; it is not sent
 
 
 def iso(t: datetime) -> str:
@@ -52,15 +63,35 @@ def iso(t: datetime) -> str:
 
 
 def parse(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(timezone.utc)
+    """An ISO 8601 time with a zone ("Z" or an offset), as an aware UTC datetime."""
+    t = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    if t.tzinfo is None:
+        raise ValueError(f"time without a time zone: {s}")
+    return t.astimezone(timezone.utc)
+
+
+class LineError(ValueError):
+    """A delivery line the replayer cannot send: the file, the line number (from 1) and what is wrong with it."""
+
+    def __init__(self, file: str, line: int, message: str):
+        self.file, self.line = file, line
+        super().__init__(f"{file}, line {line}: {message}")
 
 
 def prefixed(delivery: dict, run_id: str) -> dict:
-    """The delivery as this run sends it: the run id in front of its three ids."""
+    """The delivery as this run sends it: the run id in front of its ids (a line without a trip_id keeps none)."""
     out = dict(delivery)
     for key in ("event_id", "trip_id", "delivery_id"):
-        out[key] = f"{run_id}-{delivery[key]}"
+        if delivery.get(key) is not None:
+            out[key] = f"{run_id}-{delivery[key]}"
     return out
+
+
+def as_sent(delivery: dict) -> dict:
+    """What the target receives: the line as it was read, without a delivery_id the replayer made up."""
+    if not delivery.get(DERIVED):
+        return delivery
+    return {k: v for k, v in delivery.items() if k not in (DERIVED, "delivery_id")}
 
 
 def unprefixed(value: str, run_id: str) -> str:
@@ -72,13 +103,13 @@ def shifted(deliveries: list[dict], to: datetime) -> list[dict]:
     """Every time moved by one offset, so the first received_time is `to`."""
     first = min(parse(d["received_time"]) for d in deliveries)
     offset = to - first
-    return [{**d, "event_time": iso(parse(d["event_time"]) + offset),
-             "received_time": iso(parse(d["received_time"]) + offset)} for d in deliveries]
+    return [{**d, **{k: iso(parse(d[k]) + offset) for k in ("event_time", "received_time") if d.get(k) is not None}}
+            for d in deliveries]
 
 
 def planned(deliveries: list[dict], speed: float) -> list[tuple[float, dict]]:
     """(seconds after the start, delivery), in the order received; speed 0 plans every send at 0."""
-    ordered = sorted(deliveries, key=lambda d: (d["received_time"], d["delivery_id"]))
+    ordered = sorted(deliveries, key=lambda d: (parse(d["received_time"]), str(d["delivery_id"])))
     if not ordered:
         return []
     first = parse(ordered[0]["received_time"])
@@ -102,8 +133,8 @@ class KinesisSender:
         results = ["ok"] * len(batch)
         pending = list(range(len(batch)))
         for attempt in range(MAX_ATTEMPTS):
-            records = [{"Data": json.dumps(batch[i], sort_keys=True).encode(), "PartitionKey": batch[i]["trip_id"]}
-                       for i in pending]
+            records = [{"Data": json.dumps(batch[i], sort_keys=True).encode(),
+                        "PartitionKey": str(batch[i].get("trip_id") or batch[i]["event_id"])} for i in pending]
             self.calls.append(len(records))
             resp = self.client.put_records(StreamName=self.stream, Records=records)
             failed = {i: f"{r['ErrorCode']}: {r.get('ErrorMessage', '')}"
@@ -214,6 +245,11 @@ class LocalSender:
         return ["ok"] * len(batch)
 
 
+def discard(batch: list[dict]) -> None:
+    """A local target that takes every batch and keeps none (`--to local --target replay:discard`): for a data set
+    no handler in this folder reads, sent.jsonl is then the record of what was sent, in what order and when."""
+
+
 def load_handler(spec: str):
     """`module:function`, for example rides.pipeline:handle."""
     module, _, func = spec.partition(":")
@@ -268,7 +304,7 @@ def replay(deliveries: list[dict], sender, run_id: str, speed: float = 0.0, *, e
         nonlocal late
         sent_at = wall()
         late = max(late, clock() - start - due)
-        for d, result in zip(batch, sender.send(batch)):
+        for d, result in zip(batch, sender.send([as_sent(d) for d in batch])):
             lines.append({"delivery_id": d["delivery_id"], "event_id": d["event_id"], "sent_time": iso(sent_at),
                           "target": sender.name, "result": result})
 
@@ -304,16 +340,68 @@ def replay(deliveries: list[dict], sender, run_id: str, speed: float = 0.0, *, e
     return summary
 
 
-def load_deliveries(data_set: str, data_dir: Path | None = None) -> list[dict]:
-    """The delivery files of a data set (<source>/dt=<day>/hour=<hour>/deliveries.jsonl, read in that order), each
-    line validated against its model, as plain dicts. _truth/ is not read: the system never sees it."""
-    from rides.events import DELIVERY, read_jsonl
+def source_folder(folder: Path, source: str | None = None) -> Path:
+    """The folder of a data set's delivery files: `source`, or else the one folder that is not _truth/."""
+    if not folder.is_dir():
+        raise FileNotFoundError(f"{folder}: no such data set (run sim/generate.py {folder.name} first)")
+    if source == "_truth":
+        raise ValueError("--source _truth: the replayer never reads _truth/, the system never sees it")
+    choices = sorted(p.name for p in folder.iterdir() if p.is_dir() and p.name != "_truth" and p.name[0] != ".")
+    if source is not None:
+        if source not in choices:
+            raise FileNotFoundError(f"{folder}: no folder {source}/ (its folders: {', '.join(choices) or 'none'})")
+        return folder / source
+    if len(choices) == 1:
+        return folder / choices[0]
+    if not choices:
+        raise FileNotFoundError(f"{folder}: no folder of delivery files besides _truth/ (run sim/generate.py "
+                                f"{folder.name} first)")
+    raise ValueError(f"{folder} has {len(choices)} folders of delivery files ({', '.join(choices)}): "
+                     f"name one with --source")
+
+
+def read_deliveries(path: Path, name: str, derived: str) -> list[dict]:
+    """The lines of one delivery file as plain dicts; a line without event_id or received_time (with a zone) stops
+    the read with its file and line. A line without delivery_id gets `<derived>-<line number>`."""
+    out = []
+    for n, text in enumerate(path.read_text().splitlines(), 1):
+        if not text.strip():
+            continue
+        try:
+            d = json.loads(text)
+        except json.JSONDecodeError as err:
+            raise LineError(name, n, f"not JSON: {err}") from None
+        if not isinstance(d, dict):
+            raise LineError(name, n, "not a JSON object")
+        for key in ("event_id", "received_time"):
+            if d.get(key) in (None, ""):
+                raise LineError(name, n, f"no {key}")
+        try:
+            parse(d["received_time"])
+        except (TypeError, ValueError, AttributeError) as err:
+            raise LineError(name, n, f"received_time {d['received_time']!r} is not ISO 8601 with a time zone "
+                                     f"({err})") from None
+        if d.get("delivery_id") is None:
+            d = {**d, "delivery_id": f"{derived}-{n:06d}", DERIVED: True}
+        out.append(d)
+    return out
+
+
+def load_deliveries(data_set: str, data_dir: Path | None = None, source: str | None = None) -> list[dict]:
+    """The delivery files of a data set (<source>/dt=<day>/hour=<hour>/deliveries.jsonl, read in that order), as
+    plain dicts. _truth/ is not read: the system never sees it."""
     folder = (data_dir or ROOT / "sim" / "data") / data_set
-    paths = sorted(folder.glob("*/dt=*/hour=*/deliveries.jsonl"))
+    src = source_folder(folder, source)
+    paths = sorted(src.glob("dt=*/hour=*/deliveries.jsonl"))
     if not paths:
-        raise FileNotFoundError(f"{folder}: no <source>/dt=<day>/hour=<hour>/deliveries.jsonl (run sim/generate.py "
+        raise FileNotFoundError(f"{src}: no dt=<day>/hour=<hour>/deliveries.jsonl (run sim/generate.py "
                                 f"{data_set} first)")
-    return [d.model_dump(mode="json") for path in paths for d in read_jsonl(path, DELIVERY)]
+    out = []
+    for path in paths:
+        parts = path.relative_to(src).parent.parts
+        derived = "line-" + "-".join(part.split("=", 1)[-1] for part in parts)
+        out += read_deliveries(path, f"{data_set}/{path.relative_to(folder)}", derived)
+    return out
 
 
 def _record_s3_replay(run_id: str) -> None:
@@ -337,7 +425,7 @@ def _commit() -> str:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("data_set", help="SIM01, SIM03, SIM04 ... (sim/data/<id>/trip-events/dt=*/hour=*/deliveries.jsonl)")
+    p.add_argument("data_set", help="SIM01, SIM03, SIM04 ... (sim/data/<id>/<source>/dt=*/hour=*/deliveries.jsonl)")
     p.add_argument("--speed", type=float, default=0.0, help="k times the simulated rate; 0 = as fast as it goes")
     p.add_argument("--run-id", required=True)
     p.add_argument("--to", required=True, choices=TARGETS)
@@ -345,11 +433,17 @@ def main(argv=None) -> int:
     p.add_argument("--slot-min", type=int, default=1, help="minutes per object for --to s3")
     p.add_argument("--shift-to", choices=["now"], help="move the times so the first delivery is now")
     p.add_argument("--data-dir", type=Path, default=ROOT / "sim" / "data")
+    p.add_argument("--source", help="the folder of the delivery files in the data set (default: the one that is not "
+                                    "_truth)")
     p.add_argument("--evidence", type=Path, default=ROOT / "evidence")
     args = p.parse_args(argv)
     if args.speed < 0:
         p.error("--speed must be 0 or more")
-    deliveries = load_deliveries(args.data_set, args.data_dir)
+    try:
+        deliveries = load_deliveries(args.data_set, args.data_dir, args.source)
+    except (OSError, ValueError) as err:   # a missing folder, two folders without --source, a line it cannot send
+        print(f"replay: {err}", file=sys.stderr)
+        return 2
     sender = make_sender(args.to, args.target, run_id=args.run_id, slot_min=args.slot_min)
     if args.to == "s3":
         _record_s3_replay(args.run_id)

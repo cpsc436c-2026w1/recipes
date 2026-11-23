@@ -140,7 +140,7 @@ files = [
 
 [[helper]]
 name = "TripRequested"
-why = "the event models: a field renamed in one copy makes the generator, the replayer and a team's handler disagree on what a line holds"
+why = "the event models: a field renamed in one copy makes the generator, the stand-in pipeline and a team's handler disagree on what a line holds"
 files = [
   "simulated-runs/src/rides/events.py",
   "lambda-dynamodb/src/rides/events.py",
@@ -670,7 +670,7 @@ files = ["lambda-dynamodb/ext-dashboard-page/slots.py", "streaming-ingestion/ext
 
 [[helper]]
 name = "SOURCE"
-why = "the folder the delivery files are written under (trip-events, as raw/trip-events/ in the lake bucket); a copy with another name writes files the replayer of another recipe does not find"
+why = "the folder the delivery files are written under (trip-events, as raw/trip-events/ in the lake bucket); a copy with another name writes a folder that no longer matches the raw/trip-events/ prefix the s3 target and the clean-up use"
 files = [
   "simulated-runs/sim/generate.py",
   "lambda-dynamodb/sim/generate.py",
@@ -818,7 +818,7 @@ files = [
 
 [[helper]]
 name = "load_deliveries"
-why = "the replayer reads the delivery files in the order received and never _truth/; a copy that reads _truth/events.jsonl sends events without their faults"
+why = "the replayer reads the delivery files of one source folder in the order received and never _truth/, and checks only event_id and received_time; a copy that reads _truth/events.jsonl sends events without their faults, and one that checks a model refuses a team's own lines"
 files = [
   "simulated-runs/sim/replay.py",
   "lambda-dynamodb/sim/replay.py",

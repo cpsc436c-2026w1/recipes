@@ -205,3 +205,88 @@ def test_cli_writes_evidence(tmp_path, sim01, monkeypatch):
     assert len((tmp_path / "ev" / "c1" / "sent.jsonl").read_text().splitlines()) == 60
     assert "commit" in (tmp_path / "ev" / "c1" / "command.txt").read_text()
     assert len(got) == 60
+
+
+def cp1_style(folder, source="trip-events"):
+    """A delivery file as a team's generator writes it: its own fields, times without milliseconds, no delivery_id,
+    written out of received_time order."""
+    rows = [("ev-000003", "t-0002", "2026-11-23T09:00:40Z"),
+            ("ev-000001", "t-0001", "2026-11-23T09:00:01Z"),
+            ("ev-000002", "t-0001", "2026-11-23T09:00:20+00:00")]
+    lines = [{"event_type": "trip_requested", "trip_id": t, "rider_id": "p-52201", "quoted_fare": 86.45,
+              "event_time": rt, "event_id": e, "received_time": rt} for e, t, rt in rows]
+    path = folder / "SIM01" / source / "dt=2026-11-23" / "hour=09" / "deliveries.jsonl"
+    path.parent.mkdir(parents=True)
+    (folder / "SIM01" / "_truth").mkdir()
+    path.write_text("".join(json.dumps(x) + "\n" for x in lines))
+    return lines
+
+
+def test_a_team_line_with_extra_fields_and_no_delivery_id(tmp_path, monkeypatch):
+    lines = cp1_style(tmp_path / "data")
+    got = []
+    monkeypatch.setattr(replay, "load_handler", lambda spec: got.extend)
+    assert replay.main(["SIM01", "--run-id", "t1", "--to", "local", "--data-dir", str(tmp_path / "data"),
+                        "--evidence", str(tmp_path / "ev")]) == 0
+    assert [d["event_id"] for d in got] == ["t1-ev-000001", "t1-ev-000002", "t1-ev-000003"]
+    by_id = {x["event_id"]: x for x in lines}
+    for d in got:                     # the line as it was read, with the run id in front of its ids
+        line = by_id[d["event_id"].removeprefix("t1-")]
+        assert d == {**line, "event_id": d["event_id"], "trip_id": f"t1-{line['trip_id']}"}
+    sent = [json.loads(x) for x in (tmp_path / "ev" / "t1" / "sent.jsonl").read_text().splitlines()]
+    assert [x["delivery_id"] for x in sent] == ["t1-line-2026-11-23-09-000002", "t1-line-2026-11-23-09-000003",
+                                                "t1-line-2026-11-23-09-000001"]
+    assert all(x["result"] == "ok" for x in sent)
+
+
+def test_a_team_source_folder_named_with_source(tmp_path, capsys):
+    cp1_style(tmp_path / "data", source="orders")
+    (tmp_path / "data" / "SIM01" / "payments").mkdir()
+    args = ["SIM01", "--run-id", "t2", "--to", "local", "--target", "replay:discard",
+            "--data-dir", str(tmp_path / "data"), "--evidence", str(tmp_path / "ev")]
+    assert replay.main(args) == 2
+    assert "2 folders of delivery files (orders, payments): name one with --source" in capsys.readouterr().err
+    assert replay.main(args + ["--source", "orders"]) == 0
+    assert len((tmp_path / "ev" / "t2" / "sent.jsonl").read_text().splitlines()) == 3
+
+
+def test_the_one_source_folder_is_the_default(tmp_path):
+    cp1_style(tmp_path / "data", source="orders")
+    assert len(replay.load_deliveries("SIM01", tmp_path / "data")) == 3
+
+
+def test_a_line_without_received_time_names_file_and_line(tmp_path, capsys):
+    cp1_style(tmp_path / "data")
+    path = tmp_path / "data" / "SIM01" / "trip-events" / "dt=2026-11-23" / "hour=09" / "deliveries.jsonl"
+    rows = path.read_text().splitlines()
+    rows[1] = json.dumps({k: v for k, v in json.loads(rows[1]).items() if k != "received_time"})
+    path.write_text("\n".join(rows) + "\n")
+    with pytest.raises(replay.LineError) as err:
+        replay.load_deliveries("SIM01", tmp_path / "data")
+    assert (err.value.file, err.value.line) == ("SIM01/trip-events/dt=2026-11-23/hour=09/deliveries.jsonl", 2)
+    assert replay.main(["SIM01", "--run-id", "t3", "--to", "local", "--target", "replay:discard",
+                        "--data-dir", str(tmp_path / "data"), "--evidence", str(tmp_path / "ev")]) == 2
+    assert ("SIM01/trip-events/dt=2026-11-23/hour=09/deliveries.jsonl, line 2: no received_time"
+            in capsys.readouterr().err)
+
+
+def test_a_received_time_without_a_zone_is_refused(tmp_path):
+    cp1_style(tmp_path / "data")
+    path = tmp_path / "data" / "SIM01" / "trip-events" / "dt=2026-11-23" / "hour=09" / "deliveries.jsonl"
+    path.write_text(path.read_text().replace("2026-11-23T09:00:40Z", "2026-11-23T09:00:40"))
+    with pytest.raises(replay.LineError, match="line 1: received_time '2026-11-23T09:00:40' is not ISO 8601"):
+        replay.load_deliveries("SIM01", tmp_path / "data")
+
+
+def test_a_team_line_into_kinesis_is_keyed_by_trip_and_sent_without_a_made_up_id(aws, tmp_path):
+    cp1_style(tmp_path / "data")
+    kin = aws.client("kinesis")
+    kin.create_stream(StreamName="recipe-test-trip-events", ShardCount=1)
+    deliveries = replay.load_deliveries("SIM01", tmp_path / "data")
+    assert replay.replay(deliveries, replay.make_sender("kinesis", session=aws), "k1", evidence=tmp_path)["sent"] == 3
+    shard = kin.describe_stream(StreamName="recipe-test-trip-events")["StreamDescription"]["Shards"][0]["ShardId"]
+    it = kin.get_shard_iterator(StreamName="recipe-test-trip-events", ShardId=shard,
+                                ShardIteratorType="TRIM_HORIZON")["ShardIterator"]
+    records = kin.get_records(ShardIterator=it)["Records"]
+    assert [r["PartitionKey"] for r in records] == ["k1-t-0001", "k1-t-0001", "k1-t-0002"]
+    assert all("delivery_id" not in json.loads(r["Data"]) for r in records)

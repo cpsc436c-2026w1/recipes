@@ -7,8 +7,9 @@
 A delivery line is the event's fields plus `delivery_id` and `received_time`. Every time is ISO 8601 with a time zone;
 it is written in UTC, fixed width, with milliseconds and a "Z" (2026-11-23T09:00:00.000Z), so strings sort as times.
 
-Decision (README, "one definition of the events"): the generator, the replayer, the team's handlers and the step
-code all import these models, so a field renamed in one place fails everywhere at once. `extra="forbid"`: a line
+Decision (README, "one definition of the events"): the generator, the team's handlers and the step code all import
+these models, so a field renamed in one place fails everywhere at once (the replayer does not: it reads only
+`event_id` and `received_time`, so it also sends a team's own lines). `extra="forbid"`: a line
 with a field the model does not have is refused, not passed over.
 
 This file is a shared helper (tools/shared_helpers.toml): copy it unchanged into `src/rides/events.py`.
