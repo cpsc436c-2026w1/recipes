@@ -39,7 +39,7 @@ test = "uv run pytest -q"          # offline, no AWS account
 scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
 run = "uv run python main/run.py --target aws"
 run_local = "uv run python main/run.py --target local"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [scenarios]
 main = "main/run.py"

@@ -30,7 +30,10 @@
         "DynamoDB",
         "Parameter Store",
         "Logfire",
-        "pydantic-settings"
+        "pydantic-settings",
+        "Pydantic AI (ext-sdk-lambda)",
+        "Lambda function URLs (ext-sdk-lambda)",
+        "DuckDB (ext-sdk-lambda)"
       ],
       "practices": [
         {
@@ -54,6 +57,14 @@
           "source": "Twelve-Factor App, Config; course settings standard"
         },
         {
+          "name": "A value is shown only when the tool log holds it: the answer's SQL and rows come from what ran, not from the model's output (ext-sdk-lambda)",
+          "source": "L17; Agentic AI Lens AGENTSEC02-BP02 (validate tool inputs and outputs)"
+        },
+        {
+          "name": "One absolute deadline around the whole agent, checked before each call and cancelling the call in flight (ext-sdk-lambda)",
+          "source": "L17; Agentic AI Lens AGENTCOST07-BP01"
+        },
+        {
           "name": "Eval first: requests with expected tool use and outcome, scored in code, offline on a stub model",
           "source": "Course standard stack (Inspect AI)"
         }
@@ -74,7 +85,20 @@
           "evals/task.py",
           "evals/scoring.py",
           "clean_up.py",
-          ".env.example"
+          ".env.example",
+          "ext-sdk-lambda/handler.py",
+          "ext-sdk-lambda/agent_strands.py",
+          "ext-sdk-lambda/agent_pydantic.py",
+          "ext-sdk-lambda/caps.py",
+          "ext-sdk-lambda/toollog.py",
+          "ext-sdk-lambda/verdict.py",
+          "ext-sdk-lambda/engine.py",
+          "ext-sdk-lambda/sqlcheck.py",
+          "ext-sdk-lambda/deploy.py",
+          "ext-sdk-lambda/clean_up.py",
+          "ext-sdk-lambda/invoke_url.py",
+          "ext-sdk-lambda/trip_eval.py",
+          "ext-sdk-lambda/.env.example"
         ]
       },
       "validates": {
@@ -89,7 +113,7 @@
         "run_offline": "uv run --env-file .env.example python -m main.run ask --model stub --yes",
         "run": "uv run --env-file .env python -m main.run deploy",
         "invoke": "uv run --env-file .env python -m main.invoke",
-        "clean": "uv run --env-file .env python clean_up.py"
+        "clean": "uv run --env-file .env python clean_up.py --yes"
       },
       "cost_one_run": "under one cent in AWS charges (assumed from the AgentCore price list, not measured); model calls count against the course LLM gateway budget, at most MAX_MODEL_CALLS per request",
       "region": "ca-central-1",
@@ -121,7 +145,10 @@
         "change data capture",
         "lag monitoring",
         "table maintenance",
-        "rollback"
+        "rollback",
+        "scheduled merge",
+        "late data correction",
+        "compaction rule"
       ],
       "lectures": [
         "L11",
@@ -139,7 +166,9 @@
       "secondary": [
         "PyIceberg",
         "DuckDB",
-        "EventBridge Scheduler"
+        "EventBridge Scheduler",
+        "Amazon SNS",
+        "Pydantic"
       ],
       "practices": [
         {
@@ -161,6 +190,18 @@
         {
           "name": "Compact small files and expire old snapshots on a schedule",
           "source": "L11; Athena docs (OPTIMIZE, VACUUM); Data Analytics Lens BP 13.1"
+        },
+        {
+          "name": "Compact by a rule from the files a query reads, only closed days, and never lose a late file",
+          "source": "Athena docs (OPTIMIZE, partition projection, CTAS); Firehose docs (S3 prefixes, delivery retries)"
+        },
+        {
+          "name": "Merge late, repeated and corrected events into one row per item, and rebuild the periods they change",
+          "source": "L13; Athena docs (MERGE INTO); S3 docs (consistency model)"
+        },
+        {
+          "name": "Scheduled jobs: a lease, recorded query ids, no automatic retries, and a manifest of what is done",
+          "source": "Lambda docs (asynchronous error handling); DynamoDB docs (condition expressions)"
         }
       ],
       "instruments": {
@@ -174,6 +215,19 @@
           "ext-rollback-or-schema/rollback.py",
           "ext-rollback-or-schema/schema_change.py",
           "ext-maintenance/maintenance.py",
+          "ext-maintenance/compact_days.py",
+          "ext-maintenance/nightly_ops.py",
+          "ext-maintenance/land_parquet.py",
+          "ext-maintenance/clean_up.py",
+          "ext-scheduled-merge/merge_run.py",
+          "ext-scheduled-merge/merge.py",
+          "ext-scheduled-merge/sql/trips_source.sql",
+          "ext-scheduled-merge/sql/merge_trips.sql",
+          "ext-scheduled-merge/sql/rebuild_counts.sql",
+          "ext-scheduled-merge/sql/athena_tables.sql",
+          "ext-scheduled-merge/live_run.py",
+          "ext-scheduled-merge/clean_up.py",
+          "main/jobs.py",
           "clean_up.py"
         ]
       },
@@ -187,7 +241,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python -m main.run --target aws",
         "run_offline": "uv run python -m main.run",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "under 0.01 USD (assumed from the AWS bulk price lists, ca-central-1, read 2026-11-13: Firehose Direct PUT to Iceberg 0.083 USD per GB, Athena 5.50 USD per TB of Data scanned with a 10 MB minimum per query); not measured",
       "region": "ca-central-1",
@@ -257,7 +311,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python main/run.py --target aws",
         "run_local": "uv run python main/run.py --target local",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "under 0.001 USD, from the price list (DynamoDB on-demand 0.6875 USD per million writes, 0.1375 USD per million reads); not measured",
       "region": "ca-central-1",
@@ -274,6 +328,90 @@
       "readme": "concurrency-correctness/README.md"
     },
     {
+      "name": "cost-and-teardown",
+      "summary": "One list of everything your scripts created, what a run, 30 days and a year cost in USD and CAD, and a teardown that calls every clean-up and proves nothing is left",
+      "task": "Tag and record every create, find every resource by four routes, price a run, 30 days and a year from its measured units, and tear everything down with proof",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L1",
+        "L2",
+        "L11",
+        "L12",
+        "L16",
+        "L18"
+      ],
+      "core": [
+        "Resource Groups Tagging API",
+        "IAM",
+        "Kinesis Data Streams",
+        "Lambda",
+        "DynamoDB",
+        "Athena",
+        "S3",
+        "AWS Glue Data Catalog",
+        "CloudWatch Logs",
+        "EventBridge Scheduler"
+      ],
+      "secondary": [
+        "moto as the offline stand-in for AWS",
+        "the course price sheet (prices.toml)",
+        "simulated-runs' replayer and SIM01"
+      ],
+      "practices": [
+        {
+          "name": "tag every resource at creation and keep a ledger of every create, borrowed resources included",
+          "source": "COST03-BP02 (add organization information to cost and usage); course tags Project, Team, Owner"
+        },
+        {
+          "name": "price from measured units and the price sheet, always on against on demand, over a stated horizon",
+          "source": "course price sheet; COST06-BP01 (perform cost modeling)"
+        },
+        {
+          "name": "decommission the hourly parts first and prove each delete by the service's own not found",
+          "source": "course rule: every recipe has a clean-up step; each delete proved by the service"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "scripts/tags.py",
+          "scripts/lake.py",
+          "scripts/kinds.py",
+          "scripts/inventory.py",
+          "scripts/units.py",
+          "scripts/cost.py",
+          "scripts/teardown.py",
+          "scripts/teardown.sh",
+          "scripts/teardown.toml",
+          "prices.toml"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "the cost arithmetic matches the price sheet; the inventory finds what the ledger, the tags and the names hold; the teardown deletes hourly parts first and fails while anything is left"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "bash scripts/live_run.sh",
+        "clean": "bash scripts/teardown.sh --yes"
+      },
+      "cost_one_run": "0.019 USD (0.027 CAD) for one demonstration run, measured 2026-11-23 (the shard-hour 0.0165 of it); the stream bills 0.0165 USD an hour until the teardown",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX"
+      },
+      "folder": "cost-and-teardown",
+      "readme": "cost-and-teardown/README.md"
+    },
+    {
       "name": "dashboard-chat",
       "summary": "Chat on a dashboard: the model writes one read-only SQL query through one tool, app code checks it and DuckDB computes the number, and every question leaves a trace in DynamoDB",
       "task": "Users ask plain-language questions over a team's table; the model writes read-only SQL through one tool, app code checks and runs it in DuckDB, and each question leaves one trace item in DynamoDB",
@@ -287,7 +425,8 @@
         "Chat on the dashboard",
         "Answer or retrieval cache",
         "Guardrails with a red-team log",
-        "Trace analysis and alarms"
+        "Trace analysis and alarms",
+        "Athena as the chat's engine"
       ],
       "lectures": [
         "L15",
@@ -299,7 +438,10 @@
         "DynamoDB",
         "CloudWatch",
         "SNS",
-        "course LLM gateway"
+        "course LLM gateway",
+        "Athena",
+        "Lambda",
+        "IAM"
       ],
       "secondary": [
         "sqlglot",
@@ -322,12 +464,24 @@
           "source": "Agentic AI Lens AGENTREL02-BP02; Generative AI Lens GENSEC05-BP01"
         },
         {
+          "name": "Text other people wrote reaches the model only through a tool whose SQL the code writes, as marked data; the reply's citations and numbers are checked in code, and typed attacks and attacks in data rows are counted apart",
+          "source": "AWS Prescriptive Guidance, security reference architecture for generative AI (data and retrieval); Generative AI Lens GENSEC02-BP01; Agentic AI Lens AGENTREL02-BP02; L15, L16"
+        },
+        {
           "name": "Bounded work per question: a cap on model calls, output tokens, rows and the time of one call and one query",
           "source": "Generative AI Lens GENCOST05-BP01, GENREL03-BP02, GENCOST03-BP01, GENCOST03-BP02"
         },
         {
           "name": "Model calls through the model gateway with a per-student key; one trace per question",
           "source": "L16 (model gateway); AI Engineering ch. 10; Generative AI Lens GENOPS03-BP02"
+        },
+        {
+          "name": "Limits outside the model on a query engine that bills per scan: a workgroup cutoff, a query counter, one deadline for every wait, a daily cap reserved before each query",
+          "source": "Generative AI Lens GENCOST05-BP01, GENREL03-BP02; Athena per-query data usage controls"
+        },
+        {
+          "name": "The chat's queries run as a role that can read two tables and start queries in one workgroup only",
+          "source": "Generative AI Lens GENSEC01-BP03; Athena example workgroup policies"
         }
       ],
       "instruments": {
@@ -340,6 +494,9 @@
           "ext-answer-cache/cache.py",
           "ext-guardrails-redteam/guards.py",
           "ext-guardrails-redteam/redteam.py",
+          "ext-guardrails-redteam/comments_tool.py",
+          "ext-guardrails-redteam/comments_chat.py",
+          "ext-guardrails-redteam/comment_redteam.py",
           "ext-trace-alarms/spans.py",
           "ext-trace-alarms/alarms.py",
           "ext-trace-alarms/analyze.py",
@@ -347,12 +504,17 @@
           "ext-shiny-app/app.py",
           "ext-shiny-app/source.py",
           "ext-shiny-app/client.py",
-          "ext-shiny-app/fargate/deploy.sh"
+          "ext-shiny-app/fargate/deploy.sh",
+          "ext-athena-engine/athena_engine.py",
+          "ext-athena-engine/query_fn.py",
+          "ext-athena-engine/chat_athena.py",
+          "ext-athena-engine/deploy.py",
+          "ext-athena-engine/trip_counts.py"
         ]
       },
       "validates": {
-        "command": "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub",
-        "shows": "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused"
+        "command": "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub && uv run python ext-guardrails-redteam/redteam.py --model stub --cases all --runs 3",
+        "shows": "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused; with the rider comments, typed attacks and attacks in data rows apart, and the verdict of the eval comment-attacks"
       },
       "commands": {
         "setup": "uv sync",
@@ -361,7 +523,7 @@
         "run": "uv run python -m main.run --target aws",
         "run_offline": "uv run python -m main.run --target local --model stub",
         "app_offline": "APP_MODEL=stub uv run shiny run ext-shiny-app/app.py --port 8000",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "0.000287 CAD of gateway budget for the six questions (measured, output/main-gateway.txt); DynamoDB writes far below one cent (AWS price list); alarms 0.10 USD per alarm-month and metrics 0.30 USD per metric-month while they exist (AWS bulk price list, ca-central-1, published 2026-11-04)",
       "region": "ca-central-1",
@@ -415,6 +577,10 @@
           "source": "L12-L13; DynamoDB developer guide, export to S3"
         },
         {
+          "name": "location lookups by key: items stored under their map cell and type, a request reads its cell and its neighbours, the code computes the distances",
+          "source": "L12; DynamoDB developer guide, access patterns (bp-general-nosql-design) and transactions (transaction-apis)"
+        },
+        {
           "name": "vector search where the data already is: an index added to the table, filters applied during the search, the bill measured in bytes on a sample",
           "source": "L17; DynamoDB developer guide, vector search (VectorSearchWorkingWith, VectorSearchMonitoring)"
         }
@@ -427,6 +593,11 @@
           "ext-vector-search/run.sh",
           "ext-vector-search/vectors.py",
           "ext-vector-search/vectors.json",
+          "ext-nearby/run.sh",
+          "ext-nearby/nearby.py",
+          "ext-nearby/clean_up.py",
+          "ext-nearby/sim/generate.py",
+          "ext-nearby/scripts/tags.py",
           "lib.sh",
           "clean_up.sh"
         ]
@@ -441,7 +612,7 @@
         "scenarios": "uv run behave",
         "run": "bash main/run.sh",
         "dry_run": "DRY=1 bash main/run.sh",
-        "clean": "bash clean_up.sh"
+        "clean": "bash clean_up.sh --yes"
       },
       "cost_one_run": "well under 0.01 USD per scenario (measured units in output/, AWS price list ca-central-1)",
       "region": "ca-central-1",
@@ -519,7 +690,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python -m main.run --backend opensearch --embedder gateway --answers gateway",
         "run_offline": "uv run python -m main.run",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "gateway: 0.000246 CAD (measured, output/eval-gateway.txt); OpenSearch Serverless: 0.266 USD per OCU-hour for indexing and for search (AWS bulk price list, ca-central-1, published 2026-11-12), at most about 0.36 USD for a 10-minute run and the 10 idle minutes before scale to zero (4 OCU, an upper bound; run length assumed)",
       "region": "ca-central-1",
@@ -537,6 +708,90 @@
       "readme": "hybrid-retrieval-eval/README.md"
     },
     {
+      "name": "lake-layout-experiment",
+      "summary": "A layout experiment that is valid on a small table: grow it until Athena's 10 MB minimum stops hiding the difference, keep every run, and read medians with their IQR and cost per 1,000 queries from one SQL file",
+      "task": "Build the same trips table in four layouts (Hive and Iceberg, flat and partitioned by day) at three sizes grown until the smallest query scans more than 10 MB, run three zone-count queries 10 times each in Athena and in DuckDB on Lambda in one seeded order, and summarise times, Data scanned, billed MB and cost from one SQL file",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first"
+      ],
+      "extensions": [
+        "Layout experiment"
+      ],
+      "lectures": [
+        "L2",
+        "L10",
+        "L11"
+      ],
+      "core": [
+        "Athena",
+        "S3",
+        "Parquet",
+        "Iceberg",
+        "DuckDB",
+        "Lambda"
+      ],
+      "secondary": [
+        "Glue Data Catalog",
+        "boto3"
+      ],
+      "practices": [
+        {
+          "name": "Grow the table until the smallest query scans more than the billing minimum, within a spend limit on the whole plan",
+          "source": "L11 (Athena billing, partitions); Athena pricing (10 MB minimum per query)"
+        },
+        {
+          "name": "Report each cell as median (IQR) over 10 runs in one seeded, interleaved order; mark overlapping ranges before reading a gap as a difference",
+          "source": "L11 (measurement); course experiment template"
+        },
+        {
+          "name": "Keep failed, cancelled and reused runs, out of the times but in the spend",
+          "source": "Athena pricing (cancelled queries are billed for what they scanned)"
+        },
+        {
+          "name": "Compare engines with the same clock at the caller, service times beside it",
+          "source": "Athena QueryExecutionStatistics; L2 (Lambda REPORT lines, cold starts)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "layout.py",
+          "experiment.py",
+          "backends.py",
+          "store.py",
+          "summary.sql",
+          "duckdb_fn/handler.py",
+          "function.py",
+          "report_lines.py",
+          "experiments/lake-layout.md"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q && uv run behave",
+        "shows": "the growth rule and spend bound pick the sizes, the statements carry the layouts' properties, every run is stored with its billed MB and exclusion, and summary.sql gives medians, IQR overlap marks and costs"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "uv run python experiment.py build && uv run python experiment.py run && uv run python experiment.py summary",
+        "run_offline": "uv run python experiment.py build --offline && uv run python experiment.py run --offline && uv run python experiment.py summary --offline",
+        "clean": "uv run python clean_up.py --yes"
+      },
+      "cost_one_run": "measured 2026-11-23 (sizes 1, 8 and 32 copies): Athena 0.33 USD and Lambda 0.0035 USD for the run that is the result, under 0.67 USD (0.97 CAD) for both runs with S3 (output/live.txt); before the run, computed from the course price sheet (ca-central-1, 2026-11-18) at the assumed sizes 1, 4 and 16 copies: about 0.52 USD (0.76 CAD) estimated, at most 2.19 USD (3.18 CAD); MAX_USD (default 2.00) bounds the Athena part before the final tables are built",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "spend_limit_before_final_tables": true,
+        "runs_kept_with_exclusions": true,
+        "summary_from_sql_only": true,
+        "tests_offline": true
+      },
+      "folder": "lake-layout-experiment",
+      "readme": "lake-layout-experiment/README.md"
+    },
+    {
       "name": "lambda-dynamodb",
       "summary": "AWS CLI scripts that deploy a Python Lambda handler over the dynamodb recipe's tables, with a least-privilege role and a public function URL, call it with curl and read its REPORT lines",
       "task": "A small HTTPS API (a Lambda function behind a function URL) in front of the DynamoDB trip store, with a role allowed only what the handler does",
@@ -550,6 +805,7 @@
       "lectures": [
         "L2",
         "L3",
+        "L11",
         "L12",
         "L13",
         "L16"
@@ -561,7 +817,11 @@
         "DynamoDB",
         "CloudWatch Logs"
       ],
-      "secondary": [],
+      "secondary": [
+        "EventBridge Scheduler",
+        "Athena",
+        "DuckDB"
+      ],
       "practices": [
         {
           "name": "least privilege: the function's role lists the actions and tables the handler uses, nothing more",
@@ -574,6 +834,22 @@
         {
           "name": "read the metrics AWS already keeps (REPORT lines, AWS/Lambda) before adding your own",
           "source": "L16; Lambda developer guide, monitoring metrics"
+        },
+        {
+          "name": "a page shows how fresh each number is, and a missing count as no data, never as 0 (ext-dashboard-page)",
+          "source": "L16; conditional writes keep the newer value (DynamoDB developer guide, condition expressions)"
+        },
+        {
+          "name": "a public URL only during a demonstration, its deletion scheduled before it exists (ext-dashboard-page)",
+          "source": "Lambda function URL auth; EventBridge Scheduler one-time schedules and universal targets"
+        },
+        {
+          "name": "SDK clients made in the Init phase, and the memory chosen by a measured cold read against the SLO (ext-dashboard-page)",
+          "source": "L2; Lambda developer guide, execution environment lifecycle (static initialization), memory and CPU"
+        },
+        {
+          "name": "percentiles only from enough calls, one call at a time, cold calls read from the REPORT line (ext-read-path)",
+          "source": "L2, L13; Lambda developer guide, execution environment lifecycle"
         }
       ],
       "instruments": {
@@ -582,13 +858,30 @@
           "main/run.sh",
           "lib.sh",
           "clean_up.sh",
+          "clean_up.py",
           "ext-redeploy/run.sh",
-          "ext-metrics/run.sh"
+          "ext-metrics/run.sh",
+          "ext-dashboard-page/page.py",
+          "ext-dashboard-page/page.html",
+          "ext-dashboard-page/refresh.py",
+          "ext-dashboard-page/deploy.py",
+          "ext-dashboard-page/run.sh",
+          "ext-dashboard-page/load_counts.py",
+          "ext-dashboard-page/serve_local.py",
+          "ext-dashboard-page/bench.py",
+          "ext-dashboard-page/slots.py",
+          "ext-read-path/read_path.py",
+          "ext-read-path/report_lines.py",
+          "ext-read-path/writer.py",
+          "ext-read-path/summary.sql",
+          "ext-read-path/variants.toml",
+          "ext-read-path/run.sh",
+          "experiments/read-path.md"
         ]
       },
       "validates": {
         "command": "uv run pytest -q",
-        "shows": "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first"
+        "shows": "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first; ext-dashboard-page: the page's JSON (12 periods, null where nothing was counted, each zone's freshness), one Query per zone, the lake job's conditional writes and lock, url-on making the URL's deletion first, bench.py's cold read judged on its own, the page in headless Chromium; ext-read-path: the seeded plan, REPORT lines joined and classed, the busy rider written and deleted, the paced writer, the summary's percentiles and costs"
       },
       "commands": {
         "setup": "uv sync",
@@ -604,7 +897,7 @@
         "no_keys_in_code": true,
         "name_prefix_env": "PREFIX",
         "policy_lists_named_tables_only": true,
-        "no_role_creation_beyond_main": true,
+        "no_role_creation_beyond_main": false,
         "url_auth_none_is_demo_only": "switch to AWS_IAM before a URL leaves the team",
         "handler_stdlib_and_boto3_only": true
       },
@@ -686,7 +979,7 @@
         "run_offline": "uv run python main/run.py --target local",
         "fire": "uv run python main/fire.py --target aws",
         "fire_synthetic": "uv run python main/fire.py --target aws --synthetic",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "cents when cleaned up the same day: 5 standard alarms at 0.10 USD per alarm metric month and up to 12 custom metrics at 0.30 USD per metric-month, both prorated by the hour (AWS bulk price list ca-central-1, published 2026-11-04, read 2026-11-13); EMF log ingestion 0.55 USD per GB; 12 Lambda requests; a budget without actions is free (AWS Budgets pricing page); one dashboard inside the free three of up to 50 metrics (AWS bulk price list, read 2026-11-13)",
       "region": "ca-central-1",
@@ -906,7 +1199,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python main/run.py --target aws",
         "run_offline": "uv run python main/run.py --target local",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "far below one cent: a few dozen DynamoDB on-demand requests for all three scripts (unchecked: counted from the code); ca-central-1 on demand 0.6875 USD per million write request units, 0.1375 USD per million read request units, first 25 GB-months of storage free (AWS bulk price list https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/ca-central-1/index.csv, published 2026-11-11, read 2026-11-13)",
       "region": "ca-central-1",
@@ -989,7 +1282,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python -m main.server",
         "run_client": "uv run python -m main.client",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "0: runs on a laptop; no model calls and no AWS resources",
       "region": "ca-central-1",
@@ -1063,7 +1356,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python -m main.run --model gateway",
         "run_offline": "uv run python -m main.run",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "0.000304 CAD of gateway budget for the six main requests and 0.0035 CAD for the eval (measured 2026-11-12, output/main-gateway.txt and output/eval-gateway.md); no AWS resources",
       "region": "ca-central-1",
@@ -1090,7 +1383,9 @@
         "operational-first",
         "genai-first"
       ],
-      "extensions": [],
+      "extensions": [
+        "backfill"
+      ],
       "lectures": [
         "L3",
         "L8",
@@ -1157,7 +1452,15 @@
           "rep-operational-first/operational.py",
           "rep-genai-first/genai.py",
           "rep-genai-first/lake_example.py",
-          "clean_up.py"
+          "clean_up.py",
+          "ext-backfill/backfill.py",
+          "ext-backfill/statements.py",
+          "ext-backfill/engines.py",
+          "ext-backfill/dynamo_load.py",
+          "ext-backfill/history.toml",
+          "ext-backfill/clean_up.py",
+          "scripts/tags.py",
+          "scripts/lake.py"
         ]
       },
       "validates": {
@@ -1170,7 +1473,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python rep-lakehouse-first/run.py --target aws",
         "run_offline": "uv run python rep-lakehouse-first/run.py",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "under 0.05 USD for all three representatives (sum of AWS bulk price list rates, ca-central-1, read 2026-11-13; not measured); the Kinesis shard bills 0.0165 USD per hour until clean_up.py runs",
       "region": "ca-central-1",
@@ -1192,7 +1495,7 @@
     },
     {
       "name": "prompt-optimization",
-      "summary": "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix.",
+      "summary": "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix, which reports the outcomes per group of questions, counts each case once, tests two cells on the same cases with the exact McNemar test, and compares each model cell with a cell without a model (the rides case).",
       "task": "Tune the instructions of one LLM step with GEPA against a metric with feedback, choose on validation questions, and report the pass rate before and after on held-out test questions",
       "format": "main-scenario",
       "shapes": [
@@ -1226,6 +1529,14 @@
         {
           "name": "Use the simplest model that passes the eval",
           "source": "L16-17; AGENTCOST02-BP01 (ext-eval-matrix)"
+        },
+        {
+          "name": "Report the outcomes per group of questions, count each case once, and compare two alternatives on the same cases with an exact test",
+          "source": "ext-eval-matrix (ours: the exact McNemar test as a binomial test of the discordant cases; a bootstrap stratified by group as a descriptive interval)"
+        },
+        {
+          "name": "Compare the model step with a version without the model, scored by the same metric",
+          "source": "ext-eval-matrix, cell no-model/templates (ours)"
         }
       ],
       "instruments": {
@@ -1237,12 +1548,16 @@
           "main/models.py",
           "main/data.py",
           "ext-gepa-direct/optimize_direct.py",
-          "ext-eval-matrix/matrix.py"
+          "ext-eval-matrix/matrix.py",
+          "ext-eval-matrix/groups.py",
+          "ext-eval-matrix/score.py",
+          "ext-eval-matrix/templates.py",
+          "ext-eval-matrix/rides.py"
         ]
       },
       "validates": {
         "command": "uv run pytest -q",
-        "shows": "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model"
+        "shows": "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model; the eval matrix counts each case once, reports per group, and its exact test and interval give the worked numbers of the README"
       },
       "commands": {
         "setup": "uv sync",
@@ -1250,9 +1565,11 @@
         "scenarios": "uv run behave",
         "run": "uv run python -m main.run --target gateway",
         "run_offline": "uv run python -m main.run",
-        "clean": "uv run python clean_up.py"
+        "run_matrix_rides": "uv run python ext-eval-matrix/matrix.py --case rides",
+        "run_live_rides": "bash ext-eval-matrix/run_live.sh",
+        "clean": "uv run python clean_up.py --yes"
       },
-      "cost_one_run": "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); capped by --max-cad",
+      "cost_one_run": "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); the rides matrix 0.0141 CAD (measured 2026-11-23 on the gateway, 16,384 output tokens asked for each call, output/ext-eval-matrix-rides-gateway); capped by --max-cad",
       "region": "ca-central-1",
       "constraints": {
         "no_keys_in_code": true,
@@ -1271,11 +1588,203 @@
         "spend_cap_flags": [
           "--max-metric-calls",
           "--max-reflection-calls",
+          "--max-calls",
           "--max-cad"
         ]
       },
       "folder": "prompt-optimization",
       "readme": "prompt-optimization/README.md"
+    },
+    {
+      "name": "s3-event-etl",
+      "summary": "Each landed file checked line by line, its bad rows kept with the reason, its good rows loaded exactly once by a bounded Glue job or Athena MERGE",
+      "task": "Check each file as it lands in S3 (an event calls a function), set bad rows aside with their reason, and load the good rows once into an Iceberg table with a Glue job or one Athena MERGE, under limits on the runs",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first"
+      ],
+      "extensions": [],
+      "lectures": [
+        "L7",
+        "L8",
+        "L10",
+        "L11"
+      ],
+      "core": [
+        "S3 event notifications",
+        "Lambda",
+        "AWS Glue jobs",
+        "Apache Iceberg",
+        "Athena MERGE INTO",
+        "DynamoDB",
+        "EventBridge Scheduler",
+        "SNS"
+      ],
+      "secondary": [
+        "moto as the offline stand-in for AWS",
+        "DuckDB as the offline stand-in for the Glue job's load",
+        "simulated-runs' replayer and SIM01"
+      ],
+      "practices": [
+        {
+          "name": "validate at the boundary, one row at a time, and keep what fails with its reason",
+          "source": "data quality at ingestion; L10"
+        },
+        {
+          "name": "make every step safe to repeat: conditional writes, an insert-only MERGE on the event id, the manifest after the commit",
+          "source": "idempotent writes; L11 (MERGE INTO)"
+        },
+        {
+          "name": "bound a batch job's cost: timeout, no automatic retries, one run at a time, runs per day, hold after failures",
+          "source": "Glue Job API defaults (Timeout, MaxRetries, ExecutionProperty)"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "pipeline/check.py",
+          "pipeline/control.py",
+          "pipeline/sweep.py",
+          "pipeline/etl_job.py",
+          "pipeline/athena_load.py",
+          "pipeline/local_load.py",
+          "scripts/etl.py",
+          "clean_up.py",
+          "scripts/tags.py",
+          "scripts/lake.py",
+          "scripts/run_log.py"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q",
+        "shows": "bad lines are quarantined with reasons, repeats leave the table unchanged, a failed run is retried, the start limits hold, and the clean-up keeps other notification entries"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "run": "bash scripts/live_run.sh",
+        "clean": "uv run python clean_up.py --yes"
+      },
+      "cost_one_run": "about 0.025 USD (0.036 CAD) for an hour of files checked and one Glue load (191 DPU-seconds, measured 2026-11-23); 3.47 USD for 30 days at 4 Glue runs a day, 1.06 with Athena",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX"
+      },
+      "folder": "s3-event-etl",
+      "readme": "s3-event-etl/README.md"
+    },
+    {
+      "name": "simulated-runs",
+      "summary": "Seeded simulated data with injected faults (twice, late, never, changed) with the events and faults under _truth/ (the answer computed from them), one replayer for every target with send times in sent.jsonl, whole-run scenarios offline and @live, and a daily check of the deployed system that emails when the count is wrong or the check did not run",
+      "task": "Generate a simulated hour of rides events with injected faults and its known answer, replay it into a stream, queue, URL, bucket or handler at a chosen speed, check the tables against the answer offline and on AWS, and check the deployed system every day",
+      "format": "main-scenario",
+      "shapes": [
+        "lakehouse-first",
+        "operational-first",
+        "genai-first"
+      ],
+      "extensions": [
+        "streaming-ingestion"
+      ],
+      "lectures": [
+        "L13",
+        "L14"
+      ],
+      "core": [
+        "Kinesis Data Streams",
+        "S3",
+        "Lambda",
+        "EventBridge Scheduler",
+        "SNS",
+        "DynamoDB",
+        "CloudWatch"
+      ],
+      "secondary": [
+        "Athena",
+        "SQS",
+        "Pydantic",
+        "behave",
+        "moto",
+        "DuckDB"
+      ],
+      "practices": [
+        {
+          "name": "a test whose right answer is written down before the run, from the events, counting each event once",
+          "source": "L13; DDIA 2e ch. 12 (event time against processing time)"
+        },
+        {
+          "name": "inject the faults a stream produces (a repeat, a late event, a lost one, a correction) and record them",
+          "source": "L14 (at-least-once delivery, idempotent writes)"
+        },
+        {
+          "name": "measure data latency from when each delivery was sent, under a run id that no earlier run shares",
+          "source": "L13 (data latency, p95)"
+        },
+        {
+          "name": "one schema for producer, consumer and test; refuse a line that does not match, naming file, line and field",
+          "source": "DDIA 2e ch. 5 (encoding and evolution)"
+        },
+        {
+          "name": "a scheduled check of the deployed system, with an alert when it fails and a backstop when it does not run",
+          "source": "OPS08-BP04"
+        },
+        {
+          "name": "every create tagged in its call and recorded in a ledger; clean-up deletes what was created, keeps what was borrowed",
+          "source": "AWS tagging best practices; course constraint 3"
+        }
+      ],
+      "instruments": {
+        "files": [
+          "src/rides/events.py",
+          "sim/generate.py",
+          "sim/truth.py",
+          "sim/replay.py",
+          "sim/datasets.toml",
+          "scripts/lake.py",
+          "scripts/tags.py",
+          "scripts/run_log.py",
+          "scripts/check.py",
+          "scripts/live_check.py",
+          "scripts/live_run.py",
+          "features/steps/sim_steps.py",
+          "experiments/latency.py",
+          "clean_up.py",
+          ".github/workflows/offline.yml"
+        ]
+      },
+      "validates": {
+        "command": "uv run pytest -q && uv run behave",
+        "shows": "the generator writes the counts the README states and the same bytes from the same seed; a bad line is refused with its file, line and field; each target receives every delivery under the run id within 1 s of its time; the whole run equals the answer from _truth/; the check counts 20 probe trips, emails a wrong, failed or missing day only when a send was due, and its role names only its own resources; clean-up leaves nothing"
+      },
+      "commands": {
+        "setup": "uv sync",
+        "test": "uv run pytest -q",
+        "scenarios": "uv run behave",
+        "generate": "uv run python sim/generate.py --all",
+        "replay": "uv run python sim/replay.py SIM01 --speed 60 --run-id <id> --to kinesis",
+        "run": "uv run python scripts/live_run.py run SIM01 --to s3 --run-id <id>",
+        "check": "uv run python scripts/check.py up",
+        "clean": "uv run python clean_up.py --yes && uv run python scripts/lake.py down --yes"
+      },
+      "cost_one_run": "0.018 USD (0.026 CAD): SIM01 replayed into a 1-shard stream and into the lake bucket, read back, and the daily check deployed, called and removed; units measured in output/main.txt, priced from the course price sheet (the shard counted as one hour)",
+      "region": "ca-central-1",
+      "constraints": {
+        "no_keys_in_code": true,
+        "name_prefix_env": "PREFIX",
+        "shared_helpers_copied_unchanged": [
+          "src/rides/events.py",
+          "sim/replay.py",
+          "scripts/lake.py",
+          "scripts/tags.py",
+          "scripts/run_log.py"
+        ],
+        "function_needs_only_boto3": "scripts/live_check.py and sim/replay.py are zipped as they are",
+        "every_create_recorded": "scripts/tags.py record(); clean_up.py deletes what the ledger records created",
+        "offline_tests": "moto; a test clock in the replay scenarios"
+      },
+      "folder": "simulated-runs",
+      "readme": "simulated-runs/README.md"
     },
     {
       "name": "streaming-ingestion",
@@ -1289,7 +1798,9 @@
       "extensions": [
         "streaming-ingestion",
         "windowed-aggregates",
-        "fan-out"
+        "fan-out",
+        "source-poller",
+        "queue-ingest"
       ],
       "lectures": [
         "L14"
@@ -1301,7 +1812,10 @@
         "SNS",
         "SQS"
       ],
-      "secondary": [],
+      "secondary": [
+        "EventBridge Scheduler",
+        "S3"
+      ],
       "practices": [
         {
           "name": "measure lag from the event time the update carries, as a distribution (median and p95), split by stage",
@@ -1326,6 +1840,14 @@
         {
           "name": "one least-privilege role per function",
           "source": "SEC03-BP02"
+        },
+        {
+          "name": "poll a source outside the account on a schedule; claim each period's file with a conditional write, take over a claim left by a stopped run, and show missing periods apart from quiet ones",
+          "source": "L12 (conditional writes); L14; Scheduler at-least-once delivery (AWS docs)"
+        },
+        {
+          "name": "a queue consumer reports only its failed messages, a dead-letter queue keeps what failed 5 times, and a replay sends it back once the fault is fixed",
+          "source": "L14 (poison message, dead-letter queue); Lambda SQS error handling (AWS docs); REL05-BP03"
         }
       ],
       "instruments": {
@@ -1336,12 +1858,16 @@
           "main/lag.py",
           "ext-windowed-aggregates/windows.py",
           "ext-fan-out/fanout_consumer.py",
+          "ext-source-poller/poller.py",
+          "ext-source-poller/slots.py",
+          "ext-queue-ingest/queue_consumer.py",
+          "ext-queue-ingest/replay_dlq.py",
           "clean_up.py"
         ]
       },
       "validates": {
         "command": "uv run pytest -q",
-        "shows": "every update is stored once even when redelivered; a bad record is reported and stops its batch; the lag summary matches the times stored; window counts plus late records equal the truth; a stopped fan-out consumer does not hold up the other; clean_up.py removes every resource with the prefix"
+        "shows": "a feed's slot is loaded once, a late one is marked late and a missing one shown missing; a queued completion is stored once and a broken message reaches the dead-letter queue and is stored after the replay; every update is stored once even when redelivered; a bad record is reported and stops its batch; the lag summary matches the times stored; window counts plus late records equal the truth; a stopped fan-out consumer does not hold up the other; clean_up.py removes every resource with the prefix"
       },
       "commands": {
         "setup": "uv sync",
@@ -1349,7 +1875,7 @@
         "scenarios": "uv run behave",
         "run": "uv run python main/run.py --target aws",
         "run_local": "uv run python main/run.py --target local",
-        "clean": "uv run python clean_up.py"
+        "clean": "uv run python clean_up.py --yes"
       },
       "cost_one_run": "under 0.01 USD per scenario, from the price list (Kinesis shard-hour 0.0165 USD, AWS bulk price list published 2026-11-10; DynamoDB 0.6875 USD per million writes); not measured",
       "region": "ca-central-1",
@@ -1360,7 +1886,8 @@
         "handlers_stdlib_and_boto3_only": true,
         "writes_idempotent_by": "update_id",
         "lag_clock": "event_time from the update; arrival_ms from the consumer",
-        "offline_tests": "moto; local_poller.py and ext-fan-out/run.py poll_queue stand in for Lambda's pollers"
+        "offline_tests": "moto; local_poller.py, ext-fan-out/run.py poll_queue and ext-queue-ingest/run.py drain stand in for Lambda's pollers",
+        "data_stand_in": "sim/stand_in.py writes synthetic data sets with the simulator's counts until sim/generate.py output replaces them"
       },
       "folder": "streaming-ingestion",
       "readme": "streaming-ingestion/README.md"
@@ -1523,7 +2050,7 @@
         "run_offline": "uv run python -m main.run",
         "demo": "uv run marimo edit demo/search_demo.py",
         "demo_aws": "uv run marimo edit demo/search_demo.py -- --target aws",
-        "clean": "uv run python clean_up.py",
+        "clean": "uv run python clean_up.py --yes",
         "migrate_backfill": "uv run python -m main.migrate backfill",
         "migrate_check": "uv run python -m main.migrate check",
         "migrate_drop": "uv run python -m main.migrate drop items-v1",

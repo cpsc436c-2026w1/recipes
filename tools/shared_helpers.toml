@@ -87,6 +87,11 @@ files = [
   "llm-state-dynamodb/clean_up.py",
   "project-skeleton/clean_up.py",
   "concurrency-correctness/clean_up.py",
+  "simulated-runs/clean_up.py",
+  "lambda-dynamodb/clean_up.py",
+  "agent-agentcore/ext-sdk-lambda/clean_up.py",
+  "dashboard-chat/ext-athena-engine/clean_up.py",
+  "lake-layout-experiment/clean_up.py",
 ]
 
 [[helper]]
@@ -102,6 +107,11 @@ files = [
   "limits-and-alarms/clean_up.py",
   "llm-state-dynamodb/clean_up.py",
   "concurrency-correctness/clean_up.py",
+  "simulated-runs/clean_up.py",
+  "lambda-dynamodb/clean_up.py",
+  "agent-agentcore/ext-sdk-lambda/clean_up.py",
+  "dashboard-chat/ext-athena-engine/clean_up.py",
+  "lake-layout-experiment/clean_up.py",
 ]
 
 [[helper]]
@@ -121,4 +131,737 @@ why = "where the gateway's address and the token come from: COURSE_GATEWAY_URL a
 files = [
   "llm-gateway/main/call_gateway.py",
   "prompt-optimization/main/models.py",
+]
+
+# The foundation helpers of simulated-runs: the event models, the replayer, the shared lake bucket and workgroups,
+# the course tags with the creation ledger, and the run log. Every recipe that uses one copies the whole file
+# unchanged (src/rides/events.py, sim/replay.py, scripts/lake.py, scripts/tags.py, scripts/run_log.py) and adds its
+# copy to the `files` of each entry below.
+
+[[helper]]
+name = "TripRequested"
+why = "the event models: a field renamed in one copy makes the generator, the replayer and a team's handler disagree on what a line holds"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "TripAccepted"
+why = "as TripRequested"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "TripCompleted"
+why = "as TripRequested; event_id on the completion is what lets twice and changed be counted by id"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "Event"
+why = "the union told apart by event_type; a copy without one kind refuses that kind's lines"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "Delivery"
+why = "a delivery line is the event plus delivery_id and received_time; a copy that differs reads another recipe's deliveries.jsonl wrongly"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "read_jsonl"
+why = "every line validated, the first bad one named by file, line and field; a copy that skips bad lines hides them"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "iso"
+why = "the one time format (UTC, fixed width, milliseconds, Z), so time strings sort as times in every file and table"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/src/rides/events.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "replay"
+why = "the send times, the run-id prefixes and sent.jsonl; a copy that paces or prefixes differently measures another data latency"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "prefixed"
+why = "the run id in front of event_id, trip_id and delivery_id; a copy that misses one makes a second replay look like repeats"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "KinesisSender"
+why = "PutRecords of up to 500, keyed by trip_id, refused records retried with backoff"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "S3Sender"
+why = "the raw/trip-events/dt=<day>/<slot start>-<run id>.jsonl key every lake recipe lists"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "WORKGROUPS"
+why = "the settings of the shared workgroups; a copy with another cutoff creates a workgroup the other copies then refuse as mismatched"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "ensure_workgroup"
+why = "creates a missing workgroup with its settings, stops on a mismatch, never changes one, and records who owns its delete"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "down"
+why = "the shared bucket and workgroups are deleted only when the ledger records them created, and never while another recipe's objects are left"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "tags"
+why = "the course tags in each service's shape; a copy with another key or shape leaves resources the teardown does not find by tag"
+files = [
+  "simulated-runs/scripts/tags.py",
+  "lambda-dynamodb/scripts/tags.py",
+  "cdc-to-lake/scripts/tags.py",
+  "cost-and-teardown/scripts/tags.py",
+  "s3-event-etl/scripts/tags.py",
+  "project-skeleton/scripts/tags.py",
+  "dynamodb/ext-nearby/scripts/tags.py",
+  "agent-agentcore/scripts/tags.py",
+  "dashboard-chat/scripts/tags.py",
+  "lake-layout-experiment/scripts/tags.py",
+  "streaming-ingestion/scripts/tags.py",
+]
+
+[[helper]]
+name = "record"
+why = "one ledger line per create, borrow or delete; a copy with other fields breaks the teardown's reading of the ledger"
+files = [
+  "simulated-runs/scripts/tags.py",
+  "lambda-dynamodb/scripts/tags.py",
+  "cdc-to-lake/scripts/tags.py",
+  "cost-and-teardown/scripts/tags.py",
+  "s3-event-etl/scripts/tags.py",
+  "project-skeleton/scripts/tags.py",
+  "dynamodb/ext-nearby/scripts/tags.py",
+  "agent-agentcore/scripts/tags.py",
+  "dashboard-chat/scripts/tags.py",
+  "lake-layout-experiment/scripts/tags.py",
+  "streaming-ingestion/scripts/tags.py",
+]
+
+[[helper]]
+name = "recorded"
+why = "the last line for a type and name is its state; a copy that reads the first deletes a bucket that is borrowed now"
+files = [
+  "simulated-runs/scripts/tags.py",
+  "lambda-dynamodb/scripts/tags.py",
+  "cdc-to-lake/scripts/tags.py",
+  "cost-and-teardown/scripts/tags.py",
+  "s3-event-etl/scripts/tags.py",
+  "project-skeleton/scripts/tags.py",
+  "dynamodb/ext-nearby/scripts/tags.py",
+  "agent-agentcore/scripts/tags.py",
+  "dashboard-chat/scripts/tags.py",
+  "lake-layout-experiment/scripts/tags.py",
+  "streaming-ingestion/scripts/tags.py",
+]
+
+[[helper]]
+name = "ensure_run_log"
+why = "every user of <PREFIX>-runs creates it if missing with the same keys, and records it created or borrowed"
+files = [
+  "simulated-runs/scripts/run_log.py",
+  "lambda-dynamodb/scripts/run_log.py",
+  "cdc-to-lake/scripts/run_log.py",
+  "s3-event-etl/scripts/run_log.py",
+  "streaming-ingestion/scripts/run_log.py",
+]
+
+[[helper]]
+name = "_Event"
+why = "the fields every event has and extra=\"forbid\"; a copy without forbid lets an unknown field through"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "_Delivered"
+why = "delivery_id and received_time on every delivery"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "Time"
+why = "how every time is read (with a zone) and written (UTC, fixed width)"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "TripRequestedDelivery"
+why = "as Delivery"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "TripAcceptedDelivery"
+why = "as Delivery"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "TripCompletedDelivery"
+why = "as Delivery"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "validate_line"
+why = "the file, line and field a bad line is reported with"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "to_line"
+why = "sorted keys, so the same model gives the same bytes"
+files = [
+  "simulated-runs/src/rides/events.py",
+  "lambda-dynamodb/src/rides/events.py",
+  "cdc-to-lake/src/rides/events.py",
+  "cost-and-teardown/src/rides/events.py",
+  "s3-event-etl/src/rides/events.py",
+  "streaming-ingestion/src/rides/events.py",
+]
+
+[[helper]]
+name = "planned"
+why = "each delivery's send time, (received_time minus the first) / speed"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "shifted"
+why = "--shift-to now moves every time by one offset"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "make_sender"
+why = "the default target names (<PREFIX>-trip-events, <PREFIX>-lake-<account>, rides.pipeline:handle)"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "SqsSender"
+why = "SendMessageBatch of up to 10, refused entries retried"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "UrlSender"
+why = "SigV4-signed POSTs of up to 100 to a function URL"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "LocalSender"
+why = "the in-process target the offline scenarios use"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+[[helper]]
+name = "up"
+why = "the shared bucket: tags in the create call, public access blocked, athena-results/ expire after 7 days, borrowed when it was there"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "SHARED_WORKGROUPS"
+why = "which workgroups down deletes"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "KEEP_PREFIXES"
+why = "the prefixes down may delete in a bucket; a copy with more deletes another recipe's objects"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "_settings"
+why = "how a workgroup name maps to its settings, and the refusal of an unknown name"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "workgroup_differences"
+why = "what counts as a mismatched existing workgroup"
+files = [
+  "simulated-runs/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "agent-agentcore/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
+]
+
+[[helper]]
+name = "KEY_SCHEMA"
+why = "the run log's keys: job and run_id"
+files = [
+  "simulated-runs/scripts/run_log.py",
+  "lambda-dynamodb/scripts/run_log.py",
+  "cdc-to-lake/scripts/run_log.py",
+  "s3-event-etl/scripts/run_log.py",
+  "streaming-ingestion/scripts/run_log.py",
+]
+
+[[helper]]
+name = "slot_states"
+why = "the state of each 15-minute slot on the page and in the poller's own scenarios; copies that differ show a missing slot as not due"
+files = ["lambda-dynamodb/ext-dashboard-page/slots.py", "streaming-ingestion/ext-source-poller/slots.py"]
+
+[[helper]]
+name = "get_slots"
+why = "GET /api/slots?day=: the 400 for a day that is not a date and the body the page draws"
+files = ["lambda-dynamodb/ext-dashboard-page/slots.py", "streaming-ingestion/ext-source-poller/slots.py"]
+
+[[helper]]
+name = "query_day"
+why = "one Query of the day's slot items, every page followed; a copy that stops at the first page drops slots"
+files = ["lambda-dynamodb/ext-dashboard-page/slots.py", "streaming-ingestion/ext-source-poller/slots.py"]
+
+[[helper]]
+name = "_parse"
+why = "a slot_start with or without seconds; a copy that reads only one form shows a written slot as missing"
+files = ["lambda-dynamodb/ext-dashboard-page/slots.py", "streaming-ingestion/ext-source-poller/slots.py"]
+
+# The generator and the answer of the simulated data sets (the _truth/ layout: deliveries under
+# <source>/dt=<day>/hour=<hour>/, the events and the faults under _truth/), copied unchanged with sim/replay.py.
+
+[[helper]]
+name = "SOURCE"
+why = "the folder the delivery files are written under (trip-events, as raw/trip-events/ in the lake bucket); a copy with another name writes files the replayer of another recipe does not find"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "delivery_path"
+why = "deliveries go to <source>/dt=<day>/hour=<hour>/deliveries.jsonl by the day and hour of receipt (the course's _truth/ layout); a copy that groups otherwise writes another layout"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "delivery_files"
+why = "the delivery files of a data set in the order received; a copy that sorts otherwise replays out of order"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "delivery_lines"
+why = "every delivery line of a data set, in the order received"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "generate"
+why = "the files of a data set: the delivery files, _truth/events.jsonl and _truth/faults.jsonl, the old folder removed first; a copy that writes another layout gives another recipe's scenarios other numbers"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "ensure"
+why = "a data set generated when its _truth/ or its delivery files are missing"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "stream"
+why = "the faults SIM01 and SIM04 inject and the lines of _truth/faults.jsonl; the README numbers of every copying recipe come from it"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "bad_lines"
+why = "the broken lines of SIM02 and their `broken` faults"
+files = [
+  "simulated-runs/sim/generate.py",
+  "lambda-dynamodb/sim/generate.py",
+  "cdc-to-lake/sim/generate.py",
+  "cost-and-teardown/sim/generate.py",
+  "s3-event-etl/sim/generate.py",
+]
+
+[[helper]]
+name = "compute"
+why = "the answer the scenarios state, each event once, late ones in, never ones out; a copy that counts otherwise gives a recipe another right answer"
+files = [
+  "simulated-runs/sim/truth.py",
+  "lambda-dynamodb/sim/truth.py",
+  "cdc-to-lake/sim/truth.py",
+  "cost-and-teardown/sim/truth.py",
+  "s3-event-etl/sim/truth.py",
+  "streaming-ingestion/sim/truth.py",
+]
+
+[[helper]]
+name = "read_faults"
+why = "_truth/faults.jsonl, one fault per line"
+files = [
+  "simulated-runs/sim/truth.py",
+  "lambda-dynamodb/sim/truth.py",
+  "cdc-to-lake/sim/truth.py",
+  "cost-and-teardown/sim/truth.py",
+  "s3-event-etl/sim/truth.py",
+  "streaming-ingestion/sim/truth.py",
+]
+
+[[helper]]
+name = "by_kind"
+why = "the ids of each kind of fault (delivery ids for twice and late, event ids for never and changed)"
+files = [
+  "simulated-runs/sim/truth.py",
+  "lambda-dynamodb/sim/truth.py",
+  "cdc-to-lake/sim/truth.py",
+  "cost-and-teardown/sim/truth.py",
+  "s3-event-etl/sim/truth.py",
+  "streaming-ingestion/sim/truth.py",
+]
+
+[[helper]]
+name = "read_events"
+why = "_truth/events.jsonl without the lines a `broken` fault names"
+files = [
+  "simulated-runs/sim/truth.py",
+  "lambda-dynamodb/sim/truth.py",
+  "cdc-to-lake/sim/truth.py",
+  "cost-and-teardown/sim/truth.py",
+  "s3-event-etl/sim/truth.py",
+  "streaming-ingestion/sim/truth.py",
+]
+
+[[helper]]
+name = "answer"
+why = "the answer of a data set folder, from its _truth/ files; nothing stores it, so it cannot drift from the events"
+files = [
+  "simulated-runs/sim/truth.py",
+  "lambda-dynamodb/sim/truth.py",
+  "cdc-to-lake/sim/truth.py",
+  "cost-and-teardown/sim/truth.py",
+  "s3-event-etl/sim/truth.py",
+  "streaming-ingestion/sim/truth.py",
+]
+
+[[helper]]
+name = "load_deliveries"
+why = "the replayer reads the delivery files in the order received and never _truth/; a copy that reads _truth/events.jsonl sends events without their faults"
+files = [
+  "simulated-runs/sim/replay.py",
+  "lambda-dynamodb/sim/replay.py",
+  "cdc-to-lake/sim/replay.py",
+  "cost-and-teardown/sim/replay.py",
+  "s3-event-etl/sim/replay.py",
+  "streaming-ingestion/sim/replay.py",
+]
+
+# dashboard-chat's SQL check, copied unchanged into agent-agentcore/ext-sdk-lambda.
+
+[[helper]]
+name = "check_sql"
+why = "the parse check before DuckDB runs the model's SQL; a copy that drifts lets a write or a file read through in one recipe and not the other"
+files = ["dashboard-chat/main/sqlcheck.py", "agent-agentcore/ext-sdk-lambda/sqlcheck.py"]
+
+[[helper]]
+name = "BLOCKED_FUNCTIONS"
+why = "the table functions that read files or the environment; a name missing in one copy lets that recipe's model read a file"
+files = ["dashboard-chat/main/sqlcheck.py", "agent-agentcore/ext-sdk-lambda/sqlcheck.py"]
+
+[[helper]]
+name = "SqlRejected"
+why = "the exception the tool turns into a rejection for the model"
+files = ["dashboard-chat/main/sqlcheck.py", "agent-agentcore/ext-sdk-lambda/sqlcheck.py"]
+
+[[helper]]
+name = "_cte_references"
+why = "which table names in the model's SQL are the query's own CTEs, by sqlglot's scopes; a copy that scopes otherwise lets an outer table named like an inner CTE pass"
+files = ["dashboard-chat/main/sqlcheck.py", "agent-agentcore/ext-sdk-lambda/sqlcheck.py"]
+
+[[helper]]
+name = "own_raw"
+why = "which files under raw/trip-events/ this ledger made; a copy that matches more deletes another recipe's run or a team's own files"
+files = [
+  "agent-agentcore/scripts/lake.py",
+  "cdc-to-lake/scripts/lake.py",
+  "cost-and-teardown/scripts/lake.py",
+  "dashboard-chat/scripts/lake.py",
+  "lake-layout-experiment/scripts/lake.py",
+  "lambda-dynamodb/scripts/lake.py",
+  "project-skeleton/scripts/lake.py",
+  "s3-event-etl/scripts/lake.py",
+  "simulated-runs/scripts/lake.py",
+  "streaming-ingestion/scripts/lake.py",
 ]

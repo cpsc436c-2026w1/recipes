@@ -52,7 +52,7 @@ uv run python ext-traces/trace_run.py --target local    # offline, moto
 uv run python ext-traces/trace_run.py --target aws      # your sandbox: the table $PREFIX-llm-traces
 ```
 
-Clean-up and cost: `uv run python clean_up.py` removes the table with the recipe's other tables; one run makes five
+Clean-up and cost: `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` removes the table with the recipe's other tables; one run makes five
 DynamoDB requests.
 
 ## What you should see

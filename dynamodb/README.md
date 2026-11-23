@@ -79,7 +79,8 @@ Each requirement has one or more scenarios in [`features/`](features/), tagged w
 runs them offline. The requirements of an extension are in its own README, and their numbers go on from here:
 [riders and drivers](ext-riders-and-drivers/README.md#requirements) from 50,
 [nightly report](ext-nightly-report/README.md#requirements) from 60,
-[vector search](ext-vector-search/README.md#requirements) from 70. When you change what the recipe does, change
+[vector search](ext-vector-search/README.md#requirements) from 70,
+[nearby](ext-nearby/README.md#requirements) from 80. When you change what the recipe does, change
 the requirement and its scenario with it: `python3 tools/check_requirements.py` (repo root) fails when they do not
 match.
 
@@ -134,11 +135,11 @@ match.
 
 **Clean-up**
 
-- **R40** (event) When `clean_up.sh` runs, the recipe shall delete its three tables, the Athena table
+- **R40** (event) When `clean_up.sh --yes` runs, the recipe shall delete its three tables, the Athena table
   `trips_export` and the Athena database of this `PREFIX`.
 - **R41** (optional) Where `BUCKET` is set, the recipe shall delete the export and the Athena results under
   `s3://$BUCKET/$PREFIX/` in a clean-up.
-- **R42** (unwanted) If `clean_up.sh` runs without `BUCKET`, then the recipe shall delete nothing from S3 and print
+- **R42** (unwanted) If `clean_up.sh --yes` runs without `BUCKET`, then the recipe shall delete nothing from S3 and print
   what stays there.
 - **R43** (unwanted) If AWS refuses a step of `clean_up.sh`, then the recipe shall exit with code 1 after it has
   tried every other step and printed `FAILED` for the refused one.
@@ -149,14 +150,15 @@ match.
 - **R46** (event) When `clean_up.sh` has deleted a table, the recipe shall wait until the table is gone.
 - **R47** (unwanted) If a table or the Athena database of this `PREFIX` is still there after the deletes, then the
   recipe shall print `FAILED: still there` with its name and exit with code 1.
-- **R48** (ubiquitous) The recipe shall leave in place every table other than its own three, also one whose name
-  starts with `$PREFIX-`.
+- **R48** (ubiquitous) The recipe shall leave in place every table other than its own three and the two that
+  `ext-nearby` records as created, also one whose name starts with `$PREFIX-`.
 
 **Requirements of the extensions**, each in the README of its folder:
 
 - 50 to 55, riders and drivers: [`ext-riders-and-drivers/README.md`](ext-riders-and-drivers/README.md#requirements)
 - 60 to 65, nightly report: [`ext-nightly-report/README.md`](ext-nightly-report/README.md#requirements)
 - 70 to 76, vector search: [`ext-vector-search/README.md`](ext-vector-search/README.md#requirements)
+- 80 to 115, nearby: [`ext-nearby/README.md`](ext-nearby/README.md#requirements)
 
 ## Run it
 
@@ -244,7 +246,7 @@ bash main/run.sh                              # runs the scenario and cleans up 
 What you should see: the nine steps of [What you should see](#what-you-should-see), then the clean-up's three
 `"DELETING"` lines and `(no table left)`.
 
-Clean-up and cost: the run cleans up itself; after a run with `KEEP=1`, run `bash clean_up.sh` in the same terminal
+Clean-up and cost: the run cleans up itself; after a run with `KEEP=1`, run `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` in the same terminal
 with the same `PREFIX`. One run is well under one cent ([Cost and clean-up](#cost-and-clean-up)).
 
 ### 3. Sandbox terminal: the extensions
@@ -283,7 +285,7 @@ the index within about a second, and DynamoDB may hand some back as unprocessed.
 not take that path: both calls came back with `unprocessed: 0`.
 
 With the index the load uses two write units per trip, not one: a write to the table and one to the index.
-For clean-up, use `bash clean_up.sh` from `dynamodb`. The captured runs of the two extensions are of 2026-10-21 and
+For clean-up, use `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` from `dynamodb`. The captured runs of the two extensions are of 2026-10-21 and
 predate three changes: the index and its second write unit; their last line names an older clean-up path; and the
 nightly report stops with a `FAILED` line when an Athena query does not succeed.
 
@@ -294,6 +296,7 @@ nightly report stops with a `FAILED` line when an Athena query does not succeed.
 | riders and drivers | a second access pattern (a rider's trips in time order) with a sort key; a transaction that keeps a trip and its driver in agreement; optimistic locking with a version number | [`ext-riders-and-drivers/`](ext-riders-and-drivers/) | two more tables; runs after `KEEP=1 bash main/run.sh` |
 | nightly report | a report that Athena queries from an export of the table to S3, instead of a Scan of the live table | [`ext-nightly-report/`](ext-nightly-report/) | turns on point-in-time recovery; needs `BUCKET`; runs after `KEEP=1 bash main/run.sh` |
 | vector search | riders' messages searched by meaning with a vector index on the trips table, filtered by fare and pickup zone during the search, with the bytes and price of each vector write and search | [`ext-vector-search/`](ext-vector-search/) | adds the index `trip-messages` and two attributes to each trip; runs after `KEEP=1 bash main/run.sh` |
+| nearby | drivers within 500 m of a pickup point, nearest first, from 9 Queries on map cells (geohashes) and distances in code; a transaction that moves a driver's cell item without leaving it in two cells; the nearest static points (weather stations) from rings of cells widened until the answer is certain | [`ext-nearby/`](ext-nearby/) | two more tables and five attributes on the drivers; runs after `KEEP=1 bash ext-riders-and-drivers/run.sh` |
 
 ## Cost and clean-up
 
@@ -308,8 +311,10 @@ The extensions state their own cost. From your sandbox terminal for the AWS run,
 everything the recipe made:
 
 ```bash
-bash clean_up.sh                          # the tables (with the vector index of ext-vector-search), and the Athena table of ext-nightly-report
-BUCKET=my-report-bucket bash clean_up.sh  # instead, if you ran ext-nightly-report: your bucket's name
+bash clean_up.sh                          # lists what it would delete; deletes nothing
+bash clean_up.sh --yes                    # the tables (with the vector index of ext-vector-search), and the Athena table of ext-nightly-report
+BUCKET=my-report-bucket bash clean_up.sh  # lists what it would delete; deletes nothing
+BUCKET=my-report-bucket bash clean_up.sh --yes  # instead, if you ran ext-nightly-report: your bucket's name
 ```
 
 The clean-up's last checks look for this recipe's exact table and database names and print `(no ... left)`.

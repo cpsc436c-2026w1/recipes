@@ -76,7 +76,9 @@ after a requirement's number names its EARS form, one of the forms in this table
 
 Each requirement has one or more scenarios in [`features/`](features/), tagged with its number. `uv run behave`
 runs them offline. The requirements of an extension are in its own README, and their numbers go on from here:
-[redeploy](ext-redeploy/README.md#requirements) from 80, [metrics](ext-metrics/README.md#requirements) from 90.
+[redeploy](ext-redeploy/README.md#requirements) from 80, [metrics](ext-metrics/README.md#requirements) from 90,
+[dashboard page](ext-dashboard-page/README.md#requirements) from 100, [read path](ext-read-path/README.md#requirements)
+from 220.
 When you change what the recipe does, change the requirement and its scenario with it:
 Run `python3 tools/check_requirements.py` from the repo root to check that they match. The check fails when they do not match.
 
@@ -149,11 +151,11 @@ Run `python3 tools/check_requirements.py` from the repo root to check that they 
 
 **Clean-up**
 
-- **R60** (event) When `clean_up.sh` runs, the recipe shall delete the URL, the function, its log group, the role's
+- **R60** (event) When `clean_up.sh --yes` runs, the recipe shall delete the URL, the function, its log group, the role's
   policy and the role of this `PREFIX`, the URL first.
 - **R61** (unwanted) If AWS refuses a delete of `clean_up.sh`, then the recipe shall exit with code 1 after it has
   tried every other delete and printed `FAILED` for the refused one.
-- **R62** (event) When `clean_up.sh` runs and AWS answers "not found" for a delete, the recipe shall report that
+- **R62** (event) When `clean_up.sh --yes` runs and AWS answers "not found" for a delete, the recipe shall report that
   part as already gone, not as a failure.
 - **R63** (unwanted) If the function, the log group or the role of this `PREFIX` is still there after the deletes,
   then the recipe shall print `FAILED: still there` with its name and exit with code 1.
@@ -181,6 +183,8 @@ Run `python3 tools/check_requirements.py` from the repo root to check that they 
 
 - 80 to 82, redeploy: [`ext-redeploy/README.md`](ext-redeploy/README.md#requirements)
 - 90 to 93, metrics: [`ext-metrics/README.md`](ext-metrics/README.md#requirements)
+- 100 to 210, dashboard page: [`ext-dashboard-page/README.md`](ext-dashboard-page/README.md#requirements)
+- 220 to 320, read path: [`ext-read-path/README.md`](ext-read-path/README.md#requirements)
 
 ## Run it
 
@@ -196,6 +200,9 @@ Lambda. Everything else runs in your terminal and sends requests.
 | Deploying | `main/run.sh`, `lib.sh` | `DRY=1` prints the commands | yes: it creates the role, the function and the URL, and calls the URL with `curl` | no |
 | Redeploy | `ext-redeploy/run.sh` | `DRY=1` | yes: it uploads the handler again | no |
 | Logs and metrics | `ext-metrics/run.sh` | `DRY=1` | yes: it reads CloudWatch | no |
+| Dashboard page | `ext-dashboard-page/` | the tests and scenarios against moto, the page in headless Chromium; `DRY=1` | yes: `run.sh` deploys, loads the counts, opens and closes the URL; `serve_local.py` shows the page | yes: `page.py` behind its URL, and in the lake variant `refresh.py` every hour |
+| Read path | `ext-read-path/` | the tests and scenarios against a fake URL; `DRY=1` | yes: `run.sh` calls the URL with `curl` and reads the `REPORT` lines | no: it calls `main/handler.py` |
+| Clean-up of the extensions | `clean_up.py` | the tests against moto | yes, with the `PREFIX` of the run | no |
 | Clean-up | `clean_up.sh` | `DRY=1` | yes, with the `PREFIX` of the run | no |
 | Tables | `../dynamodb/` | that recipe's dry run | that recipe's scripts, with `KEEP=1` | no: DynamoDB is a service AWS runs |
 | Tests and scenarios | `tests/`, `features/` | yes, and in CI | never against AWS | no |
@@ -214,6 +221,8 @@ Your sign-in needs these IAM actions to run the scripts and the clean-up. The ro
 |---|---|
 | Main scenario and clean-up | `dynamodb:DescribeTable`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:UpdateItem`, `iam:CreateRole`, `iam:DeleteRole`, `iam:DeleteRolePolicy`, `iam:ListRoles`, `iam:PassRole`, `iam:PutRolePolicy`, `lambda:AddPermission`, `lambda:CreateFunction`, `lambda:CreateFunctionUrlConfig`, `lambda:DeleteFunction`, `lambda:DeleteFunctionUrlConfig`, `lambda:GetFunction`, `lambda:GetFunctionUrlConfig`, `lambda:InvokeFunction`, `lambda:ListFunctions`, `lambda:UpdateFunctionCode`, `logs:CreateLogGroup`, `logs:DeleteLogGroup`, `logs:DescribeLogGroups`, `logs:FilterLogEvents`, `logs:PutRetentionPolicy` |
 | `ext-metrics/` adds | `cloudwatch:GetMetricStatistics` |
+| `ext-dashboard-page/` adds, with `clean_up.py` (recorded by `tests/test_dashboard_page.py::test_operations_the_extension_calls`; a second run adds the two updates, tags and `PassRole` go with the creates) | `athena:CreateWorkGroup`, `athena:ListWorkGroups`, `dynamodb:CreateTable`, `dynamodb:DeleteTable`, `dynamodb:DescribeTable`, `dynamodb:ListTables`, `dynamodb:PutItem`, `dynamodb:UpdateItem`, `dynamodb:TagResource`, `iam:CreateRole`, `iam:DeleteRole`, `iam:DeleteRolePolicy`, `iam:GetRole`, `iam:ListRolePolicies`, `iam:ListRoles`, `iam:PassRole`, `iam:PutRolePolicy`, `iam:TagRole`, `lambda:AddPermission`, `lambda:CreateFunction`, `lambda:CreateFunctionUrlConfig`, `lambda:DeleteFunction`, `lambda:DeleteFunctionUrlConfig`, `lambda:GetFunction`, `lambda:GetFunctionUrlConfig`, `lambda:ListFunctions`, `lambda:PutFunctionEventInvokeConfig`, `lambda:RemovePermission`, `lambda:TagResource`, `lambda:UpdateFunctionCode`, `lambda:UpdateFunctionConfiguration`, `logs:CreateLogGroup`, `logs:DeleteLogGroup`, `logs:DescribeLogGroups`, `logs:PutRetentionPolicy`, `logs:TagResource`, `scheduler:CreateSchedule`, `scheduler:CreateScheduleGroup`, `scheduler:DeleteSchedule`, `scheduler:DeleteScheduleGroup`, `scheduler:GetScheduleGroup`, `scheduler:ListScheduleGroups`, `scheduler:TagResource`, `sts:GetCallerIdentity`; `clean_up.py --check` also `tag:GetResources` (a refusal is fine: it lists by name instead); `bench.py` also `lambda:GetFunctionConfiguration` and `lambda:UpdateFunctionConfiguration` for its cold read |
+| `ext-read-path/` adds | `dynamodb:BatchWriteItem`, `dynamodb:UpdateItem` and `dynamodb:Query` on `$PREFIX-rider-trips`, `lambda:GetFunctionConfiguration`, `lambda:UpdateFunctionConfiguration` |
 
 ### 1. Laptop, offline: the dry run
 
@@ -231,10 +240,12 @@ DRY=1 bash main/run.sh
 
 What you should see, line by line:
 
-1. `uv sync` installs boto3, pytest, behave and moto (a library that stands in for AWS on your machine).
-2. `pytest` ends with a line like `28 passed`.
+1. `uv sync` installs boto3, pytest, behave and moto (a library that stands in for AWS on your machine), and for the
+   extensions pydantic, DuckDB and playwright.
+2. `pytest` ends with a line like `100 passed` (28 of them the main scenario's).
 3. `behave` ends with `0 failed`. One feature runs the dynamodb recipe's scripts and the handler against moto and
-   takes about half a minute; without the AWS CLI it is skipped.
+   takes about half a minute; without the AWS CLI it is skipped. The extensions' scenarios take about two minutes
+   more; the two `@browser` examples are skipped unless Chromium is installed (`uv run playwright install chromium`).
 4. The dry run prints the ten steps with every command under them, the five `curl` requests of step 8 with
    `<url>` where the function's address will be, and does not call anything.
 
@@ -277,7 +288,7 @@ step 4 (`create-log-group`, `put-retention-policy`) should print nothing. The sc
 10 s for the new role, 5 s for the new URL, 15 s for the logs.
 
 Clean-up and cost: the run without `KEEP=1` removes the API itself. After a `KEEP=1` run, in the same terminal with
-the same `PREFIX`: `bash clean_up.sh`, and `bash ../dynamodb/clean_up.sh` when your team is done with the tables.
+the same `PREFIX`: `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes`, and `bash ../dynamodb/clean_up.sh` (it lists what it would delete), then `bash ../dynamodb/clean_up.sh --yes` when your team is done with the tables.
 While the API is up it is public: anyone who has the URL can claim trips, and nothing limits how many copies of the
 function run at once. A flood of calls is served, and billed, up to the account's own limit on concurrent runs
 ,
@@ -290,6 +301,13 @@ Each extension's README has its own part, with the sign-in, the commands, what y
 cost: [redeploy](ext-redeploy/README.md#run-it) and [metrics](ext-metrics/README.md#run-it). Both start from
 `KEEP=1 bash main/run.sh`. Both were run by us on 2026-11-14 in a course sandbox, after a main run of the same day
 (`output/ext-redeploy.txt`, `output/ext-metrics.txt`).
+
+The extensions [dashboard page](ext-dashboard-page/README.md#run-it-live) and
+[read path](ext-read-path/README.md#run-it-live) have their own "Run it live" parts; one run of each is captured in `output/ext-dashboard-page.txt`,
+`output/ext-read-path.txt` and their clean-ups `output/clean-up-ext-*.txt`. Both write the ledger `state/ledger.jsonl`.
+`uv run python clean_up.py --ext dashboard-page` (or `--ext read-path`) lists one extension's resources, and with
+`--yes` removes them and keeps `main/`'s API; `uv run python clean_up.py --yes` removes what both made, then runs
+`clean_up.sh --yes`, which removes `main/`'s API.
 
 ## What you should see
 
@@ -328,6 +346,8 @@ charged for the start-up of a new environment).
 |---|---|---|---|
 | redeploy | deploys a changed `main/handler.py` to the function, keeping its URL, role and logs | [`ext-redeploy/`](ext-redeploy/) | nothing; after `KEEP=1 bash main/run.sh` and after each edit of the handler, run `bash ext-redeploy/run.sh` |
 | metrics | the function's log group, its `REPORT` lines, and the `Invocations` and `Duration` metrics of the last hour | [`ext-metrics/`](ext-metrics/) | nothing; after `KEEP=1 bash main/run.sh`, run `bash ext-metrics/run.sh` |
+| dashboard page | a page of requests by zone with each zone's freshness, from its own function `$PREFIX-page`; a lake variant whose hourly job runs the Athena query; a public URL only during a demonstration; an optional slot list | [`ext-dashboard-page/`](ext-dashboard-page/) | nothing; it makes its own function, role and table |
+| read path | p50, p95 and p99 of each read through the URL, warm, cold, after a quiet time and on a fresh copy, with a writer beside it; results in DuckDB | [`ext-read-path/`](ext-read-path/) | nothing; after `KEEP=1 bash main/run.sh`, it calls the URL and changes only its own test items and one variable, both undone |
 
 ## Cost and clean-up
 
@@ -340,9 +360,14 @@ Prices from the AWS bulk price lists for `ca-central-1` (AWSLambda, AmazonCloudW
 In the terminal of the AWS run, in `lambda-dynamodb`, with the same `PREFIX`:
 
 ```bash
-bash clean_up.sh                   # after a KEEP=1 run: URL, function, log group, role
-bash ../dynamodb/clean_up.sh       # the tables, when your team is done with them
+bash clean_up.sh                   # lists what it would delete; deletes nothing
+bash clean_up.sh --yes             # after a KEEP=1 run: URL, function, log group, role
+bash ../dynamodb/clean_up.sh       # lists what it would delete; deletes nothing
+bash ../dynamodb/clean_up.sh --yes # the tables, when your team is done with them
 ```
+
+After the extensions, `uv run python clean_up.py --yes` removes what their ledger lists (the page's URL first) and
+then runs `clean_up.sh`; `--check` lists what is left by tag, schedule group and name.
 
 The last checks look for the exact names this recipe made and print `(no ... left)`; a name still there is a
 `FAILED` line. Captured: [output/clean-up.txt](output/clean-up.txt) (2026-11-14, after a second run of the same day).

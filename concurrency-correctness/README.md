@@ -113,9 +113,9 @@ do not match.
 
 **Clean-up**
 
-- **R40** (event) When `clean_up.py` runs, the recipe shall delete the two tables of this `PREFIX` and wait until
+- **R40** (event) When `clean_up.py --yes` runs, the recipe shall delete the two tables of this `PREFIX` and wait until
   each is gone.
-- **R41** (event) When `clean_up.py` runs and a table is already gone, the recipe shall report the table as
+- **R41** (event) When `clean_up.py --yes` runs and a table is already gone, the recipe shall report the table as
   `absent`, not as a failure.
 - **R42** (unwanted) If AWS refuses a step of `clean_up.py`, then the recipe shall exit with code 1 after it has
   tried the other table and printed `FAILED` for the refused step.
@@ -205,7 +205,7 @@ What you should see: `removed  table recipe-yourname-race-trips`, then the same 
 creates one DynamoDB table and does not create an IAM role. `--rounds 50` changes the count. `--keep` keeps the table.
 
 Clean-up and cost: the run removes its table itself. After `--keep`, or after a run that stopped early, run
-`uv run python clean_up.py` in the same terminal with the same `PREFIX`. One run is under 0.001 USD
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` in the same terminal with the same `PREFIX`. One run is under 0.001 USD
 ([Cost and clean-up](#cost-and-clean-up)).
 
 ### 3. Sandbox terminal: the retried write
@@ -250,7 +250,8 @@ A refused conditional write still consumes write units
 it left:
 
 ```bash
-PREFIX=recipe-yourname uv run python clean_up.py
+PREFIX=recipe-yourname uv run python clean_up.py    # lists what it would delete; deletes nothing
+PREFIX=recipe-yourname uv run python clean_up.py --yes
 ```
 
 It attempts both tables and waits until each is gone: one that is refused is printed as `FAILED`, and the exit code

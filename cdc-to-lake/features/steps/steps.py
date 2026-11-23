@@ -594,6 +594,9 @@ def step_everything(context, prefix):
                        ("maintenance.py", "--target aws --schedule")):
         _run_entry(context, name, args)
         assert context.exit_code == 0, (name, context.printed, context.error)
+    # Also the two nightly schedules of ext-maintenance before its revision (Athena started directly, in the
+    # default group, with the role $PREFIX-cdc-scheduler-role): an account deployed then still has them.
+    _legacy_schedules()
     # What the stand-ins do not make: the Glue table and view (Athena's DDL), and the objects Firehose and
     # Athena write.
     from main.config import Settings
@@ -608,10 +611,33 @@ def step_everything(context, prefix):
     context.printed, context.sleeps, context.runs = "", [], []
 
 
+def _legacy_schedules():
+    import boto3
+
+    from main.config import Settings
+    from main.infra import ensure_roles
+
+    s = ensure_roles(boto3.client("iam", region_name="ca-central-1"), Settings(), "123456789012", "",
+                     which=("scheduler",))
+    sch = support.client("scheduler")
+    for name, cron, sql in ((f"{s.prefix}-lake-optimize", "cron(0 3 * * ? *)",
+                             f"OPTIMIZE {s.database}.{s.lake_table} REWRITE DATA USING BIN_PACK"),
+                            (f"{s.prefix}-lake-vacuum", "cron(0 4 * * ? *)", f"VACUUM {s.database}.{s.lake_table}")):
+        sch.create_schedule(Name=name, ScheduleExpression=cron, ScheduleExpressionTimezone="America/Vancouver",
+                            FlexibleTimeWindow={"Mode": "OFF"}, State="ENABLED",
+                            Target={"Arn": "arn:aws:scheduler:::aws-sdk:athena:startQueryExecution",
+                                    "RoleArn": s.scheduler_role_arn,
+                                    "Input": json.dumps({"QueryString": sql, "WorkGroup": s.workgroup})})
+
+
 @then("the account has no schedule, alarm, mapping, function, log group, queue, Firehose stream, Glue database, bucket, table or role left")
 def step_empty(context):
     found = support.inventory()
-    assert not any(found.values()), found
+    # What stays by design: the shared lake bucket of simulated-runs (scripts/lake.py down deletes it), and the
+    # Glue database that holds trip_events_parquet, which ext-maintenance keeps for the landing path.
+    shared = {"buckets": ["recipe-ana-lake-123456789012"], "glue": ["recipe_ana_lake"]}
+    left = {k: [x for x in v if x not in shared.get(k, [])] if isinstance(v, list) else v for k, v in found.items()}
+    assert not any(left.values()), found
 
 
 @given("the account is noted")
@@ -692,8 +718,10 @@ def step_being_deleted(context):
 @then("no call was made to delete the table, the Firehose stream or the mapping again")
 def step_not_again(context):
     made = set(zip(context.calls.services, context.calls.names()))
-    again = {("dynamodb", "DeleteTable"), ("firehose", "DeleteDeliveryStream"), ("lambda", "DeleteEventSourceMapping")}
+    again = {("firehose", "DeleteDeliveryStream"), ("lambda", "DeleteEventSourceMapping")}
     assert not again & made, again & made
+    # the trips table only: ext-scheduled-merge's clean-up may delete the run log $PREFIX-runs, which is not deleting
+    assert "recipe-ana-trips" not in [p.get("TableName") for p in context.calls.of("DeleteTable")]
     assert context.printed.count("(already being deleted)") == 3, context.printed
 
 

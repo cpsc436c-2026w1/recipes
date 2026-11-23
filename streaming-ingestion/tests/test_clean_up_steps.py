@@ -126,7 +126,7 @@ def test_a_refused_delete_is_reported_and_the_other_steps_still_run(capsys):
     refuse(s.client("lambda"), "list_event_source_mappings", "AccessDeniedException", times=99)
     refuse(s.client("sqs"), "get_queue_url", "AccessDenied", times=1)
     steps = clean_up.clean(s, PREFIX)
-    assert len(steps.failed) == 5                                        # four functions' mappings and one queue
+    assert len(steps.failed) == 7                                        # six functions' mappings and one queue
     assert all("AccessDenied" in f for f in steps.failed)
     assert s.client("lambda").list_functions()["Functions"] == []
     assert s.client("dynamodb").list_tables()["TableNames"] == []

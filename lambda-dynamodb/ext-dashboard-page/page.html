@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requests by zone</title>
+<!-- Chart.js at a pinned version, with the file's hash: the browser refuses a file that changed (README, Decisions) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+        integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  :root { --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --stale: #b3261e; --line: #d9d9de; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17181a; --fg: #ececef; --muted: #a0a4aa; --stale: #f2b8b5; --line: #3a3b3f; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  #freshness { color: var(--muted); margin: 0 0 12px; }
+  #freshness.stale { color: var(--stale); font-weight: 600; }
+  .chart { position: relative; height: 320px; }
+  table { border-collapse: collapse; margin-top: 16px; font-size: 0.85rem; width: 100%; display: block; overflow-x: auto; }
+  th, td { border-bottom: 1px solid var(--line); padding: 3px 6px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  td.none { color: var(--muted); font-style: italic; }
+  tr.stale td:first-child { color: var(--stale); }
+  #slots { display: none; margin-top: 16px; }
+  #slot-cells { display: grid; grid-template-columns: repeat(48, 1fr); gap: 2px; }
+  #slot-cells span { height: 14px; border-radius: 2px; background: var(--line); }
+  #slot-cells .loaded { background: #2e7d32; } #slot-cells .late { background: #f9a825; }
+  #slot-cells .loading { background: #1565c0; } #slot-cells .failed, #slot-cells .missing { background: #b3261e; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Trips requested by zone</h1>
+  <p id="freshness">loading…</p>
+  <div class="chart"><canvas id="chart" aria-label="trips requested per zone and period"></canvas></div>
+  <table id="values"></table>
+  <section id="slots"><h2 style="font-size:1rem">Feed slots today (UTC)</h2><div id="slot-cells"></div></section>
+</main>
+<script>
+// The page only draws: every number, time and stale flag comes from /api/zone-counts (README, Decisions).
+const REFRESH_MS = 60000;
+const COLORS = ["#1a73e8", "#e8710a", "#188038", "#9334e6", "#d01884"];
+let chart = null;
+
+function hms(iso) { return iso ? iso.slice(11, 19) + " UTC" : null; }
+function label(p, minutes) { return minutes >= 1440 ? p.slice(0, 10) : p.slice(11, 16); }
+
+function zoneLabel(z) {
+  if (!z.stale) return `zone ${z.zone_id}`;
+  return z.as_of ? `zone ${z.zone_id} (not reporting since ${hms(z.as_of)})` : `zone ${z.zone_id} (not reporting: no data)`;
+}
+
+function draw(data) {
+  const f = document.getElementById("freshness");
+  f.textContent = data.data_as_of
+    ? `data as of ${hms(data.data_as_of)}, read at ${hms(data.read_at)}` + (data.stale ? ` (stale: ${data.age_minutes} minutes old)` : "")
+    : `${data.message}, read at ${hms(data.read_at)}`;
+  f.className = data.stale ? "stale" : "";
+  const labels = data.periods.map(p => label(p, data.period_minutes));
+  const datasets = data.zones.map((z, i) => ({
+    label: zoneLabel(z), data: z.values, spanGaps: false,          // null stays a gap, never 0
+    borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length],
+    borderDash: z.stale ? [6, 4] : [], pointRadius: 3,
+  }));
+  if (!chart) {
+    chart = new Chart(document.getElementById("chart"), {
+      type: "line", data: { labels, datasets },
+      options: { animation: false, maintainAspectRatio: false,
+                 scales: { y: { beginAtZero: true, title: { display: true, text: "trips requested" } } },
+                 plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw ?? "no data"}` } } } },
+    });
+  } else {
+    chart.data.labels = labels; chart.data.datasets = datasets; chart.update();
+  }
+  const rows = [`<tr><th>zone</th>${labels.map(l => `<th>${l}</th>`).join("")}</tr>`];
+  for (const z of data.zones) {
+    const cells = z.values.map(v => v === null ? `<td class="none">no data</td>` : `<td>${v}</td>`).join("");
+    rows.push(`<tr class="${z.stale ? "stale" : ""}"><td>${zoneLabel(z)}</td>${cells}</tr>`);
+  }
+  document.getElementById("values").innerHTML = rows.join("");
+}
+
+function drawSlots(list) {
+  const box = document.getElementById("slots");
+  box.style.display = "block";
+  document.getElementById("slot-cells").innerHTML = list.slots.map(s =>
+    `<span class="${s.slot_state.replace(" ", "-")}" title="${s.slot_start} ${s.slot_state}"></span>`).join("");
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/zone-counts", { cache: "no-store" });
+    const data = await r.json();
+    draw(data);
+    if (data.slots) {
+      const s = await fetch(`/api/slots?day=${data.read_at.slice(0, 10)}`, { cache: "no-store" });
+      if (s.ok) drawSlots(await s.json());
+    }
+  } catch (err) {
+    document.getElementById("freshness").textContent = `could not read the data: ${err}`;
+    document.getElementById("freshness").className = "stale";
+  }
+}
+
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>

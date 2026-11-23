@@ -48,7 +48,7 @@ test = "uv run pytest -q"
 scenarios = "uv run behave"
 run = "uv run python -m main.run --model gateway"
 run_offline = "uv run python -m main.run"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [extension_commands]
 ext-eval = "uv run python ext-eval/routing_eval.py --model gateway"

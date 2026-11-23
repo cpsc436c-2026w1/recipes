@@ -1,0 +1,6 @@
+# ext-source-poller, offline: uv run python ext-source-poller/run.py --target local (moto; synthetic stand-in data, sim/stand_in.py)
+# captured 2026-11-23; not a run in AWS; moto's account number masked
+created  s3://recipe-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+104 runs from 2026-11-22 00:15 to 02:00 the next day: 95 slots loaded, 1 of them late; 18729 updates stored of the 18729 trips in the 95 published files
+GET /api/slots?day=2026-11-22 at 00:46 the next day: 200, 96 slots: 94 loaded, 1 late, 1 missing
+missing: 2026-11-22T09:15Z

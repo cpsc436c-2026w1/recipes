@@ -65,7 +65,7 @@ Feature: Clean-up removes what the three representatives created, and nothing el
 
   @R36
   Scenario: Only the offline files
-    When clean_up.py runs with "--local"
+    When clean_up.py runs with "--local --yes"
     Then the exit code is 0
     And the folder ".local" is gone
     And no call was made to AWS

@@ -47,7 +47,8 @@ In an account that allows it, sign in first and check the account with `aws sts 
 ```bash
 uv run python ext-zero-etl/zero_etl.py                      # offline: validate, moto table, stand-in pipeline
 PREFIX=recipe-yourname uv run python ext-zero-etl/zero_etl.py --target aws   # only where osis:* is allowed
-PREFIX=recipe-yourname uv run python clean_up.py            # removes the pipeline, bucket and role as well
+PREFIX=recipe-yourname uv run python clean_up.py            # lists what it would delete; deletes nothing
+PREFIX=recipe-yourname uv run python clean_up.py --yes      # removes the pipeline, bucket and role as well
 ```
 
 After a change to `render()`, write the example again: `uv run python ext-zero-etl/pipeline.py --write`

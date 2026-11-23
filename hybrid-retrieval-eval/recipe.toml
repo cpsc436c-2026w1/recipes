@@ -43,7 +43,7 @@ test = "uv run pytest -q"
 scenarios = "uv run behave"
 run = "uv run python -m main.run --backend opensearch --embedder gateway --answers gateway"
 run_offline = "uv run python -m main.run"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [extension_commands]
 ext-filters = "uv run python ext-filters/filters_run.py --backend opensearch --embedder gateway"

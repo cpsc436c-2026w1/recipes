@@ -1,7 +1,9 @@
 """Remove everything a real run of this recipe created in your AWS account, for this PREFIX.
 
-  PREFIX=recipe-yourname uv run python clean_up.py --dry-run  print the names it would delete; no AWS call
-  PREFIX=recipe-yourname uv run python clean_up.py            delete
+  PREFIX=recipe-yourname uv run python clean_up.py            print the names it would delete; no AWS call
+  PREFIX=recipe-yourname uv run python clean_up.py --yes      delete
+
+--dry-run is the same as no flag. Without --yes nothing is deleted, as in every clean-up of the recipes.
 
 Removes: DynamoDB tables {PREFIX}-chat-traces, -chat-cache, -chat-spans; CloudWatch alarms {PREFIX}-chat-errors,
 -chat-slow-answers, -chat-daily-cost (only these: a team's own alarm whose name starts the same way stays);
@@ -127,14 +129,18 @@ def clean_up(s: Settings, dry_run: bool = False, ddb=None, cw=None, sns=None) ->
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--yes", action="store_true", help="delete; without it, print what would be deleted")
+    g.add_argument("--dry-run", action="store_true", help="print what would be deleted (the default)")
     args = p.parse_args()
     s = Settings()
-    steps = clean_up(s, args.dry_run)
-    if args.dry_run:
+    dry_run = not args.yes  # a bare run deleted the traces table in the live run of 2026-11-23: now it lists only
+    steps = clean_up(s, dry_run)
+    if dry_run:
         for r in steps.removed:
             print(f"would remove, if it exists: {r}")
-        print(f"{len(steps.removed)} names for PREFIX={s.prefix} in {s.region}; nothing was contacted or deleted")
+        print(f"{len(steps.removed)} names for PREFIX={s.prefix} in {s.region}; nothing was contacted")
+        print("Nothing deleted. Run again with --yes to delete these.")
         return
     for r in steps.removed:
         print(f"removed {r}")

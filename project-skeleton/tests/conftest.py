@@ -16,8 +16,10 @@ AS_OF = datetime(2026, 11, 12, 16, 0, 30, tzinfo=timezone.utc)   # a fixed "now"
 
 
 @pytest.fixture(autouse=True)
-def _no_profile(monkeypatch):
-    """No test depends on the caller's profile: a profile set in the shell could point a test at a real account."""
+def _no_profile(monkeypatch, tmp_path):
+    """No test depends on the caller's profile: a profile set in the shell could point a test at a real account.
+    scripts/tags.py writes the test's own ledger, never the folder's state/."""
+    monkeypatch.setenv("LEDGER", str(tmp_path / "ledger.jsonl"))
     monkeypatch.delenv("AWS_PROFILE", raising=False)
     monkeypatch.delenv("AWS_DEFAULT_PROFILE", raising=False)
 

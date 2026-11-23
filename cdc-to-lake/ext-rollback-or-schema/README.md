@@ -81,7 +81,7 @@ uv run python ext-rollback-or-schema/rollback.py --target aws
 uv run python ext-rollback-or-schema/schema_change.py --target aws
 ```
 
-Clean-up: nothing new is created; `uv run python clean_up.py` removes the table with the rest. Cost: see below.
+Clean-up: nothing new is created; `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` removes the table with the rest. Cost: see below.
 
 ## What you should see
 

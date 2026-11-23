@@ -4,7 +4,7 @@
 > a service AWS runs.
 
 `bash ext-vector-search/run.sh` ends by deleting the whole recipe (`clean_up.sh`), its tables and the vector index
-with them. With `KEEP=1` it keeps everything, and you run `bash clean_up.sh` yourself when you are done.
+with them. With `KEEP=1` it keeps everything, and you run `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` yourself when you are done.
 
 Extension of the [dynamodb recipe](../README.md). Riders write short messages about their trips: a lost phone, a
 driver at the wrong corner, a fare above the quote. Support staff want the messages that mean the same as a new one,
@@ -100,7 +100,7 @@ DRY=1 bash ext-vector-search/run.sh           # prints every command, runs nothi
 bash ext-vector-search/run.sh                 # runs the seven steps, then cleans up the whole recipe
 ```
 
-A run without `KEEP=1` ends with clean-up. Otherwise, run `bash clean_up.sh` in the same terminal with the same
+A run without `KEEP=1` ends with clean-up. Otherwise, run `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` in the same terminal with the same
 `PREFIX`: deleting `$PREFIX-trips` also deletes its vector index. Cost: see below.
 
 ## What you should see
@@ -171,7 +171,7 @@ storage and 125% on requests", and the table's own Standard-IA prices are on the
 
 ## Clean up
 
-The captured run used `KEEP=1`; the clean-up was run separately the same day with `bash clean_up.sh` and its output is
+The captured run used `KEEP=1`; the clean-up was run separately the same day with `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` and its output is
 at the end of [../output/ext-vector-search.txt](../output/ext-vector-search.txt), under "== Clean up". To check that the
 table and its index are gone:
 

@@ -27,7 +27,7 @@ shows = "<what passing shows, in one sentence>"
 setup = "uv sync"
 test = "uv run pytest -q"          # offline, no AWS account
 run = "uv run python main/run.py --target aws"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [constraints]                       # what an assistant must keep when it changes this recipe
 no_keys_in_code = true

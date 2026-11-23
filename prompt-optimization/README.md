@@ -66,7 +66,7 @@ experiment in the L15 demo repository, [`evals/gepa/`](https://github.com/cpsc43
 | Three splits (R10, R12, R15) | Train for reflection, validation for choosing, test only for the report, in its own file that `main/optimize.py` does not load | The reflection model copies what it reads into the prompt. In the L15 run, two of the three queries at the end of the new prompt were reference SQL of train questions. The winner's validation score is biased upward because it was chosen for being highest there | L15 demo, `evals/gepa/README.md` "Questions and splits"; [AI Engineering ch. 4](https://learning.oreilly.com/library/view/ai-engineering/9781098166298/ch04.html), Model Selection, "Data contamination with public benchmarks" (a model evaluated on data it was trained on scores higher than it should; the book says this of models and benchmarks, and applying it to a prompt tuned on its own test questions is a course choice) |
 | Two models (R32) | Task model `qwen3.6-35b-a3b`, reflection model `qwen3.8-27b`, both on the course LLM gateway | The task model answers every question in the search and the test runs, so the cheaper one keeps the run within a small budget. Reflection calls are few: in the L15 run they were US$0.09 of the US$0.62 the optimization spent | DSPy's `dspy.GEPA` docs ask for a strong reflection model; prices from the gateway's price table |
 | Search settings (R10) | 3 train questions per reflection, candidates kept by Pareto front, no merge | The settings of `dspy.GEPA(auto="light")` and of the L15 run; one search move keeps the log readable | `dspy/teleprompt/gepa/gepa.py` (DSPy 3.5.0); L15 demo `evals/gepa/optimize.py` |
-| Spend cap in code (R20, R21, R22, R23, R24, R25, R26, R27, R28) | GEPA's `max_metric_calls` (default 120), a reflection cap (default 8), a money cap for the whole run (default 0.50 CAD); the search stops at 60% of the money cap. A call is refused when what is spent, what the calls in flight can still cost and the most this call can cost would together pass the money cap; the most a call can cost is one input token per byte of its prompt and its output cap: 4,000 tokens for a task-model call, `REFLECTION_MAX_TOKENS` (16,384) for a reflection call. A run therefore does not end above the cap, and a cap needs room for the calls in flight: about 0.002 CAD for the four task calls of an evaluation. The search's task-model calls are refused past `--max-metric-calls` plus one iteration; the test runs have their own allowance, `--max-test-calls` (default: twice 2 prompts x runs x test questions; the doubling is room for a retried answer). A refused call, or a call the gateway refuses or fails, cuts the search: the search does not make a reflection call afterward and the other questions of that evaluation are not sent, the candidates found so far, `instructions_after.txt` and the report are still written, and the report names the call that cut the search and why | Team budgets are small and the gateway key has a per-key budget; the test runs must still fit after the search, and a search ended by its own cap must still be tested. The L15 run stopped GEPA at US$3.00 under a US$4.00 hard cap. GEPA and DSPy catch an exception inside an evaluation and go on (`gepa/core/engine.py`, gepa 0.1.4; DSPy scores it 0), so a refusal must reach the stop condition, or the search repeats the refused call or rewrites a prompt whose answers were never given | Course constraint (state the cost of a run, per-key budget); L15 demo `evals/gepa/program.py` |
+| Spend cap in code (R20, R21, R22, R23, R24, R25, R26, R27, R28) | GEPA's `max_metric_calls` (default 120), a reflection cap (default 8), a money cap for the whole run (default 0.50 CAD); the search stops at 60% of the money cap. A call is refused when what is spent, what the calls in flight can still cost and the most this call can cost would together pass the money cap; the most a call can cost is one input token per byte of its prompt and its output cap: 16,384 tokens for a task-model call (the course LLM gateway's per-key cap; a reasoning model's reply did not fit in 4,000), `REFLECTION_MAX_TOKENS` (16,384) for a reflection call. A run therefore does not end above the cap, and a cap needs room for the calls in flight: about 0.007 CAD for the four task calls of an evaluation. The search's task-model calls are refused past `--max-metric-calls` plus one iteration; the test runs have their own allowance, `--max-test-calls` (default: twice 2 prompts x runs x test questions; the doubling is room for a retried answer). A refused call, or a call the gateway refuses or fails, cuts the search: the search does not make a reflection call afterward and the other questions of that evaluation are not sent, the candidates found so far, `instructions_after.txt` and the report are still written, and the report names the call that cut the search and why | Team budgets are small and the gateway key has a per-key budget; the test runs must still fit after the search, and a search ended by its own cap must still be tested. The L15 run stopped GEPA at US$3.00 under a US$4.00 hard cap. GEPA and DSPy catch an exception inside an evaluation and go on (`gepa/core/engine.py`, gepa 0.1.4; DSPy scores it 0), so a refusal must reach the stop condition, or the search repeats the refused call or rewrites a prompt whose answers were never given | Course constraint (state the cost of a run, per-key budget); L15 demo `evals/gepa/program.py` |
 | Calls through the course LLM gateway (R30, R31, R33, R34, R35) | `COURSE_GATEWAY_URL` and `KB_MCP_TOKEN` from the environment (the older `GATEWAY_URL` and `COURSE_MCP_TOKEN` still work); `dspy.LM("openai/<model>", model_type="chat", num_retries=0, ...)`: one call is one request; a GPT or o-series model gets `temperature` 1.0 | The code and the repo do not contain a key. A retry would send a request again under the one amount held for it against the money cap, and a gateway may charge each sent attempt that times out or fails; with one request per call the cap counts what the key can be charged. DSPy 3.5 picks the Responses API by default for `openai/` models (its `model_type` "auto"). The gateway serves chat completions only. GPT and o-series models accept only the default temperature, 1, and DSPy refuses `max_tokens` under 16,000 for its gpt-5 and o-series names. A gateway may clamp the output-token limit lower | Course constraint (model calls through the course LLM gateway); [`llm-gateway`](../llm-gateway/README.md) |
 | Plain text replies (R11) | DSPy's ChatAdapter for the task call and the reflection call | Plain text field markers work on any chat model. DSPy's default for reflection is the JSONAdapter, which may ask the endpoint for structured output | Test what an endpoint supports before designing on it: [`llm-probes`](../llm-probes/README.md) (L15–17) |
 | Report on test, several runs (R13, R17, R18) | 3 runs per prompt; the median with every run and the failure types; a table per test question with the runs each prompt passed | Replies vary: in the L15 run the same prompt passed 33% to 75% of the same 12 questions over 8 runs. A median can go up while one question goes from always right to always wrong: the table per question shows which questions the new prompt fixed and which it broke (the L15 results have the same table: 11 questions passed more often, 0 less often) | L15 demo, `evals/gepa/results.md`; Agentic AI Lens [AGENTOPS02-BP03](https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/agentops02-bp03.html), Implement agent behavior versioning and rollback capabilities (compare two versions of a prompt on the same test questions over several runs, and tie a change in quality to the version that caused it) |
@@ -94,7 +94,7 @@ Each requirement has one or more scenarios in [`features/`](features/), tagged w
 runs them offline, on the stub or against a stand-in for the gateway on `127.0.0.1`. The requirements of a
 variant (a folder `ext-*`) are in its own README, and their numbers go on from here:
 [GEPA without DSPy](ext-gepa-direct/README.md#requirements) from 60,
-[eval matrix](ext-eval-matrix/README.md#requirements) from 70. When you change what the recipe does, change the
+[eval matrix](ext-eval-matrix/README.md#requirements) from 70 (its groups and paired comparison from 80). When you change what the recipe does, change the
 requirement and its scenario with it: `python3 tools/check_requirements.py` (repo root) fails when they do not
 match.
 
@@ -156,7 +156,7 @@ match.
   `COURSE_GATEWAY_URL` and `KB_MCP_TOKEN`, before any request is sent.
 - **R32** (ubiquitous) The recipe shall ask the gateway for `qwen3.6-35b-a3b` as the task model and `qwen3.8-27b`
   as the reflection model unless `--task-model` or `--reflection-model` names another.
-- **R33** (ubiquitous) The recipe shall cap the output of every task-model call at 4,000 tokens and of every
+- **R33** (ubiquitous) The recipe shall cap the output of every task-model call at 16,384 tokens and of every
   reflection call at `REFLECTION_MAX_TOKENS` (16,384 unless set).
 - **R34** (unwanted) If the gateway starts to refuse calls during a run, then the recipe shall end the run with
   exit code 1 and a report of what ran.
@@ -172,15 +172,15 @@ match.
 
 **Clean-up**
 
-- **R50** (event) When `clean_up.py` runs, the recipe shall remove the folder `runs/` and leave the captured runs
+- **R50** (event) When `clean_up.py --yes` runs, the recipe shall remove the folder `runs/` and leave the captured runs
   in `output/`.
-- **R51** (complex) While there is no `runs/` folder, when `clean_up.py` runs, the recipe shall print
+- **R51** (complex) While there is no `runs/` folder, when `clean_up.py --yes` runs, the recipe shall print
   `nothing to remove`.
 
 **Requirements of the variants**, each in the README of its folder:
 
 - 60 to 63, GEPA without DSPy: [`ext-gepa-direct/README.md`](ext-gepa-direct/README.md#requirements)
-- 70 to 73, eval matrix: [`ext-eval-matrix/README.md`](ext-eval-matrix/README.md#requirements)
+- 70 to 73, eval matrix, and 80 to 88, its groups and paired comparison: [`ext-eval-matrix/README.md`](ext-eval-matrix/README.md#requirements)
 
 ## Run it
 
@@ -227,7 +227,7 @@ What you should see, line by line:
 5. The direct run prints the same before and after table and `written to runs/direct-<time>`.
 6. The matrix prints one row per model with the seed prompt and `written to runs/matrix-<time>`.
 
-Clean-up and cost: nothing was spent. `uv run python clean_up.py` removes `runs/`.
+Clean-up and cost: nothing was spent. `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` removes `runs/`.
 
 ### 2. Laptop, with the course LLM gateway
 
@@ -258,7 +258,7 @@ Options: `--runs 5` for more test runs per prompt, `--max-metric-calls 200` for 
 Clean-up and cost: our two runs spent 0.0099 and 0.0063 CAD of the key's budget
 ([Cost and clean-up](#cost-and-clean-up)); yours will differ. `--max-cad` is the most a run can spend: a call
 that could take the run past it is refused before it is made. The last line of the block takes the token out of
-the shell. Save any report you need, then `uv run python clean_up.py`.
+the shell. Save any report you need, then `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes`.
 
 ## What you should see
 
@@ -314,7 +314,7 @@ The two folders here are variants of the main scenario. They are not extensions 
 | Variant | What it adds | Folder | What changes in the main scenario |
 |---|---|---|---|
 | GEPA without DSPy | The same loop with the `gepa` library over an existing system prompt string, as the L15 demo ran it | `ext-gepa-direct/` | Steps 2 and 3: the program is a prompt string and one chat call; GEPA gets an adapter with `evaluate` and `make_reflective_dataset` instead of a five-argument metric |
-| Eval matrix | The same eval over several models and prompts, with pass rate and spend per cell | `ext-eval-matrix/` | Steps 3 and 4 are left out: each cell is one model with one prompt, run on the test questions |
+| Eval matrix | The same eval over several models and prompts, with pass rate and spend per cell, the outcomes per group of questions, a paired test of two cells, and a cell without a model (the rides case) | `ext-eval-matrix/` | Steps 3 and 4 are left out: each cell is one model with one prompt, run on the test questions |
 
 ## Cost and clean-up
 
@@ -322,7 +322,8 @@ The stub run does not spend anything. One run through the course LLM gateway wit
 (2026-11-12) made 171 model calls and spent 0.0099 CAD by the recipe's own count: 0.0053 for the search's 128
 task-model calls, 0.0033 for 4 reflection calls, 0.0013 for the 39 test calls
 . The matrix run of the same day (two models, two prompts, 3
-runs) spent 0.0063 CAD.
+runs) spent 0.0063 CAD. The rides matrix on the gateway (2026-11-23, 240 model answers, 16,384 output tokens asked for each) spent
+0.0141 CAD (0.0097 USD at 1.45 CAD) as the gateway recorded it ([ext-eval-matrix/README.md](ext-eval-matrix/README.md#cost-and-clean-up)).
 Both at the gateway's prices: 0.05 and 0.10 CAD per million tokens in and out for `qwen3.6-35b-a3b`, 0.10 and 0.20
 for `qwen3.8-27b`. The reflection model is a
 reasoning model: its 4 calls wrote 13,348 output tokens, more than twice the 6,252 it read.
@@ -334,7 +335,8 @@ The recipe does not create AWS resources. Save any report you need, then remove 
 `runs/`), in the recipe folder:
 
 ```bash
-uv run python clean_up.py
+uv run python clean_up.py    # lists what it would delete; deletes nothing
+uv run python clean_up.py --yes
 ```
 
 ## Adapt it

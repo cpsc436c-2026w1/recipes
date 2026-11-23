@@ -1,0 +1,359 @@
+# ext-athena-engine live run, 2026-11-23, ca-central-1, PREFIX=recipe-chat,
+# account masked as 111122223333, no token. Model qwen3.6-35b-a3b through the course gateway, max_tokens 16384.
+# The run went step by step (the commands of ext-athena-engine/run.sh, each one printed before its output); three
+# defects it showed were fixed on the way and the step run again (lines starting "+ fix:"):
+#   1. R170: the reader role's Glue refusals (DROP TABLE, CTAS) end the query as FAILED, not as an error of
+#      StartQueryExecution, and came back as "FAILED"; query_fn.py now reads them as DENIED (tests: 3 new).
+#   2. DS01 was cut by request time: 6,045,129 trips. DS01 is the month's pickups, 6,045,943; 814 were requested on
+#      2024-02-29, so trips now has 32 request days (load.py, deploy.py; the month cases' reference queries say March).
+#   3. The sanity line of load.py printed the machine's absolute path; it prints the path in the recipe now.
+# Two @live scenarios were added (R140 and R200 in AWS); the reference rows of the eval are checked against DuckDB
+# on the uploaded files before the model runs.
+
++ deploy.py --data sim01 --dry-run
+1. scripts/lake.py up (bucket <PREFIX>-lake-<account>, created if missing, else borrowed)
+2. ensure_workgroup(recipe-chat-chat-wg) (100 MB cutoff, enforced, results athena-results/chat-wg/)
+3. load.py --data sim01, upload to s3://<bucket>/chat/
+4. Athena DDL in recipe-chat-chat-wg: database recipe_chat_chat, tables trips and zones, MSCK REPAIR TABLE
+5. SHOW PARTITIONS trips lists 1
+6. DynamoDB table recipe-chat-chat-usage (on demand, key usage_date, TTL expires_at)
+7. IAM role recipe-chat-chat-reader (trusted by lambda.amazonaws.com) with policy reader
+8. log group /aws/lambda/recipe-chat-chat-query (7 days)
+9. Lambda function recipe-chat-chat-query (arm64, python3.12, 256 MB, 15 s, asynchronous retries 0)
++ deploy.py --data sim01
+created  s3://recipe-chat-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+bucket: created
+workgroup recipe-chat-chat-wg: created
+downloading fhvhv_tripdata_2024-03.parquet (TLC)
+downloading taxi_zone_lookup.csv (TLC)
+sim01: 19,074 trips over 1 days, 265 zones, in build/athena/sim01
+uploaded sim01 to s3://recipe-chat-lake-111122223333/chat/
+partitions: 1
+function recipe-chat-chat-query ready
++ sanity: SELECT * LIMIT 3 from both tables, through the function
+{"state": "SUCCEEDED", "message": "", "columns": ["trip_id", "trip_state", "pickup_zone_id", "requested_time", "driver_id", "fare", "trip_miles", "requested_day"], "types": ["varchar", "varchar", "integer", "timestamp", "varchar", "double", "double", "date"], "rows": [["7979331387a759c55b56071ea6f58916", "completed", 230, "2024-03-14 17:33:07.000", null, 70.46, 10.09, "2024-03-14"], ["877b69dc0b9fd1a85e22a5f160a8b73e", "completed", 161, "2024-03-14 17:40:11.000", null, 17.89, 0.9, "2024-03-14"], ["9d86289ed67010a9dbfea9d1013959b0", "completed", 230, "2024-03-14 17:04:17.000", null, 41.93, 4.3, "2024-03-14"]], "data_scanned_bytes": 858609, "billed_bytes": 10485760}
+{"state": "SUCCEEDED", "message": "", "columns": ["zone_id", "borough", "zone_name", "service_zone"], "types": ["integer", "varchar", "varchar", "varchar"], "rows": [[1, "EWR", "Newark Airport", "EWR"], [2, "Queens", "Jamaica Bay", "Boro Zone"], [3, "Bronx", "Allerton/Pelham Gardens", "Boro Zone"]], "data_scanned_bytes": 4749, "billed_bytes": 10485760}
+{"state": "SUCCEEDED", "message": "", "columns": ["pickup_zone_id", "_col1"], "types": ["integer", "bigint"], "rows": [[48, 4345], [161, 7661], [230, 7068]], "data_scanned_bytes": 4943, "billed_bytes": 10485760}
++ LIVE=1 behave -t @live -t @R130 -n "The same question in AWS"
+      Then the rows are "trips: 7661"                                                  # features/steps/athena_steps.py:115
+      And the query ran in workgroup "<PREFIX>-chat-wg" with database "<prefix>_chat"  # features/steps/athena_steps.py:121
+
+1 feature passed, 0 failed, 0 skipped
+1 rule passed, 0 failed, 9 skipped
+1 scenario passed, 0 failed, 17 skipped
+5 steps passed, 0 failed, 84 skipped
+Took 0min 0.000s
++ LIVE=1 behave -t @live -t @R170
+      Then the function, its log group, the role, the usage table, the database and the prefix chat/ are gone # None
+      And the bucket, the prefix raw/trip-events/ and the workgroup "<PREFIX>-chat-wg" are still there        # None
+
+
+Failing scenarios:
+  features/athena_engine.feature:112  The query function runs statements without the chat's parse check
+
+0 features passed, 1 failed, 0 skipped
+0 rules passed, 1 failed, 9 skipped
+0 scenarios passed, 1 failed, 17 skipped
+2 steps passed, 1 failed, 86 skipped
+Took 0min 0.000s
++ fix: a role refusal that Athena reports as a FAILED query is DENIED (query_fn.py); deploy.py --data sim01 again
+exists   s3://recipe-chat-lake-111122223333 (created by lake.py up)
+bucket: created
+workgroup recipe-chat-chat-wg: created
+uploaded sim01 to s3://recipe-chat-lake-111122223333/chat/
+partitions: 1
+function recipe-chat-chat-query ready
++ LIVE=1 behave -t @live -t @R170
+
+
+
+
+
+
+
+
+
+
+
+
+
+Took 0min 0.000s
+      Given the function "<PREFIX>-chat-query" with its role "<PREFIX>-chat-reader" ... passed in 0.257s
+      When it is invoked directly with each of these queries: ... passed in 4.405s
+      Then each query gets the answer in its row ... passed in 0.000s
+      And table trips still exists ... passed in 0.122s
+1 scenario passed, 0 failed, 17 skipped
+4 steps passed, 0 failed, 85 skipped
++ ext-athena-engine/clean_up.py (dry run: SIM01 out before DS01 in)
+would remove lambda function recipe-chat-chat-query
+would remove log group /aws/lambda/recipe-chat-chat-query
+would remove iam role recipe-chat-chat-reader
+would remove dynamodb table recipe-chat-chat-usage
+would remove athena workgroup recipe-chat-chat-wg (only if the ledger records it created)
+would remove glue tables recipe_chat_chat.trips and .zones, database recipe_chat_chat
+would remove s3 prefixes chat/ and athena-results/chat-wg/ in <PREFIX>-lake-<account>
+dry run for PREFIX=recipe-chat in ca-central-1: nothing was contacted or deleted; add --yes
++ ext-athena-engine/clean_up.py --yes
+removed  lambda function recipe-chat-chat-query
+removed  log group /aws/lambda/recipe-chat-chat-query
+removed  iam role recipe-chat-chat-reader
+removed  dynamodb table recipe-chat-chat-usage
+removed  athena workgroup recipe-chat-chat-wg
+removed  glue table recipe_chat_chat.trips
+removed  glue table recipe_chat_chat.zones
+removed  glue database recipe_chat_chat
+removed  s3://recipe-chat-lake-111122223333/chat/ (2 objects)
+removed  s3://recipe-chat-lake-111122223333/athena-results/chat-wg/ (58 objects)
++ deploy.py --data ds01
+exists   s3://recipe-chat-lake-111122223333 (created by lake.py up)
+bucket: created
+workgroup recipe-chat-chat-wg: created
+ds01: 6,045,129 trips over 31 days, 265 zones, in build/athena/ds01
+WARNING: expected 6,045,943 trips for ds01 (README, Data); got 6,045,129
+uploaded ds01 to s3://recipe-chat-lake-111122223333/chat/
+partitions: 31
+function recipe-chat-chat-query ready
++ fix: DS01 cut by pickup time (load.py), 32 request days; clean_up.py --yes, then deploy.py --data ds01 again
+removed  lambda function recipe-chat-chat-query
+removed  log group /aws/lambda/recipe-chat-chat-query
+removed  iam role recipe-chat-chat-reader
+removed  dynamodb table recipe-chat-chat-usage
+removed  athena workgroup recipe-chat-chat-wg
+removed  glue table recipe_chat_chat.trips
+removed  glue table recipe_chat_chat.zones
+removed  glue database recipe_chat_chat
+removed  s3://recipe-chat-lake-111122223333/chat/ (32 objects)
+removed  s3://recipe-chat-lake-111122223333/athena-results/chat-wg/ (7 objects)
+exists   s3://recipe-chat-lake-111122223333 (created by lake.py up)
+bucket: created
+workgroup recipe-chat-chat-wg: created
+ds01: 6,045,943 trips over 32 request days, 265 zones, in build/athena/ds01
+uploaded ds01 to s3://recipe-chat-lake-111122223333/chat/
+partitions: 32
+function recipe-chat-chat-query ready
++ size of chat/trips/
+Total Objects: 32
+   Total Size: 256995085
++ LIVE=1 behave -t @live -t @R150
+      Given table trips holds DS01 ... passed in 0.481s
+      And the model's tool calls are: ... passed in 0.000s
+      When the analyst asks "Show me all the trips" ... passed in 6.482s
+      Then Athena cancels the query ... passed in 0.000s
+      And the tool result is "the query was stopped at the scan limit of 100 MB" ... passed in 0.000s
+1 scenario passed, 0 failed, 17 skipped
+5 steps passed, 0 failed, 84 skipped
++ the cutoff query's state, as Athena reports it
+SELECT * FROM trips CANCELLED Bytes scanned limit was exceeded 104857600 None None 
++ LIVE=1 behave -t @live -t @R140 (added: the refusal and the daily cap in AWS)
+      Given table trips holds DS01 ... passed in 0.625s
+      And the model's tool calls are: ... passed in 0.000s
+      When the analyst asks "Clean up the trips table" ... passed in 0.030s
+      Then each of the 6 tool results is a rejection ... passed in 0.000s
+      And Athena received 0 queries ... passed in 0.086s
+1 scenario passed, 0 failed, 19 skipped
+5 steps passed, 0 failed, 93 skipped
++ LIVE=1 behave -t @live -t @R200 (added: the refusal and the daily cap in AWS)
+      Given table trips holds DS01 ... passed in 0.544s
+      When a query is asked for with today's billed Data scanned at each of these: ... passed in 1.744s
+      Then each query gets the result in its row ... passed in 0.000s
+      And Athena received 1 query ... passed in 0.079s
+1 scenario passed, 0 failed, 19 skipped
+4 steps passed, 0 failed, 94 skipped
++ today's usage item after the run
+2026-11-23	115343360
++ run_athena.py --target aws --measure
+{"question": "How many trips were requested in zone 161 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7,661 trips requested in zone 161 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-14'", "rows": [[7661]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.015e-05, "latency_ms": 2787.3}
+{"question": "How many trips were requested in zone 48 on March 14, 2024?", "status": "answered", "reason": "", "reply": "There were 4345 trips requested in zone 48 on March 14, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 48 AND requested_day = DATE '2024-03-14'", "rows": [[4345]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 6.95e-05, "latency_ms": 2700.3}
+{"question": "How many trips started in zone 230 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7068 trips that started in zone 230 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 230 AND requested_day = DATE '2024-03-14'", "rows": [[7068]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 2771.9}
+{"question": "How many trips were requested in zone 161 on 2024-03-08?", "status": "answered", "reason": "", "reply": "There were 5804 trips requested in zone 161 on 2024-03-08.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-08'", "rows": [[5804]], "queries": 1, "data_scanned_bytes": 178008, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 6.965e-05, "latency_ms": 2664.2}
+{"question": "How many trips were requested in Times Sq/Theatre District on 2024-03-22?", "status": "answered", "reason": "", "reply": "There were 6,290 trips requested in Times Sq/Theatre District on 2024-03-22.", "sql": "SELECT COUNT(*) AS trip_count FROM trips t JOIN zones z ON t.pickup_zone_id = z.zone_id WHERE z.zone_name = 'Times Sq/Theatre District' AND t.requested_day = DATE '2024-03-22'", "rows": [[6290]], "queries": 1, "data_scanned_bytes": 190204, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.3e-05, "latency_ms": 3281.4}
+{"question": "How many trips were requested in zone 79 on Saturday 2024-03-02?", "status": "answered", "reason": "", "reply": "There were 12,566 trips requested in zone 79 on Saturday, March 2, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 79 AND requested_day = DATE '2024-03-02'", "rows": [[12566]], "queries": 1, "data_scanned_bytes": 231457, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 3308.9}
+{"question": "How many trips were requested in zone 161 in March 2024?", "status": "answered", "reason": "", "reply": "There were 191,442 trips requested in zone 161 in March 2024.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_day >= DATE '2024-03-01' AND requested_day < DATE '2024-04-01'", "rows": [[191442]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.16e-05, "latency_ms": 2731.8}
+{"question": "How many trips were requested in zone 236 during the whole of March 2024?", "status": "answered", "reason": "", "reply": "There were 113,606 trips requested in zone 236 during the whole of March 2024.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 236 AND requested_day >= DATE '2024-03-01' AND requested_day <= DATE '2024-03-31'", "rows": [[113606]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.22e-05, "latency_ms": 2714.6}
+{"question": "Compare the trips requested in zones 48 and 230 on 2024-03-14: how many in each?", "status": "answered", "reason": "", "reply": "On 2024-03-14, there were 4,345 trips requested in zone 48 and 7,068 trips requested in zone 230.", "sql": "SELECT pickup_zone_id, COUNT(*) AS trip_count FROM trips WHERE requested_day = DATE '2024-03-14' AND pickup_zone_id IN (48, 230) GROUP BY pickup_zone_id", "rows": [[230, 7068], [48, 4345]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.555e-05, "latency_ms": 2846.4}
+{"question": "How many trips were requested in zone 161 and in zone 162 on 2024-03-15, each?", "status": "answered", "reason": "", "reply": "On 2024-03-15, there were 5,913 trips requested in zone 161 and 4,157 trips requested in zone 162.", "sql": "SELECT pickup_zone_id, COUNT(*) as trip_count FROM trips WHERE pickup_zone_id IN (161, 162) AND requested_day = DATE '2024-03-15' GROUP BY pickup_zone_id", "rows": [[162, 4157], [161, 5913]], "queries": 1, "data_scanned_bytes": 188806, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.595e-05, "latency_ms": 2813.1}
+{"question": "How many trips were requested in zone 161 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7,661 trips requested in zone 161 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-14'", "rows": [[7661]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.015e-05, "latency_ms": 2722.6}
+{"question": "How many trips were requested in zone 48 on March 14, 2024?", "status": "answered", "reason": "", "reply": "There were 4345 trips requested in zone 48 on March 14, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 48 AND requested_day = DATE '2024-03-14'", "rows": [[4345]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 6.95e-05, "latency_ms": 4781.2}
+{"question": "How many trips started in zone 230 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7068 trips that started in zone 230 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 230 AND requested_day = DATE '2024-03-14'", "rows": [[7068]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 2749.6}
+{"question": "How many trips were requested in zone 161 on 2024-03-08?", "status": "answered", "reason": "", "reply": "There were 5,804 trips requested in zone 161 on 2024-03-08.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-08'", "rows": [[5804]], "queries": 1, "data_scanned_bytes": 178008, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.015e-05, "latency_ms": 3384.4}
+{"question": "How many trips were requested in Times Sq/Theatre District on 2024-03-22?", "status": "answered", "reason": "", "reply": "There were 6,290 trips requested in Times Sq/Theatre District on 2024-03-22.", "sql": "SELECT COUNT(*) AS trip_count FROM trips t JOIN zones z ON t.pickup_zone_id = z.zone_id WHERE z.zone_name = 'Times Sq/Theatre District' AND t.requested_day = DATE '2024-03-22'", "rows": [[6290]], "queries": 1, "data_scanned_bytes": 190204, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.3e-05, "latency_ms": 2769.0}
+{"question": "How many trips were requested in zone 79 on Saturday 2024-03-02?", "status": "answered", "reason": "", "reply": "There were 12,566 trips requested in zone 79 on Saturday, March 2, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 79 AND requested_day = DATE '2024-03-02'", "rows": [[12566]], "queries": 1, "data_scanned_bytes": 231457, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 2613.7}
+{"question": "How many trips were requested in zone 161 in March 2024?", "status": "answered", "reason": "", "reply": "There were 191,442 trips requested in zone 161 in March 2024.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_day >= DATE '2024-03-01' AND requested_day < DATE '2024-04-01'", "rows": [[191442]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.16e-05, "latency_ms": 3822.5}
+{"question": "How many trips were requested in zone 236 during the whole of March 2024?", "status": "answered", "reason": "", "reply": "There were 113,606 trips requested in zone 236 during the whole of March 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 236 AND requested_day >= DATE '2024-03-01' AND requested_day <= DATE '2024-03-31'", "rows": [[113606]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.26e-05, "latency_ms": 3786.0}
+{"question": "Compare the trips requested in zones 48 and 230 on 2024-03-14: how many in each?", "status": "answered", "reason": "", "reply": "On 2024-03-14, there were 4,345 trips requested in zone 48 and 7,068 trips requested in zone 230.", "sql": "SELECT pickup_zone_id, COUNT(*) AS trip_count FROM trips WHERE requested_day = DATE '2024-03-14' AND pickup_zone_id IN (48, 230) GROUP BY pickup_zone_id", "rows": [[230, 7068], [48, 4345]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.555e-05, "latency_ms": 5271.6}
+{"question": "How many trips were requested in zone 161 and in zone 162 on 2024-03-15, each?", "status": "answered", "reason": "", "reply": "On 2024-03-15, there were 5,913 trips requested in zone 161 and 4,157 trips requested in zone 162.", "sql": "SELECT pickup_zone_id, COUNT(*) as trip_count FROM trips WHERE pickup_zone_id IN (161, 162) AND requested_day = DATE '2024-03-15' GROUP BY pickup_zone_id", "rows": [[161, 5913], [162, 4157]], "queries": 1, "data_scanned_bytes": 188806, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.595e-05, "latency_ms": 2875.0}
+{"question": "How many trips were requested in zone 161 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7,661 trips requested in zone 161 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-14'", "rows": [[7661]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.015e-05, "latency_ms": 2737.7}
+{"question": "How many trips were requested in zone 48 on March 14, 2024?", "status": "answered", "reason": "", "reply": "There were 4345 trips requested in zone 48 on March 14, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 48 AND requested_day = DATE '2024-03-14'", "rows": [[4345]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 6.95e-05, "latency_ms": 2746.5}
+{"question": "How many trips started in zone 230 on 2024-03-14?", "status": "answered", "reason": "", "reply": "There were 7068 trips that started in zone 230 on 2024-03-14.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 230 AND requested_day = DATE '2024-03-14'", "rows": [[7068]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 2722.3}
+{"question": "How many trips were requested in zone 161 on 2024-03-08?", "status": "answered", "reason": "", "reply": "There were 5804 trips requested in zone 161 on 2024-03-08.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-08'", "rows": [[5804]], "queries": 1, "data_scanned_bytes": 178008, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 6.965e-05, "latency_ms": 2767.9}
+{"question": "How many trips were requested in Times Sq/Theatre District on 2024-03-22?", "status": "answered", "reason": "", "reply": "There were 6,290 trips requested in Times Sq/Theatre District on 2024-03-22.", "sql": "SELECT COUNT(*) AS trip_count FROM trips t JOIN zones z ON t.pickup_zone_id = z.zone_id WHERE z.zone_name = 'Times Sq/Theatre District' AND t.requested_day = DATE '2024-03-22'", "rows": [[6290]], "queries": 1, "data_scanned_bytes": 190204, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.3e-05, "latency_ms": 2716.5}
+{"question": "How many trips were requested in zone 79 on Saturday 2024-03-02?", "status": "answered", "reason": "", "reply": "There were 12,566 trips requested in zone 79 on Saturday, March 2, 2024.", "sql": "SELECT COUNT(*) AS trip_count FROM trips WHERE pickup_zone_id = 79 AND requested_day = DATE '2024-03-02'", "rows": [[12566]], "queries": 1, "data_scanned_bytes": 231457, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.005e-05, "latency_ms": 2851.2}
+{"question": "How many trips were requested in zone 161 in March 2024?", "status": "answered", "reason": "", "reply": "There were 191,442 trips requested in zone 161 in March 2024.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_day >= DATE '2024-03-01' AND requested_day < DATE '2024-04-01'", "rows": [[191442]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.16e-05, "latency_ms": 2741.9}
+{"question": "How many trips were requested in zone 236 during the whole of March 2024?", "status": "answered", "reason": "", "reply": "There were 113,606 trips requested in zone 236 during the whole of March 2024.", "sql": "SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 236 AND requested_day >= DATE '2024-03-01' AND requested_day <= DATE '2024-03-31'", "rows": [[113606]], "queries": 1, "data_scanned_bytes": 5367859, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.22e-05, "latency_ms": 3499.4}
+{"question": "Compare the trips requested in zones 48 and 230 on 2024-03-14: how many in each?", "status": "answered", "reason": "", "reply": "On 2024-03-14, there were 4,345 trips requested in zone 48 and 7,068 trips requested in zone 230.", "sql": "SELECT pickup_zone_id, COUNT(*) AS trip_count FROM trips WHERE requested_day = DATE '2024-03-14' AND pickup_zone_id IN (48, 230) GROUP BY pickup_zone_id", "rows": [[48, 4345], [230, 7068]], "queries": 1, "data_scanned_bytes": 176206, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.555e-05, "latency_ms": 3114.7}
+{"question": "How many trips were requested in zone 161 and in zone 162 on 2024-03-15, each?", "status": "answered", "reason": "", "reply": "On 2024-03-15, there were 5,913 trips requested in zone 161 and 4,157 trips requested in zone 162.", "sql": "SELECT pickup_zone_id, COUNT(*) as trip_count FROM trips WHERE pickup_zone_id IN (161, 162) AND requested_day = DATE '2024-03-15' GROUP BY pickup_zone_id", "rows": [[162, 4157], [161, 5913]], "queries": 1, "data_scanned_bytes": 188806, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 7.595e-05, "latency_ms": 4731.5}
+response time over 30 questions (Athena in recipe-chat-chat-wg): p95 (the 29th of 30) 4.78 s, median 2.79 s; R130 holds (under 20 s); billed 300 MB, Athena 0.001574 USD, model calls 0.002154 CAD
++ run_athena.py --target aws --eval (reference rows: Athena against DuckDB on the uploaded files, then 30 runs)
+{"case": "one-zone-day-1", "athena": [[7661]], "duckdb": [[7661]], "same": true}
+{"case": "one-zone-day-2", "athena": [[4345]], "duckdb": [[4345]], "same": true}
+{"case": "one-zone-day-3", "athena": [[7068]], "duckdb": [[7068]], "same": true}
+{"case": "one-zone-day-4", "athena": [[5804]], "duckdb": [[5804]], "same": true}
+{"case": "one-zone-day-5", "athena": [[6290]], "duckdb": [[6290]], "same": true}
+{"case": "one-zone-day-6", "athena": [[12566]], "duckdb": [[12566]], "same": true}
+{"case": "one-zone-month-1", "athena": [[191442]], "duckdb": [[191442]], "same": true}
+{"case": "one-zone-month-2", "athena": [[113606]], "duckdb": [[113606]], "same": true}
+{"case": "two-zones-1", "athena": [[48, 4345], [230, 7068]], "duckdb": [[48, 4345], [230, 7068]], "same": true}
+{"case": "two-zones-2", "athena": [[161, 5913], [162, 4157]], "duckdb": [[161, 5913], [162, 4157]], "same": true}
+reference rows: Athena and DuckDB agree on 10 cases
+{"case": "one-zone-day-1", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-1", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-1", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-day-2", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-2", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-2", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-day-3", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-3", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-3", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-day-4", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-4", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-4", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-day-5", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-5", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-5", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-day-6", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-day-6", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-day-6", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-month-1", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-month-1", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-month-1", "run": 3, "correct": true, "why": "correct"}
+{"case": "one-zone-month-2", "run": 1, "correct": true, "why": "correct"}
+{"case": "one-zone-month-2", "run": 2, "correct": true, "why": "correct"}
+{"case": "one-zone-month-2", "run": 3, "correct": true, "why": "correct"}
+{"case": "two-zones-1", "run": 1, "correct": true, "why": "correct"}
+{"case": "two-zones-1", "run": 2, "correct": true, "why": "correct"}
+{"case": "two-zones-1", "run": 3, "correct": true, "why": "correct"}
+{"case": "two-zones-2", "run": 1, "correct": true, "why": "correct"}
+{"case": "two-zones-2", "run": 2, "correct": true, "why": "correct"}
+{"case": "two-zones-2", "run": 3, "correct": true, "why": "correct"}
+trip-counts: runs correct 30/30, cases passed 10/10; PASS (needs 24 runs and 8 cases)
+exit 0
++ LIVE=1 behave features/athena_engine.feature -t @live -t "not @R130" (every DS01 @live scenario but the measure)
+    Scenario: Trips of one zone on one day
+    Scenario: The same question in AWS
+    Scenario: Response time of the eval's questions
+    Scenario: Writes, second statements, other tables and CTEs that hide a name
+    Scenario: The same statements in AWS
+    Scenario: A CTE over the allowed tables is let through
+    Scenario: A query that would scan 300 MB, offline
+    Scenario: Every column of the month
+    Scenario: Queries past the limit in one reply of the model
+    Scenario: The role's policy, offline
+    Scenario: The query function runs statements without the chat's parse check
+    Scenario: Queries under the minimum, over it, and failed
+    Scenario: The rows of the last query that succeeded are compared, typed and in any order
+    Scenario: The eval's code, offline, with a model that writes the reference queries
+    Scenario: Eval of trip counts
+    Scenario: The daily cap
+    Scenario: The daily cap in AWS
+    Scenario: Athena never finishes
+    Scenario: A model call that starts near the deadline
+    Scenario: The bucket and a borrowed workgroup stay
+5 scenarios passed, 0 failed, 15 skipped
+22 steps passed, 0 failed, 76 skipped
++ LIVE=1 behave -n "Response time of the eval"
+1 scenario passed, 0 failed, 19 skipped
+3 steps passed, 0 failed, 95 skipped
+
++ measured costs (Athena query history of the workgroup, DS01 phase; traces table for the model)
+Athena, workgroup recipe-chat-chat-wg (DS01 phase): 164 queries {'SUCCEEDED': 160, 'CANCELLED': 2, 'FAILED': 2}; 158 billed, 1760 MB billed, 0.009232 USD (0.013386 CAD)
+gateway, traces table recipe-chat-chat-traces: 92 questions, model calls 0.006600 CAD
+SIM01 phase (workgroup deleted with its history by the clean-up between the phases): about 20 queries, at most
+  200 MB billed, under 0.0011 USD. The eval scenario (R190, 30 questions) writes no traces: its model calls are
+  about 0.0022 CAD more (0.000072 CAD a question, as in the measure).
+Lambda: about 260 invocations of 256 MB for at most 7 s each, under 0.01 USD. S3: 257 MB for under an hour, and
+  about 700 requests, under 0.01 USD. DynamoDB on demand: under 0.001 USD.
+Total: Athena 0.0103 USD + Lambda, S3, DynamoDB under 0.02 USD = under 0.03 USD (0.04 CAD) against the 30 USD lease;
+  gateway 0.0088 CAD (0.0061 USD).
+
++ ext-athena-engine/clean_up.py (dry run)
+would remove lambda function recipe-chat-chat-query
+would remove log group /aws/lambda/recipe-chat-chat-query
+would remove iam role recipe-chat-chat-reader
+would remove dynamodb table recipe-chat-chat-usage
+would remove athena workgroup recipe-chat-chat-wg (only if the ledger records it created)
+would remove glue tables recipe_chat_chat.trips and .zones, database recipe_chat_chat
+would remove s3 prefixes chat/ and athena-results/chat-wg/ in <PREFIX>-lake-<account>
+dry run for PREFIX=recipe-chat in ca-central-1: nothing was contacted or deleted; add --yes
++ clean_up.py (dashboard-chat)  [meant as its dry run, but this clean-up deletes unless given --dry-run: it removed
+#   the traces table this run made; nothing else of the recipe was there]
+removed dynamodb table recipe-chat-chat-traces
+absent dynamodb table recipe-chat-chat-cache
+absent dynamodb table recipe-chat-chat-spans
+absent cloudwatch alarm recipe-chat-chat-errors
+absent cloudwatch alarm recipe-chat-chat-slow-answers
+absent cloudwatch alarm recipe-chat-chat-daily-cost
+absent sns topic recipe-chat-chat-alarms
+1 resources removed for PREFIX=recipe-chat in ca-central-1
++ scripts/lake.py down (dry run)
+REFUSED  s3://recipe-chat-lake-111122223333 holds 33 objects outside raw/trip-events/, athena-results/: run the clean-up of the recipe that wrote them first
+         chat/trips/requested_day=2024-02-29/data_0.parquet
+         chat/trips/requested_day=2024-03-01/data_0.parquet
+         chat/trips/requested_day=2024-03-02/data_0.parquet
+         chat/trips/requested_day=2024-03-03/data_0.parquet
+         chat/trips/requested_day=2024-03-04/data_0.parquet
+         chat/trips/requested_day=2024-03-05/data_0.parquet
+         chat/trips/requested_day=2024-03-06/data_0.parquet
+         chat/trips/requested_day=2024-03-07/data_0.parquet
+         chat/trips/requested_day=2024-03-08/data_0.parquet
+         chat/trips/requested_day=2024-03-09/data_0.parquet
+         chat/trips/requested_day=2024-03-10/data_0.parquet
+         chat/trips/requested_day=2024-03-11/data_0.parquet
+         chat/trips/requested_day=2024-03-12/data_0.parquet
+         chat/trips/requested_day=2024-03-13/data_0.parquet
+         chat/trips/requested_day=2024-03-14/data_0.parquet
+         chat/trips/requested_day=2024-03-15/data_0.parquet
+         chat/trips/requested_day=2024-03-16/data_0.parquet
+         chat/trips/requested_day=2024-03-17/data_0.parquet
+         chat/trips/requested_day=2024-03-18/data_0.parquet
+         chat/trips/requested_day=2024-03-19/data_0.parquet
+         chat/trips/requested_day=2024-03-20/data_0.parquet
+         chat/trips/requested_day=2024-03-21/data_0.parquet
+         chat/trips/requested_day=2024-03-22/data_0.parquet
+         chat/trips/requested_day=2024-03-23/data_0.parquet
+         chat/trips/requested_day=2024-03-24/data_0.parquet
+         chat/trips/requested_day=2024-03-25/data_0.parquet
+         chat/trips/requested_day=2024-03-26/data_0.parquet
+         chat/trips/requested_day=2024-03-27/data_0.parquet
+         chat/trips/requested_day=2024-03-28/data_0.parquet
+         chat/trips/requested_day=2024-03-29/data_0.parquet
+         chat/trips/requested_day=2024-03-30/data_0.parquet
+         chat/trips/requested_day=2024-03-31/data_0.parquet
+         chat/zones/zones.parquet
++ ext-athena-engine/clean_up.py --yes
+removed  lambda function recipe-chat-chat-query
+removed  log group /aws/lambda/recipe-chat-chat-query
+removed  iam role recipe-chat-chat-reader
+removed  dynamodb table recipe-chat-chat-usage
+removed  athena workgroup recipe-chat-chat-wg
+removed  glue table recipe_chat_chat.trips
+removed  glue table recipe_chat_chat.zones
+removed  glue database recipe_chat_chat
+removed  s3://recipe-chat-lake-111122223333/chat/ (33 objects)
+removed  s3://recipe-chat-lake-111122223333/athena-results/chat-wg/ (321 objects)
++ scripts/lake.py down (dry run)
+absent   Athena workgroup recipe-chat-wg
+absent   Athena workgroup recipe-chat-ctas-wg
+would remove s3://recipe-chat-lake-111122223333 and its 0 object versions
++ scripts/lake.py down --yes
+absent   Athena workgroup recipe-chat-wg
+absent   Athena workgroup recipe-chat-ctas-wg
+removed  s3://recipe-chat-lake-111122223333 and its 0 object versions
++ proof: nothing left for PREFIX=recipe-chat
+tagged Team=recipe-chat: 0
+lambda recipe-chat*: 0
+dynamodb recipe-chat*: 0
+iam roles recipe-chat*: 0
+log groups /aws/lambda/recipe-chat*: 0
+athena workgroups recipe-chat*: 0
+glue databases recipe_chat*: 0
+s3 buckets recipe-chat*: 0

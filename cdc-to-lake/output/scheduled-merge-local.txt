@@ -1,0 +1,7 @@
+[offline: moto S3 and DynamoDB, DuckDB in place of Athena; SIM01 rush-hour, 2515 deliveries in 110 objects]
+run 10:00  finished  objects  55  quarantined 0  old_events 0
+run 11:00  finished  objects  53  quarantined 0  old_events 0
+run 12:00  finished  objects   2  quarantined 0  old_events 0
+trips: 837 rows; zones 48, 161, 230: 304, 191, 342 (truth: 304, 191, 342)
+zone_counts 2026-11-23 (zone, requested, completed): 48 304 304, 161 191 191, 230 342 342
+the same objects merged again leave trips unchanged: True

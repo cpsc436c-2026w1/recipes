@@ -27,6 +27,7 @@ for sc in "$@"; do
     *) echo "unknown scenario $sc"; continue ;;
   esac
   [ -f "$script" ] || { echo "no $script"; continue; }
-  KEEP=1 bash "$script" 2>&1 | mask > "$R/output/$sc.txt"
+  args=(); [ "$sc" = clean-up ] && args=(--yes)   # a clean-up deletes only with --yes
+  KEEP=1 bash "$script" "${args[@]}" 2>&1 | mask > "$R/output/$sc.txt"
   echo "$script: exit ${PIPESTATUS[0]}, $(wc -l < "$R/output/$sc.txt") lines in $R/output/$sc.txt"
 done

@@ -80,7 +80,7 @@ bash ext-riders-and-drivers/run.sh            # runs the ten steps, then cleans 
 ```
 
 To go on to the nightly report, run the last line with `KEEP=1` in front. A run without `KEEP=1` ends with clean-up.
-Otherwise, run `bash clean_up.sh` in the same terminal with the same `PREFIX`. Cost: see below.
+Otherwise, run `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` in the same terminal with the same `PREFIX`. Cost: see below.
 
 ## What you should see
 

@@ -5,9 +5,9 @@ format = "main-scenario"
 task = "A small HTTPS API (a Lambda function behind a function URL) in front of the DynamoDB trip store, with a role allowed only what the handler does"
 shapes = ["operational-first"]
 extensions = ["concurrency-correctness"]
-lectures = ["L2", "L3", "L12", "L13", "L16"]
+lectures = ["L2", "L3", "L11", "L12", "L13", "L16"]
 core = ["Lambda", "Lambda function URLs", "IAM", "DynamoDB", "CloudWatch Logs"]
-secondary = []
+secondary = ["EventBridge Scheduler", "Athena", "DuckDB"]       # ext-dashboard-page, ext-read-path
 region = "ca-central-1"
 cost_one_run = "well under 0.01 USD (Lambda 0.20 USD per million requests and 0.0000133334 USD per GB-second, arm64, AWS price list ca-central-1; units measured in output/main.txt)"
 summary = "AWS CLI scripts that deploy a Python Lambda handler over the dynamodb recipe's tables, with a least-privilege role and a public function URL, call it with curl and read its REPORT lines"
@@ -25,17 +25,40 @@ source = "L12-L13; DynamoDB developer guide, condition expressions and transacti
 name = "read the metrics AWS already keeps (REPORT lines, AWS/Lambda) before adding your own"
 source = "L16; Lambda developer guide, monitoring metrics"
 
+[[practices]]
+name = "a page shows how fresh each number is, and a missing count as no data, never as 0 (ext-dashboard-page)"
+source = "L16; conditional writes keep the newer value (DynamoDB developer guide, condition expressions)"
+
+[[practices]]
+name = "a public URL only during a demonstration, its deletion scheduled before it exists (ext-dashboard-page)"
+source = "Lambda function URL auth; EventBridge Scheduler one-time schedules and universal targets"
+
+[[practices]]
+name = "SDK clients made in the Init phase, and the memory chosen by a measured cold read against the SLO (ext-dashboard-page)"
+source = "L2; Lambda developer guide, execution environment lifecycle (static initialization), memory and CPU"
+
+[[practices]]
+name = "percentiles only from enough calls, one call at a time, cold calls read from the REPORT line (ext-read-path)"
+source = "L2, L13; Lambda developer guide, execution environment lifecycle"
+
 [instruments]
-files = ["main/handler.py", "main/run.sh", "lib.sh", "clean_up.sh", "ext-redeploy/run.sh", "ext-metrics/run.sh"]
+files = ["main/handler.py", "main/run.sh", "lib.sh", "clean_up.sh", "clean_up.py", "ext-redeploy/run.sh", "ext-metrics/run.sh",
+         "ext-dashboard-page/page.py", "ext-dashboard-page/page.html", "ext-dashboard-page/refresh.py",
+         "ext-dashboard-page/deploy.py", "ext-dashboard-page/run.sh", "ext-dashboard-page/load_counts.py",
+         "ext-dashboard-page/serve_local.py", "ext-dashboard-page/bench.py", "ext-dashboard-page/slots.py",
+         "ext-read-path/read_path.py", "ext-read-path/report_lines.py", "ext-read-path/writer.py",
+         "ext-read-path/summary.sql", "ext-read-path/variants.toml", "ext-read-path/run.sh", "experiments/read-path.md"]
 
 [validates]
 command = "uv run pytest -q"
-shows = "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first"
+shows = "the handler against moto (one of two claims wins, an accept on a busy driver changes nothing, unknown actions get 400) and, under DRY=1, a policy with three DynamoDB actions on three named tables and no wildcard, both URL permissions, and a clean-up that removes the URL first; ext-dashboard-page: the page's JSON (12 periods, null where nothing was counted, each zone's freshness), one Query per zone, the lake job's conditional writes and lock, url-on making the URL's deletion first, bench.py's cold read judged on its own, the page in headless Chromium; ext-read-path: the seeded plan, REPORT lines joined and classed, the busy rider written and deleted, the paced writer, the summary's percentiles and costs"
 
 [scenarios]
 main = "main/run.sh"
 ext-redeploy = "ext-redeploy/run.sh"
 ext-metrics = "ext-metrics/run.sh"
+ext-dashboard-page = "ext-dashboard-page/run.sh"
+ext-read-path = "ext-read-path/run.sh"
 
 [commands]
 setup = "uv sync"
@@ -43,19 +66,24 @@ test = "uv run pytest -q"          # offline, no AWS account
 scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
 run = "bash main/run.sh"           # in the team sandbox; KEEP=1 keeps the API up
 dry_run = "DRY=1 bash main/run.sh"
-clean = "bash clean_up.sh"
+clean = "bash clean_up.sh"         # the API; after an extension: uv run python clean_up.py --yes
 
 [env]
 PREFIX = "first part of every name; the same as for the dynamodb recipe; default recipe"
 AWS_REGION = "ca-central-1"
 KEEP = "1 keeps the function, URL and role"
 DRY = "1 prints the commands and runs none"
+SLOTS_TABLE = "ext-dashboard-page: the slot table of streaming-ingestion/ext-source-poller; unset, no slot list"
+PERIOD = "ext-dashboard-page: 5m (default) or 1d for the lake variant"
+STALE_MINUTES = "ext-dashboard-page: a zone older than this is stale, default 10"
+RESULTS = "ext-read-path: the DuckDB file, default ext-read-path/results.duckdb"
+LEDGER = "the creation ledger, default state/ledger.jsonl"
 ROLE_ARN = "optional: an existing role for the function; the scripts then neither create nor delete $PREFIX-api-role"
 
 [constraints]                       # what an assistant must keep when it changes this recipe
 no_keys_in_code = true
 name_prefix_env = "PREFIX"
 policy_lists_named_tables_only = true    # no "dynamodb:*", no "Resource": "*"
-no_role_creation_beyond_main = true      # the recipe makes one role, $PREFIX-api-role (unless ROLE_ARN is set); do not add CreateRole elsewhere
+no_role_creation_beyond_main = false     # main makes $PREFIX-api-role (unless ROLE_ARN is set); ext-dashboard-page makes its four roles, each recorded in the ledger
 url_auth_none_is_demo_only = "switch to AWS_IAM before a URL leaves the team"
 handler_stdlib_and_boto3_only = true     # it is zipped as it is; the Lambda runtime has boto3

@@ -67,7 +67,7 @@ def dry(tmp_path):
     def _run(script, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_") and k not in ("KEEP", "DRY")}
         env |= {"DRY": "1", "PATH": f"{fake}:{os.environ['PATH']}", "TMPDIR": str(tmp_path), "ROLE_WAIT": "0"} | extra
-        p = subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=60)
+        p = subprocess.run(["bash", str(RECIPE / script), *(["--yes"] if script.endswith("clean_up.sh") else [])], env=env, capture_output=True, text=True, timeout=60)
         assert "was called under DRY=1" not in p.stderr, p.stderr
         assert p.returncode == 0, p.stdout + p.stderr
         return p.stdout

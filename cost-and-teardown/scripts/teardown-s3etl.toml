@@ -1,0 +1,12 @@
+# The steps for the s3-event-etl recipe, run with PREFIX, TEAM and LEDGER of that system:
+#   PREFIX=s3etl-yourname LEDGER=../s3-event-etl/state/ledger.jsonl bash scripts/teardown.sh --steps scripts/teardown-s3etl.toml
+# The notification entry and the schedule group go first in its clean-up, so nothing starts while the rest goes.
+
+[[step]]
+name = "s3-event-etl"
+command = "cd ../s3-event-etl && env -u VIRTUAL_ENV uv run python clean_up.py --yes"
+
+[[step]]
+name = "shared bucket and workgroups"
+command = "scripts/lake.py down --yes"
+last = true

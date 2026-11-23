@@ -47,6 +47,9 @@ class FakeGateway:
                     text = stub.reflect_reply(user)
                     if outer.empty_reflection:   # a thinking model that spent its whole cap on reasoning
                         text, finish = "", "length"
+                elif "Table trips" in system:   # the rides case of ext-eval-matrix: a plain chat call
+                    import rides  # ext-eval-matrix/rides.py, on the path once matrix.py is loaded
+                    text = rides.stub_reply("stub-small", system, user)
                 else:
                     sql = stub.task_reply("stub-small", system, user)
                     # DSPy's ChatAdapter reads field markers; the plain client of ext-gepa-direct reads the text

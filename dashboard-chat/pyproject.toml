@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Chat on the dashboard: plain-language questions answered by read-only SQL over DuckDB (CPSC 436C recipe)"
 requires-python = ">=3.12"
 dependencies = [
-    "boto3>=1.35",
+    "boto3>=1.40",
     "duckdb>=1.1",
     "httpx>=0.27",
     "sqlglot>=25",
@@ -19,7 +19,7 @@ app = [
 ]
 dev = [
     "behave>=1.3.3",
-    "moto[cloudwatch,dynamodb,sns]>=5.0",
+    "moto[athena,cloudwatch,dynamodb,glue,iam,lambda,logs,s3,sns]>=5.1",
     "playwright==1.64.1",
     "pytest>=8",
 ]
@@ -31,5 +31,5 @@ package = false
 default-groups = ["dev", "app"]
 
 [tool.pytest.ini_options]
-pythonpath = [".", "ext-answer-cache", "ext-guardrails-redteam", "ext-trace-alarms", "ext-feedback", "ext-shiny-app"]
+pythonpath = [".", "ext-athena-engine", "scripts", "ext-answer-cache", "ext-guardrails-redteam", "ext-trace-alarms", "ext-feedback", "ext-shiny-app"]
 testpaths = ["tests"]

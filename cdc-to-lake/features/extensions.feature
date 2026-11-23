@@ -1,6 +1,6 @@
 Feature: The three extensions
   ext-lag-alarm/README.md, "Requirements": R60 to R64. ext-rollback-or-schema/README.md: R70 to R73.
-  ext-maintenance/README.md: R80 to R84.
+  ext-maintenance/README.md: R110 to R114.
 
   @R60 @R64
   Scenario: The probe on AWS
@@ -61,7 +61,7 @@ Feature: The three extensions
     And Athena ran "ALTER TABLE recipe_ana_cdc.trip_changes ADD COLUMNS (payment_type string)"
     And the output names the 3 steps that fill the column
 
-  @R80 @R81
+  @R110 @R111
   Scenario: Compaction and expiry, offline
     When maintenance.py runs with ""
     Then the exit code is 0
@@ -69,7 +69,7 @@ Feature: The three extensions
     And the output holds "same query answer before and after: True"
     And the output holds "time travel to the first snapshot: no longer possible (expired)"
 
-  @R82
+  @R112
   Scenario: Compaction and expiry on AWS, measured
     When maintenance.py runs with "--target aws"
     Then the exit code is 0
@@ -77,14 +77,14 @@ Feature: The three extensions
     And the output has a row "before" and a row "after" with Data scanned in B and run time in ms
     And no schedule was created
 
-  @R83
-  Scenario: The two nightly schedules
+  @R113
+  Scenario: The two nightly schedules call the compaction function
     When maintenance.py runs with "--target aws --schedule"
     Then the exit code is 0
-    And the schedules "recipe-ana-lake-optimize" at "cron(0 3 * * ? *)" and "recipe-ana-lake-vacuum" at "cron(0 4 * * ? *)" exist, in the time zone "America/Vancouver"
-    And each schedule starts an Athena query as the role "recipe-ana-cdc-scheduler-role"
+    And the group "recipe-ana-maintenance-compaction" has the schedules "recipe-ana-compact-schedule" at "cron(0 3 * * ? *)" and "recipe-ana-lake-vacuum" at "cron(0 4 * * ? *)", in the time zone "America/Vancouver"
+    And each schedule calls the function "recipe-ana-compact-days" as the role "recipe-ana-compact-scheduler-role", with no retries
 
-  @R84
+  @R114
   Scenario: How long snapshots are kept
     Given Athena shows the changes of the scenario at its 1st look at trips_current
     When main.run runs with "--target aws"

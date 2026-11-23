@@ -53,6 +53,8 @@ def base_env(tmp_path: Path) -> dict:
     env.update(
         AWS_REGION="ca-central-1", AWS_ACCESS_KEY_ID="testing", AWS_SECRET_ACCESS_KEY="testing",
         AWS_CONFIG_FILE=os.devnull, AWS_SHARED_CREDENTIALS_FILE=os.devnull, TMPDIR=str(tmp_path),
+        # no test reads ext-nearby's own ledger: after a real run it has lines, and clean_up.sh would act on them
+        LEDGER=str(tmp_path / "no-ledger.jsonl"),
     )
     for name in ("KEEP", "DRY", "BUCKET", "PREFIX", "MAX_UNITS", "BATCH_CALLS"):
         env.pop(name, None)

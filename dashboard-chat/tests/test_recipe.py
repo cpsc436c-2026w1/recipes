@@ -60,8 +60,8 @@ def test_readme_commands_exist_and_the_offline_one_runs():
         for path in re.findall(r"\bbash ((?:ext-|main/)[\w./-]+\.sh)", c) + re.findall(r"shiny run ([\w./-]+\.py)", c):
             assert (ROOT / path).is_file(), c
     assert sum("fargate/" in c for c in commands) >= 6 and sum("shiny run" in c for c in commands) == 3
-    # Offline here: the stub model, and the clean-up dry run (it builds the names and contacts nothing).
-    offline = [c for c in scripts if "--model stub" in c or "--dry-run" in c]
+    # Offline here: the stub model, and the clean-up without --yes (it builds the names and contacts nothing).
+    offline = [c for c in scripts if "--model stub" in c or (script_of(c).name == "clean_up.py" and "--yes" not in c)]
     assert len(offline) == 2
     env = {**os.environ, "AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing",
            "AWS_SESSION_TOKEN": "testing", "AWS_REGION": "ca-central-1", "PREFIX": "test",

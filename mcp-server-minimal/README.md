@@ -179,11 +179,11 @@ root) fails when they do not match.
 
 **Clean-up**
 
-- **R70** (event) When `clean_up.py` runs, the recipe shall delete the Parquet files in `data/` and the refunds
+- **R70** (event) When `clean_up.py --yes` runs, the recipe shall delete the Parquet files in `data/` and the refunds
   database in `output/`, and leave the captured runs there.
-- **R71** (event) When `clean_up.py --dry-run` runs, the recipe shall print the names it would delete and delete
+- **R71** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print the names it would delete and delete
   nothing.
-- **R72** (event) When `clean_up.py` runs and none of these files is left, the recipe shall exit with code 0.
+- **R72** (event) When `clean_up.py --yes` runs and none of these files is left, the recipe shall exit with code 0.
 
 **Requirements of the extension**, in the README of its folder:
 
@@ -253,7 +253,7 @@ DELETE), three from the second, and `401 Unauthorized ...` from the third; in th
 per tool call ([What you should see](#what-you-should-see)).
 
 Clean-up and cost: stop the server with Ctrl-C. The run cost nothing. It wrote `data/*.parquet`;
-`uv run python clean_up.py` deletes them.
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` deletes them.
 
 ### 3. Laptop: an assistant as the client
 
@@ -317,8 +317,8 @@ or create anything in AWS. On your laptop, in `mcp-server-minimal`, list the fil
 list, then delete them:
 
 ```bash
-uv run python clean_up.py --dry-run    # what would go
-uv run python clean_up.py              # deletes data/*.parquet and output/refunds.duckdb
+uv run python clean_up.py    # what would go
+uv run python clean_up.py --yes              # deletes data/*.parquet and output/refunds.duckdb
 ```
 
 ## Adapt it

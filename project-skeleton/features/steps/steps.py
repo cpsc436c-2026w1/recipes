@@ -126,7 +126,8 @@ def step_run_streamsim(context, script, args):
 
 @when("clean_up.py runs")
 def step_clean_up(context):
-    _run(context, "clean_up.py", [])
+    # the clean-up contract: a bare run only lists; a run that deletes passes --yes
+    _run(context, "clean_up.py", ["--yes"])
 
 
 @then("the exit code is {code:d}")

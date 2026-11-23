@@ -131,7 +131,7 @@ def test_a_collection_that_does_not_go_is_a_failure_and_the_policies_are_still_t
 def test_the_command_exits_non_zero_when_a_step_failed(monkeypatch, capsys):
     aoss = FakeAoss(refuse={"batch_get_collection"})
     monkeypatch.setattr(cu.boto3, "client", lambda *a, **kw: aoss)
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     with pytest.raises(SystemExit) as done:
         cu.main()
     out = capsys.readouterr().out

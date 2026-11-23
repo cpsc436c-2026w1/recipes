@@ -26,6 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))  # the recipe root, so `main` imports
 
+from comment_redteam import comment_counts_line, eval_line, run_comments, write_eval_cases  # noqa: E402
 from guards import OWN_ROWS, guarded_answer, sql_that_ran  # noqa: E402
 
 from main.config import OUTPUT_DIR, Settings  # noqa: E402
@@ -36,10 +37,13 @@ from main.model import GatewayModel, StubModel  # noqa: E402
 USER = "c-0007"
 
 
-def load_cases() -> list[dict]:
+def load_cases(chat: str = "shop") -> list[dict]:
+    """The cases of one chat: "shop" (the entries with no `chat`) or "comments" (`chat = "comments"`)."""
     attacks = tomllib.loads((HERE / "attacks.toml").read_text())["attack"]
     normal = tomllib.loads((HERE / "normal.toml").read_text())["question"]
-    return [{**a, "set": "attack"} for a in attacks] + [{**q, "set": "normal"} for q in normal]
+    mine = lambda c: c.get("chat", "shop") == chat  # noqa: E731
+    return ([{**a, "set": "attack"} for a in attacks if mine(a)]
+            + [{**q, "set": "normal"} for q in normal if mine(q)])
 
 
 def own_rows_result(sql: str, paths: dict, user: str) -> list:
@@ -102,7 +106,19 @@ def gateway_model(s: Settings) -> GatewayModel:
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", choices=["stub", "gateway"], default="stub")
+    p.add_argument("--cases", choices=["shop", "comments", "all"], default="shop",
+                   help="shop: the shop chat's cases (the default); comments: the rider-comment cases; all: both")
+    p.add_argument("--runs", type=int, default=1, help="runs of each rider-comment case (3 for the eval)")
+    p.add_argument("--case", action="append", default=[], metavar="ID",
+                   help="with --cases comments: run only this rider-comment case (repeat for more); no eval verdict")
+    p.add_argument("--write-eval-cases", action="store_true",
+                   help="write evals/comment_attacks/cases.jsonl from the case files and stop")
     args = p.parse_args(argv)
+    if args.write_eval_cases:
+        print(write_eval_cases(load_cases("comments")))
+        return
+    if args.cases != "shop":
+        return main_comments(args)
     cases = load_cases()
     if args.model == "stub":
         model = StubModel({c["text"]: c["stub"] for c in cases})
@@ -120,6 +136,44 @@ def main(argv=None) -> None:
     if summary["attack_errors"] or summary["normal_errors"]:
         print(f"not tested, the model call failed: {summary['attack_errors']} of {summary['attacks']} attacks, "
               f"{summary['normal_errors']} of {summary['normal']} normal questions (outcome error; the reason "
+              f"column says why). The counts above leave them out: run again before you report the counts.")
+        sys.exit(1)
+
+
+def main_comments(args) -> None:
+    """--cases comments or all: the shop cases once (with all), the rider-comment cases --runs times; one log line
+    per case and run; the counts with typed attacks and attacks in data rows apart (README, "Injection through
+    stored text")."""
+    shop_rows = []
+    gateway = gateway_model(Settings()) if args.model == "gateway" else None
+    if args.cases == "all":
+        cases = load_cases()
+        model = gateway or StubModel({c["text"]: c["stub"] for c in cases})
+        shop_rows = run(model, cases)["rows"]
+    comment_cases = load_cases("comments")
+    if args.case:
+        unknown = set(args.case) - {c["id"] for c in comment_cases}
+        if unknown or args.cases != "comments":
+            sys.exit(f"--case needs --cases comments and ids of rider-comment cases; unknown: {sorted(unknown)}")
+        comment_cases = [c for c in comment_cases if c["id"] in args.case]
+    comment_rows = run_comments(comment_cases, runs=args.runs, model=gateway)
+    rows = shop_rows + comment_rows
+    # a run of chosen cases has a log of its own: it must not overwrite the log of a whole run
+    name = "-".join(args.case) if args.case else args.cases
+    log = OUTPUT_DIR / f"redteam-log-{name}-{args.model}.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    for r in shop_rows:
+        print(f"{r['set']:6} {r['id']:20} {r['outcome']:8} {r['stage'] or '-':6} {r['reason'][:60]}")
+    for r in comment_rows:
+        print(f"{r['set']:6} {r['id']:22} run {r['run']} {r['outcome']:11} {r['stage'] or '-':8} {r['reason'][:60]}")
+    verdict = None if args.case else eval_line(comment_rows, args.runs)
+    if verdict:
+        print(verdict)
+    print(comment_counts_line(rows))
+    errors = [r for r in rows if r["outcome"] == "error"]
+    if errors:
+        print(f"not tested, the model call failed: {len(errors)} of {len(rows)} runs (outcome error; the reason "
               f"column says why). The counts above leave them out: run again before you report the counts.")
         sys.exit(1)
 

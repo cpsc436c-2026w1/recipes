@@ -24,7 +24,14 @@ def before_all(context):
 
 
 def before_scenario(context, scenario):
-    example_env()
+    live = "live" in scenario.effective_tags
+    if live and os.environ.get("LIVE") == "1":
+        # A @live scenario calls the deployed function and the gateway: it runs on the shell's settings (PREFIX, AWS
+        # credentials, COURSE_GATEWAY_URL, KB_MCP_TOKEN), not on .env.example's offline ones.
+        os.environ.clear()
+        os.environ.update(context.saved_env)
+    else:
+        example_env()
     context.tmp = Path(tempfile.mkdtemp(prefix="agent-agentcore-"))
     context.behaviour = "careful"
     context.request_id = None
@@ -36,6 +43,8 @@ def before_scenario(context, scenario):
     context.result = None
     context.error = None
     context.aws = None
+    if live and os.environ.get("LIVE") != "1":
+        scenario.skip("@live: runs against the sandbox with LIVE=1 (ext-sdk-lambda/README.md, Run it live)")
 
 
 def after_scenario(context, scenario):

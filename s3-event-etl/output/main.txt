@@ -1,0 +1,116 @@
+$ ENGINE=glue scripts/etl.py up
+created  s3://recipe-s3etl-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+run log  recipe-s3etl-runs
+job      recipe-s3etl-etl: Glue 5.0, 2 G.1X workers, timeout 10 min, no retries, 1 run at a time
+trigger  recipe-s3etl-s3-event-etl: raw/trip-events/*.jsonl -> recipe-s3etl-etl-check
+exit 0
+created  Athena workgroup recipe-s3etl-wg
+$ sim/land_cases.py --run-id live045948
+landed   111 objects, 2515 deliveries; 3 lines of 20261123T0504Z-live045948.jsonl broken
+$ wait for the checks (staged objects of this run, as many as landed: 109 to 111)
+staged 111 of 111
+$ quarantine
+2026-11-22 21:00:25        979 quarantine/trip-events-rows/dt=2026-11-23/20261123T0504Z-live045948-00000000000000006B03C8651C0E0331.jsonl
+SUCCEEDED	103	207.0	10	None
+$ aws lambda invoke recipe-s3etl-etl-sweep
+finished run 2026-11-23T05:00:24.412Z
+no start: the last run started 2 min ago, under the gap of 360 min: the sweep will start one
+REPORT RequestId: 3a72d5c6-ecc5-4f7c-a4b9-6775718dbe91	Duration: 8077.89 ms	Billed Duration: 8078 ms	Memory Size: 128 MB	Max Memory Used: 114 MB	
+$ sim/land_cases.py --again, and the created event of the copied object sent again
+copied   raw/trip-events/dt=2026-11-23/20261123T0530Z-live045948.jsonl -> raw/trip-events/dt=2026-11-23/20261123T0530Z-live045948-again.jsonl
+repeat   raw/trip-events/dt=2026-11-23/20261123T0530Z-live045948.jsonl
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 ETL_FAULT=after-merge scripts/etl.py sweep
+started  run 2026-11-23T05:02:59.203Z: Glue job recipe-s3etl-etl, run jr_d355c992dc77d800e9451554663da0a7467b0fcfcae192219f027a30ac260d2b
+FAILED	91	183.0	10	RuntimeError: step=manifest: FAIL_AFTER_MERGE: stopped after the commit, before the manifest
+$ aws lambda invoke recipe-s3etl-etl-sweep
+failed   run 2026-11-23T05:02:59.203Z: step manifest: RuntimeError: step=manifest: FAIL_AFTER_MERGE: stopped after the commit, before the manifest
+no start: the last run started 1 min ago, under the gap of 360 min: the sweep will start one
+REPORT RequestId: 2958ca73-7bd6-4674-8a06-95d949609614	Duration: 8858.22 ms	Billed Duration: 8859 ms	Memory Size: 128 MB	Max Memory Used: 124 MB	
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 ETL_FAULT=hang ETL_FAULT_TIMEOUT_MIN=1 scripts/etl.py sweep
+skipped  run 2026-11-23T05:04:53.602Z: ConcurrentRunsExceededException
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 ETL_FAULT=hang ETL_FAULT_TIMEOUT_MIN=1 scripts/etl.py sweep
+started  run 2026-11-23T05:05:16.401Z: Glue job recipe-s3etl-etl, run jr_9789f959d72df3df0251ac3f616c4175612f47833bc40af3695ff189ea4633ca
+TIMEOUT	70	141.0	1	None
+$ aws lambda invoke recipe-s3etl-etl-sweep
+failed   run 2026-11-23T05:05:16.401Z: step load: TIMEOUT
+no start: the last run started 1 min ago, under the gap of 360 min: the sweep will start one
+REPORT RequestId: bfcc1bdd-3711-48c3-8b89-34945ab2a929	Duration: 10650.47 ms	Billed Duration: 10651 ms	Memory Size: 128 MB	Max Memory Used: 127 MB	
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 ETL_FAULT=after-merge scripts/etl.py sweep
+skipped  run 2026-11-23T05:07:12.208Z: ConcurrentRunsExceededException
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 ETL_FAULT=after-merge scripts/etl.py sweep
+started  run 2026-11-23T05:07:35.031Z: Glue job recipe-s3etl-etl, run jr_83a3d139f6704756325e1d008a9461ee6f6618c03561c408dad4ffcbc93981a9
+FAILED	94	188.0	10	RuntimeError: step=manifest: FAIL_AFTER_MERGE: stopped after the commit, before the manifest
+$ aws lambda invoke recipe-s3etl-etl-sweep
+failed   run 2026-11-23T05:07:35.031Z: step manifest: RuntimeError: step=manifest: FAIL_AFTER_MERGE: stopped after the commit, before the manifest
+no start: the last run started 3 min ago, under the gap of 360 min: the sweep will start one
+REPORT RequestId: a4ede381-eaa0-4008-a21e-abe777f90ccf	Duration: 8876.57 ms	Billed Duration: 9404 ms	Memory Size: 128 MB	Max Memory Used: 114 MB	Init Duration: 526.57 ms	
+$ scripts/etl.py sweep   # 3 failed runs in a row
+no start: held after 3 failed runs
+$ scripts/etl.py resume
+resumed: the next sweep may start a run
+$ ETL_MIN_GAP_MIN=0 MAX_RUNS_PER_DAY=10 scripts/etl.py sweep
+started  run 2026-11-23T05:10:49.186Z: Glue job recipe-s3etl-etl, run jr_6123161a197d29971c79052735ba7f7c669ac14a0877c782596acd1dc585de74
+SUCCEEDED	68	137.0	10	None
+$ aws lambda invoke recipe-s3etl-etl-sweep
+finished run 2026-11-23T05:10:49.186Z
+sweep    nothing waiting
+REPORT RequestId: 34f6a70d-68ae-47ce-9e46-ca523e022287	Duration: 6891.59 ms	Billed Duration: 6892 ms	Memory Size: 128 MB	Max Memory Used: 116 MB	
+$ scripts/etl.py runs
+run      jr_6123161a1  SUCCEEDED   68 s     137 DPU-s (DPUSeconds)  0.0167 USD (0.0243 CAD)
+run      jr_83a3d139f  FAILED      94 s     188 DPU-s (DPUSeconds)  0.0230 USD (0.0333 CAD)
+run      jr_9789f959d  TIMEOUT     70 s     141 DPU-s (DPUSeconds)  0.0172 USD (0.0250 CAD)
+run      jr_d355c992d  FAILED      91 s     183 DPU-s (DPUSeconds)  0.0224 USD (0.0324 CAD)
+run      jr_54c410ebe  SUCCEEDED  103 s     207 DPU-s (DPUSeconds)  0.0253 USD (0.0367 CAD)
+total    0.1046 USD (0.1517 CAD), 0.35% of the 30 USD lease
+$ the run log (etl)
+2026-11-23T05:00:24.412Z	finished	None
+2026-11-23T05:02:59.203Z	failed	manifest
+2026-11-23T05:04:53.602Z	skipped	start
+2026-11-23T05:05:16.401Z	failed	load
+2026-11-23T05:07:12.208Z	skipped	start
+2026-11-23T05:07:35.031Z	failed	manifest
+2026-11-23T05:10:45.966Z	skipped	None
+2026-11-23T05:10:49.186Z	finished	None
+$ count: rows, event_ids, from the copy, source_key as a path
+SUCCEEDED	2825
+_col0	_col1	_col2	_col3	2508	2508	0	0
+$ clean_up.py
+would remove s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+dry run: nothing was deleted. Run again with --yes to delete.
+$ clean_up.py --yes
+removed  notification entry recipe-s3etl-s3-event-etl of recipe-s3etl-lake-111122223333 (the other entries kept)
+removed  schedule group recipe-s3etl-s3-event-etl and its schedule
+removed  function recipe-s3etl-etl-check
+removed  log group /aws/lambda/recipe-s3etl-etl-check
+removed  function recipe-s3etl-etl-sweep
+removed  log group /aws/lambda/recipe-s3etl-etl-sweep
+removed  Glue job recipe-s3etl-etl
+removed  role recipe-s3etl-etl-check-role
+removed  role recipe-s3etl-etl-sweep-role
+removed  role recipe-s3etl-etl-glue-role
+removed  role recipe-s3etl-etl-scheduler-role
+removed  topic recipe-s3etl-etl-alerts
+removed  run log items etl, etl-object, etl-lock of recipe-s3etl-runs
+removed  table recipe-s3etl-runs
+removed  Glue table recipe_s3etl_lake.trip_events_clean
+absent   Glue table recipe_s3etl_lake.trip_events_stage
+removed  s3://recipe-s3etl-lake-111122223333/stage/trip-events/
+removed  s3://recipe-s3etl-lake-111122223333/quarantine/trip-events-rows/
+removed  s3://recipe-s3etl-lake-111122223333/lake/etl-state/
+removed  s3://recipe-s3etl-lake-111122223333/lake/trip_events_clean/
+removed  s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+exit 0
+$ what is left
+[]
+[]
+[
+    [
+        "recipe-s3etl-s3-event-etl",
+        "DELETING"
+    ]
+]
+
+# After this run: scripts/lake.py down --yes removed the bucket and the workgroup (not captured here); the Athena
+# run (output/main-athena.txt) started from an empty account. Five Glue runs: 856 DPU-seconds, 0.105 USD.

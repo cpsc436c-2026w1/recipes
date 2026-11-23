@@ -29,13 +29,14 @@ MAX_RATE_LIMIT_WAIT_S = 65  # the longest one wait for the rate limit (ours; the
 DEFAULT_RATE_LIMIT_WAIT_S = 5  # the wait when the refusal carries no Retry-After (ours; the same as llm-gateway)
 RATE_LIMIT_CODES = ("rate_limit_exceeded", "upstream_rate_limited")  # the refusals that clear by waiting
 
-# Decision (bounded work): an output-token cap on every model call. A reply here is a sentence and a SQL query, and 400
-# tokens hold that. A model that reasons before it answers spends part of the cap on reasoning, so it gets more room:
-# with a cap of 150, qwen3.8-27b's replies came back empty (finish_reason "length"); with 600, one answer of two
-# sentences used 330 completion tokens, 277 of them reasoning
-# (../../hybrid-retrieval-eval/output/routing-gateway-150-cap.txt). Add a model to the table when it does the same.
-DEFAULT_MAX_TOKENS = 400
-MAX_TOKENS_BY_MODEL = {"qwen3.8-27b": 600}
+# Decision (bounded work): an output-token cap on every model call, 16384, the course's cap for gateway calls. A model
+# that reasons before it answers spends part of the cap on reasoning: with 150, qwen3.8-27b's replies came back empty
+# (finish_reason "length", ../../hybrid-retrieval-eval/output/routing-gateway-150-cap.txt), and with 600 it cut 9 of
+# the 16 rider-comment replies of ext-guardrails-redteam (2026-11-23). The cap bounds a runaway reply; the cost of a
+# call is what the model writes, so a higher cap costs nothing for a reply that stops on its own. A model that needs
+# another cap goes in the table.
+DEFAULT_MAX_TOKENS = 16384
+MAX_TOKENS_BY_MODEL: dict[str, int] = {}
 CAP_USED_UP = "the model used its token cap before answering"  # an empty reply that stopped at the cap (chat.py)
 
 
@@ -94,20 +95,31 @@ class GatewayModel:
         # more, because a case that ends in a rate-limit refusal was not tested.
         self.rate_limit_waits = rate_limit_waits
         self.sleep = sleep
+        # Seconds the next request may take, or None for the client's timeout_s. ext-athena-engine sets it before
+        # each call to the smaller of 6 s and the time left to the question's deadline (httpx takes a timeout per
+        # request; it bounds each wait of the request, not the whole of it).
+        self.request_timeout_s: float | None = None
         self.http = httpx.Client(base_url=base_url, timeout=timeout_s,
                                  headers={"Authorization": f"Bearer {token}"})
 
-    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> ModelReply:
+    def chat(self, messages: list[dict], tools: list[dict] | None = None,
+             response_format: dict | None = None) -> ModelReply:
+        """`response_format` (OpenAI chat format, for example a JSON schema) is sent as given. On the course gateway it
+        is enforced, and a reply under it calls no tool, so a caller sends it without tools (ext-guardrails-redteam,
+        the repair call of a reply that is not JSON)."""
         body = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, **sampling(self.model)}
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
-        r = self.http.post("/chat/completions", json=body)
+        if response_format:
+            body["response_format"] = response_format
+        per_request = {} if self.request_timeout_s is None else {"timeout": self.request_timeout_s}
+        r = self.http.post("/chat/completions", json=body, **per_request)
         for _ in range(self.rate_limit_waits):
             if not _rate_limited(r):
                 break
             self.sleep(min(_retry_after_s(r), MAX_RATE_LIMIT_WAIT_S))
-            r = self.http.post("/chat/completions", json=body)
+            r = self.http.post("/chat/completions", json=body, **per_request)
         if r.status_code in (401, 403, 429):
             # 401: missing or unknown key. 403: revoked or expired key, or a model this key may not use.
             # 429: code rate_limit_exceeded (wait for Retry-After) or budget_exhausted (your key's budget is spent).

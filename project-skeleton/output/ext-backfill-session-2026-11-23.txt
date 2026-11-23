@@ -1,0 +1,127 @@
+# ext-backfill, one live run, step by step (ca-central-1, PREFIX=recipe-backfill), before ext-backfill/live_run.sh
+# ran the same steps end to end (output/ext-backfill.txt). Account masked as 111122223333.
+# The first CTAS was refused before the fix of statements.typed (timestamp(6) into a Hive Parquet table):
+#   RuntimeError: Athena ctas FAILED: NOT_SUPPORTED: Incorrect timestamp precision for timestamp(6); the configured
+#   precision is MILLISECONDS; column name: requested_time.
+# Everything below ran after that fix. The clean-up ran as the first step of cost-and-teardown's teardown
+# (cost-and-teardown/output/teardown-backfill.txt); its lines are repeated at the end.
+
+$ backfill.py --target aws --source course --from 2024-03-01 --to 2024-03-30
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+run      bf-20261123T031904Z-36b3: course source, 2024-03-01 to 2024-03-30
+athena   query      recipe-backfill-wg       85,619,001 bytes scanned  a3fd076a-55e4-4510-b078-76ed6891b352
+days     30 asked for: 0 already complete, 30 missing, 0 short
+athena   ctas       recipe-backfill-ctas-wg  509,127,053 bytes scanned  0421cab4-fb17-4b6a-9464-3534d3c78930
+ctas     2024-03-01 to 2024-03-30: 30 days
+athena   query      recipe-backfill-wg                0 bytes scanned  7bd1baef-530b-4c6e-8543-b1477d5b7860
+counts   30 days, 0 differ; 524629 rows in trips_history, 524629 in the source
+view     not made: no live table recipe_backfill_lake.trips yet and no --live-from
+scanned  594,746,054 bytes in Athena in this run
+exit 0
+
+$ backfill.py --target aws --source course --from 2024-03-01 --to 2024-04-02   # one INSERT INTO a month
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+run      bf-20261123T031931Z-4d40: course source, 2024-03-01 to 2024-04-02
+athena   query      recipe-backfill-wg      213,387,271 bytes scanned  444fc572-9481-4ad2-b0cf-796fa0b76670
+athena   query      recipe-backfill-wg                0 bytes scanned  d2f287b7-fa93-4718-822c-9160edc47e77
+days     33 asked for: 30 already complete, 3 missing, 0 short
+athena   insert     recipe-backfill-ctas-wg  206,592,736 bytes scanned  ab766be8-ba24-46e9-9c6d-22909c324011
+insert   2024-03-31 to 2024-03-31: 1 day
+athena   insert     recipe-backfill-ctas-wg  239,275,571 bytes scanned  a7821c24-215a-44a5-b243-024452730688
+insert   2024-04-01 to 2024-04-02: 2 days
+athena   query      recipe-backfill-wg                0 bytes scanned  625f59e0-e3b5-4293-b8cd-d015bc6f560d
+counts   33 days, 0 differ; 574665 rows in trips_history, 574665 in the source
+view     not made: no live table recipe_backfill_lake.trips yet and no --live-from
+scanned  659,255,578 bytes in Athena in this run
+exit 0
+
+$ aws s3 rm (one of the 8 files of requested_day=2024-03-14: a short day)
+delete: s3://recipe-backfill-lake-111122223333/history/trips/requested_day=2024-03-14/20261123_031912_00565_e4vak_f18eec9d-e4dc-4e3b-8f04-4c620d7ac1b8
+$ backfill.py --target aws --check-only --from 2024-03-01 --to 2024-04-02
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+athena   query      recipe-backfill-wg      213,387,271 bytes scanned  2fbc88f1-6798-4d8f-a05e-71479d4720d9
+athena   query      recipe-backfill-wg                0 bytes scanned  83d52d1a-d20f-437b-8c85-36b9323e181c
+differ   2024-03-14: 18682 rows, the source has 19074
+counts   33 days, 1 differ; 574273 rows in trips_history, 574665 in the source
+scanned  213,387,271 bytes in Athena in this run
+exit 1
+$ backfill.py --target aws --source course --from 2024-03-01 --to 2024-04-02   # the short day re-copied
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+run      bf-20261123T032026Z-eb3d: course source, 2024-03-01 to 2024-04-02
+athena   query      recipe-backfill-wg      213,387,271 bytes scanned  e4c743be-a94b-426d-bb27-f7fd5d437a68
+athena   query      recipe-backfill-wg                0 bytes scanned  304f65ee-54d6-4308-a00e-b83bed79e8a4
+days     33 asked for: 32 already complete, 0 missing, 1 short
+athena   delete-day recipe-backfill-ctas-wg            0 bytes scanned  7735c4a9-96d5-40fd-bd9d-39a41bffda8e
+deleted  requested_day=2024-03-14: 18682 rows (the source has 19074), 7 files and its partition
+athena   insert     recipe-backfill-ctas-wg  131,505,052 bytes scanned  908f1d40-d0f4-4bdc-a881-fb8f23d3e9fd
+insert   2024-03-14 to 2024-03-14: 1 day
+athena   query      recipe-backfill-wg                0 bytes scanned  910fc914-585b-4248-8fb0-cfe946a69822
+counts   33 days, 0 differ; 574665 rows in trips_history, 574665 in the source
+view     not made: no live table recipe_backfill_lake.trips yet and no --live-from
+scanned  344,892,323 bytes in Athena in this run
+exit 0
+
+$ backfill.py --target aws --to-dynamodb
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+read     574665 rows of trips_history
+wrote    574665 lines as DYNAMODB_JSON under s3://recipe-backfill-lake-111122223333/imports/trips-by-id/bf-20261123T032056Z-2d0e/
+import   01795404099388-01274f27 started: table recipe-backfill-trips-by-id
+logs     /aws-dynamodb/imports: lines kept 7 days
+574665 items imported, 574665 rows read, 0 errors
+615.80 s
+exit 0
+
+
+$ aws dynamodb describe-import (status, ProcessedSizeBytes, processed, imported, errors, start, end)
+COMPLETED	249742173	574665	574665	0	2026-11-22T19:21:39.388000-08:00	2026-11-22T19:31:09.205000-08:00
+
+$ backfill.py --target aws --to-dynamodb --from 2024-04-02 --to 2024-04-02 --load-id batch-0402   # a table that exists: BatchWriteItem
+exists   s3://recipe-backfill-lake-111122223333 (created by lake.py up)
+created  workgroup recipe-backfill-wg
+created  workgroup recipe-backfill-ctas-wg
+read     21070 rows of trips_history
+wrote    21070 items to recipe-backfill-trips-by-id in 843 BatchWriteItem calls
+21070 items of load batch-0402, 21070 rows read
+15.65 s
+exit 0
+
+
+$ clean_up.py --yes   (step "ext-backfill" of the teardown) and the proof
+kept     S3 bucket recipe-backfill-lake-111122223333 (scripts/lake.py down)
+kept     Athena workgroups recipe-backfill-wg and recipe-backfill-ctas-wg (scripts/lake.py down)
+kept     Athena data source course (the course's)
+kept     Glue table recipe_backfill_lake.trips (scheduled-merge's)
+removed  DynamoDB table recipe-backfill-trips-by-id
+removed  Glue table recipe_backfill_lake.trips_history
+removed  s3://recipe-backfill-lake-111122223333/history/trips/: 321 objects
+removed  s3://recipe-backfill-lake-111122223333/imports/trips-by-id/: 6 objects
+removed  Glue database recipe_backfill_lake
+absent   Glue table recipe_backfill_lake.trips_all
+absent   Glue table recipe_backfill_lake.history_raw
+checked  nothing of ext-backfill is left (a table being deleted counts as gone)
+absent   .local/ext-backfill/
+
+$ what is left of recipe-backfill (after the teardown)
+== recipe-backfill
+tag Team=recipe-backfill:        
+schedule groups:    
+buckets:            
+Glue databases:     
+workgroups:         
+IAM roles:          
+functions:          
+tables:             
+Glue jobs:          
+topics:             
+streams:            
+log groups:         

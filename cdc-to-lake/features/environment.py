@@ -5,6 +5,9 @@ folder. A run with `--target aws` is called inside moto too, so its boto3 calls 
 does not play (Athena's answers, a Firehose stream that rejects records, a refused call, a resource that is still
 being deleted) is put in at the one place where boto3 hands a call to the network (features/support.py, Calls).
 The lake of the offline runs is the recipe's own: a real Iceberg table on disk and DuckDB (main/lake.py).
+
+The examples tagged @live are left out (behave.ini: default_tags = not @live). `uv run behave --tags=@live` runs
+them against AWS with the shell's credentials and `$PREFIX-live`, without moto (features/live.py).
 """
 
 from __future__ import annotations
@@ -18,17 +21,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 for folder in (ROOT / "features", ROOT / "tests", ROOT / "ext-lag-alarm", ROOT / "ext-rollback-or-schema",
-               ROOT / "ext-maintenance", ROOT):
+               ROOT / "ext-maintenance", ROOT / "ext-scheduled-merge", ROOT / "scripts", ROOT / "sim", ROOT):
     sys.path.insert(0, str(folder))
 
 OFFLINE = {"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing", "AWS_SESSION_TOKEN": "testing",
-           "AWS_DEFAULT_REGION": "ca-central-1", "AWS_EC2_METADATA_DISABLED": "true", "PREFIX": "recipe-ana"}
+           "AWS_DEFAULT_REGION": "ca-central-1", "AWS_EC2_METADATA_DISABLED": "true", "PREFIX": "recipe-ana",
+           "TEAM": "recipe-ana", "OWNER": "tester"}
 NOT_SET = ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_REGION", "GATEWAY_URL", "COURSE_MCP_TOKEN", "COURSE_GATEWAY_URL", "KB_MCP_TOKEN", "BUCKET",
            "LAMBDA_ROLE_ARN", "FIREHOSE_ROLE_ARN", "SCHEDULER_ROLE_ARN", "BUFFER_SECONDS", "LAG_LIMIT_SECONDS",
-           "ATHENA_WORKGROUP", "DELIVERY_STREAM")
+           "ATHENA_WORKGROUP", "DELIVERY_STREAM", "PURPOSE", "K_DAYS", "PERIOD", "MAX_OBJECTS", "MERGE_FROM",
+           "MAX_FILES_PER_QUERY", "QUERY_DAYS", "CLOSE_AFTER_HOURS", "COMPACT_MAX_DAYS", "ICEBERG_TABLES", "RAW_TABLE",
+           "MERGE_READS_RAW", "MAX_MEASURE_USD")
 
 
 def before_all(context):
+    import live
+    live.REAL_ENV.update(os.environ)      # the shell's environment, for the @live examples (features/live.py)
     logging.getLogger("botocore").setLevel(logging.WARNING)
     logging.getLogger("pyiceberg").setLevel(logging.ERROR)
     # When a table with an event source mapping gets a write, moto starts the Lambda function in a Docker
@@ -45,10 +53,17 @@ def before_scenario(context, scenario):
     import support
     from moto import mock_aws
 
+    context.live = "live" in scenario.effective_tags
+    context.printed, context.exit_code, context.error, context.sleeps = "", None, None, []
+    if context.live:                     # AWS itself, with $PREFIX-live: no moto, no stand-ins (features/live.py)
+        import live
+        live.use_live_env()
+        return
     os.environ.update(OFFLINE)
     for name in NOT_SET:
         os.environ.pop(name, None)
     context.tmp = Path(tempfile.mkdtemp(prefix="cdc-to-lake-scenario-"))
+    os.environ["LEDGER"] = str(context.tmp / "ledger.jsonl")     # the helpers' creation ledger, the scenario's own
     context.moto = mock_aws()
     context.moto.start()
     context.calls = support.Calls()
@@ -58,6 +73,10 @@ def before_scenario(context, scenario):
 
 
 def after_scenario(context, scenario):
+    if context.live:
+        import live
+        live.capture(context, scenario)
+        return
     context.calls.stop()
     context.moto.stop()
     shutil.rmtree(context.tmp, ignore_errors=True)

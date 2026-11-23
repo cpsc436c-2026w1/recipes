@@ -144,7 +144,11 @@ def run_clean_up(context, prefix: str | None = PREFIX):
     else:
         os.environ["PREFIX"] = prefix
     sys.modules.pop("clean_up", None)
-    return run(context, runpy.run_path, str(ROOT / "clean_up.py"), run_name="__main__")
+    saved, sys.argv = sys.argv, [str(ROOT / "clean_up.py"), "--yes"]    # a bare run only lists (the contract)
+    try:
+        return run(context, runpy.run_path, str(ROOT / "clean_up.py"), run_name="__main__")
+    finally:
+        sys.argv = saved
 
 
 def ddb():

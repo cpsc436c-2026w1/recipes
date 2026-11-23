@@ -4,9 +4,9 @@ name = "dashboard-chat"
 format = "main-scenario"
 task = "Users ask plain-language questions over a team's table; the model writes read-only SQL through one tool, app code checks and runs it in DuckDB, and each question leaves one trace item in DynamoDB"
 shapes = ["lakehouse-first", "operational-first", "genai-first"]
-extensions = ["Chat on the dashboard", "Answer or retrieval cache", "Guardrails with a red-team log", "Trace analysis and alarms"]
+extensions = ["Chat on the dashboard", "Answer or retrieval cache", "Guardrails with a red-team log", "Trace analysis and alarms", "Athena as the chat's engine"]
 lectures = ["L15", "L16"]
-core = ["DuckDB", "Parquet", "DynamoDB", "CloudWatch", "SNS", "course LLM gateway"]
+core = ["DuckDB", "Parquet", "DynamoDB", "CloudWatch", "SNS", "course LLM gateway", "Athena", "Lambda", "IAM"]
 secondary = ["sqlglot", "Shiny Express", "querychat", "chatlas", "ECS on Fargate"]
 region = "ca-central-1"
 cost_one_run = "0.000287 CAD of gateway budget for the six questions (measured, output/main-gateway.txt); DynamoDB writes far below one cent (AWS price list); alarms 0.10 USD per alarm-month and metrics 0.30 USD per metric-month while they exist (AWS bulk price list, ca-central-1, published 2026-11-04)"
@@ -27,6 +27,10 @@ name = "Who may see whose rows is enforced where the query runs: an engine that 
 source = "Agentic AI Lens AGENTREL02-BP02; Generative AI Lens GENSEC05-BP01"
 
 [[practices]]
+name = "Text other people wrote reaches the model only through a tool whose SQL the code writes, as marked data; the reply's citations and numbers are checked in code, and typed attacks and attacks in data rows are counted apart"
+source = "AWS Prescriptive Guidance, security reference architecture for generative AI (data and retrieval); Generative AI Lens GENSEC02-BP01; Agentic AI Lens AGENTREL02-BP02; L15, L16"
+
+[[practices]]
 name = "Bounded work per question: a cap on model calls, output tokens, rows and the time of one call and one query"
 source = "Generative AI Lens GENCOST05-BP01, GENREL03-BP02, GENCOST03-BP01, GENCOST03-BP02"
 
@@ -35,11 +39,19 @@ name = "Model calls through the model gateway with a per-student key; one trace 
 source = "L16 (model gateway); AI Engineering ch. 10; Generative AI Lens GENOPS03-BP02"
 
 [instruments]                     # the reusable files a team copies; paths inside this folder
-files = ["main/sqlcheck.py", "main/engine.py", "main/chat.py", "main/model.py", "main/traces.py", "ext-answer-cache/cache.py", "ext-guardrails-redteam/guards.py", "ext-guardrails-redteam/redteam.py", "ext-trace-alarms/spans.py", "ext-trace-alarms/alarms.py", "ext-trace-alarms/analyze.py", "ext-feedback/feedback.py", "ext-shiny-app/app.py", "ext-shiny-app/source.py", "ext-shiny-app/client.py", "ext-shiny-app/fargate/deploy.sh"]
+files = ["main/sqlcheck.py", "main/engine.py", "main/chat.py", "main/model.py", "main/traces.py", "ext-answer-cache/cache.py", "ext-guardrails-redteam/guards.py", "ext-guardrails-redteam/redteam.py", "ext-guardrails-redteam/comments_tool.py", "ext-guardrails-redteam/comments_chat.py", "ext-guardrails-redteam/comment_redteam.py", "ext-trace-alarms/spans.py", "ext-trace-alarms/alarms.py", "ext-trace-alarms/analyze.py", "ext-feedback/feedback.py", "ext-shiny-app/app.py", "ext-shiny-app/source.py", "ext-shiny-app/client.py", "ext-shiny-app/fargate/deploy.sh", "ext-athena-engine/athena_engine.py", "ext-athena-engine/query_fn.py", "ext-athena-engine/chat_athena.py", "ext-athena-engine/deploy.py", "ext-athena-engine/trip_counts.py"]
+
+[[practices]]
+name = "Limits outside the model on a query engine that bills per scan: a workgroup cutoff, a query counter, one deadline for every wait, a daily cap reserved before each query"
+source = "Generative AI Lens GENCOST05-BP01, GENREL03-BP02; Athena per-query data usage controls"
+
+[[practices]]
+name = "The chat's queries run as a role that can read two tables and start queries in one workgroup only"
+source = "Generative AI Lens GENSEC01-BP03; Athena example workgroup policies"
 
 [validates]                       # how a team shows it works
-command = "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub"
-shows = "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused"
+command = "uv run pytest -q && uv run python ext-guardrails-redteam/redteam.py --model stub && uv run python ext-guardrails-redteam/redteam.py --model stub --cases all --runs 3"
+shows = "the SQL check refuses writes and file reads, the reply's number equals the DuckDB rows, traces are written, and the red-team log counts attacks that got through and normal questions refused; with the rider comments, typed attacks and attacks in data rows apart, and the verdict of the eval comment-attacks"
 
 [commands]
 setup = "uv sync"
@@ -48,13 +60,14 @@ scenarios = "uv run behave"           # the README's requirements, as behave sce
 run = "uv run python -m main.run --target aws"
 run_offline = "uv run python -m main.run --target local --model stub"
 app_offline = "APP_MODEL=stub uv run shiny run ext-shiny-app/app.py --port 8000"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # without --yes it lists only
 
 [extension_commands]
 ext-answer-cache = "uv run python ext-answer-cache/cache_run.py --target aws"
-ext-guardrails-redteam = "uv run python ext-guardrails-redteam/redteam.py --model gateway"
+ext-guardrails-redteam = "uv run python ext-guardrails-redteam/redteam.py --model gateway"   # rider comments: --cases all --runs 3 (bash ext-guardrails-redteam/live_run.sh); run on the gateway 2026-11-23, 0.0098 CAD, the eval passes on qwen3.6 and qwen3.8; the eval's gate: uv run behave --tags=live
 ext-trace-alarms = "uv run python ext-trace-alarms/trace_run.py --target aws"
 ext-feedback = "uv run python ext-feedback/feedback_run.py --target aws report"
+ext-athena-engine = "uv run python ext-athena-engine/run_athena.py --target aws"   # after deploy.py; offline: --target local (run live by the course 2026-11-23: output/ext-athena-engine-live.txt)
 ext-shiny-app = "uv run python ext-shiny-app/browser_check.py"   # offline; on Fargate: bash ext-shiny-app/fargate/deploy.sh, then start.sh (not run by the course yet)
 
 [env]
@@ -71,6 +84,8 @@ dynamodb_tables = ["$PREFIX-chat-traces", "$PREFIX-chat-cache", "$PREFIX-chat-sp
 cloudwatch_alarms = ["$PREFIX-chat-errors", "$PREFIX-chat-slow-answers", "$PREFIX-chat-daily-cost"]
 sns_topics = ["$PREFIX-chat-alarms"]
 # ext-shiny-app/fargate/deploy.sh creates these; ext-shiny-app/fargate/teardown.sh removes them, clean_up.py does not
+# ext-athena-engine/deploy.py creates these; ext-athena-engine/clean_up.py --yes removes them, clean_up.py does not
+athena = ["workgroup $PREFIX-chat-wg", "function $PREFIX-chat-query", "role $PREFIX-chat-reader", "DynamoDB table $PREFIX-chat-usage", "log group /aws/lambda/$PREFIX-chat-query", "Glue database <prefix>_chat (tables trips, zones)", "prefixes chat/ and athena-results/chat-wg/ in $PREFIX-lake-<account> (the bucket is scripts/lake.py's)"]
 fargate = ["secret $PREFIX-chat-app/token", "role $PREFIX-chat-app-exec", "ECR repository, ECS cluster, security group and task definition $PREFIX-chat-app", "log group /ecs/$PREFIX-chat-app"]
 
 [constraints]

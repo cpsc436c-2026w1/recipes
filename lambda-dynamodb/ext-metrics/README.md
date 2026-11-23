@@ -57,7 +57,7 @@ export PREFIX=recipe-ana AWS_REGION=ca-central-1
 bash ext-metrics/run.sh
 ```
 
-This extension has nothing to remove. The log group goes with `bash clean_up.sh`. See the cost below.
+This extension has nothing to remove. The log group goes with `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes`. See the cost below.
 
 ## What you should see
 
@@ -71,4 +71,4 @@ missing.
 ## Cost
 
 Reading logs and metrics this way is well under one cent. Log storage bills 0.033 USD per GB-month in ca-central-1
-while the log group exists (AWS bulk price list); `bash clean_up.sh` deletes it.
+while the log group exists (AWS bulk price list); `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` deletes it.

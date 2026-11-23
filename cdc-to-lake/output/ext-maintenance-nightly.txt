@@ -1,0 +1,34 @@
+Live run of the nightly compaction (ext-maintenance), 2026-11-23 UTC, PREFIX=recipe-lake, ca-central-1 (account masked).
+After the scheduled-merge run in the same bucket: its hourly schedule was disabled and its JSON objects of
+dt=2026-11-23 deleted first, because trip_events (JSON) and trip_events_parquet read the same raw/trip-events/.
+
+$ uv run python ext-maintenance/land_parquet.py --days 3
+landed 7545 deliveries as 4320 Parquet files over 3 days (2026-11-20 to 2026-11-22)
+
+$ ICEBERG_TABLES=recipe_lake_lake.trips:requested_time uv run python ext-maintenance/maintenance.py --target aws --schedule
+exists   s3://recipe-lake-lake-111122223333 (created by lake.py up)
+created  Athena workgroup recipe-lake-wg
+created  Athena workgroup recipe-lake-ctas-wg
+created  table recipe_lake_lake.trip_events_parquet (registered partitions)
+ready    function recipe-lake-compact-days (900 s, asynchronous retries 0, MERGE_READS_RAW=1)
+created  schedule recipe-lake-maintenance-compaction/recipe-lake-compact-schedule: cron(0 3 * * ? *) America/Vancouver
+created  schedule recipe-lake-maintenance-compaction/recipe-lake-lake-vacuum: cron(0 4 * * ? *) America/Vancouver
+ready    alarm recipe-lake-compact-errors: Errors GreaterThanOrEqualToThreshold 1 over 86400 s
+ready    alarm recipe-lake-compact-missed: Invocations LessThanThreshold 1 over 86400 s
+
+$ uv run python ext-maintenance/maintenance.py --target aws --register-partitions
+projection.enabled = false on recipe_lake_lake.trip_events_parquet; registered 10 partitions
+
+$ aws lambda invoke --function-name $PREFIX-compact-days --cli-binary-format raw-in-base64-out --payload '{"mode": "compact"}' night.json && cat night.json
+{"run_id": "2026-11-23T02:14:52.329Z", "run_state": "finished", "files_by_day": {"recipe_lake_lake.trips": {"2026-11-23": 1}, "recipe_lake_lake.trip_events_parquet": {"2026-11-20": 1440, "2026-11-21": 1440, "2026-11-22": 1440}}, "limit_per_day": 100, "marked": ["recipe_lake_lake.trip_events_parquet 2026-11-20", "recipe_lake_lake.trip_events_parquet 2026-11-21", "recipe_lake_lake.trip_events_parquet 2026-11-22"], "waiting": [], "moved_days": ["2026-11-20", "2026-11-21", "2026-11-22"], "registered": ["2026-11-30"]}
+(37 s from the terminal; REPORT: Duration 35742.57 ms, Billed 35803 ms, 256 MB, 112 MB used)
+
+After the night (S3 listings, Glue GetPartition, run log items moved-<day>):
+2026-11-20 raw 1440 files, compacted 1 file, partition at s3://recipe-lake-lake-111122223333/compacted/trip-events/dt=2026-11-20/20261123T021452Z/, rows 2515 before and 2515 after
+2026-11-21 raw 1440 files, compacted 1 file, partition at .../compacted/trip-events/dt=2026-11-21/20261123T021452Z/, rows 2515 before and 2515 after
+2026-11-22 raw 1440 files, compacted 1 file, partition at .../compacted/trip-events/dt=2026-11-22/20261123T021452Z/, rows 2515 before and 2515 after
+raw_delete of each day: waiting (deleted 24 hours after the move, and only when the merge's manifest lists the files merged: MERGE_READS_RAW=1)
+
+$ aws lambda invoke ... --payload '{"mode": "vacuum"}' vac.json && cat vac.json
+{"vacuumed": ["recipe_lake_lake.trips"]}
+(REPORT: Duration 2152.12 ms, Billed 2153 ms)

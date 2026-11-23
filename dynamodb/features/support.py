@@ -47,7 +47,10 @@ class Run:
 
 
 def _run(script: str, env: dict) -> subprocess.CompletedProcess:
-    return subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=TIMEOUT_S)
+    # the clean-up contract: clean_up.sh deletes only with --yes (with DRY=1 it still only prints)
+    args = ["--yes"] if script == "clean_up.sh" else []
+    return subprocess.run(["bash", str(RECIPE / script), *args], env=env, capture_output=True, text=True,
+                          timeout=TIMEOUT_S)
 
 
 def dry(context, script: str, **extra) -> Run:

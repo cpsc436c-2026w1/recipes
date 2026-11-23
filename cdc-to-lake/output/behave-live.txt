@@ -1,0 +1,75 @@
+--- The day bounds are accepted on a 2-day copy (passed) 2026-11-23T02:22:37Z
+recipe_lake_live_lake.trip_changes_probe: 1480 data files in one commit (2026-11-21 40, 2026-11-22 1440)
+optimized recipe_lake_live_lake.trip_changes_probe 2026-11-22
+trip_changes_probe data files per day after the night: {'2026-11-21': 40, '2026-11-22': 1}
+  athena SUCCEEDED          0 B     255 ms  CREATE TABLE IF NOT EXISTS recipe_lake_live_lake.trip_changes_probe (
+  athena SUCCEEDED        812 B     653 ms  SELECT CAST(partition.change_time_day AS varchar) AS day, file_count AS files FR
+  athena SUCCEEDED        812 B     586 ms  SELECT CAST(partition.change_time_day AS varchar) AS day, file_count AS files FR
+  athena SUCCEEDED    1578122 B    1654 ms  OPTIMIZE recipe_lake_live_lake.trip_changes_probe REWRITE DATA USING BIN_PACK WH
+  athena SUCCEEDED        812 B     680 ms  SELECT CAST(partition.change_time_day AS varchar) AS day, file_count AS files FR
+  athena SUCCEEDED        812 B     584 ms  SELECT CAST(partition.change_time_day AS varchar) AS day, file_count AS files FR
+--- The 1,440-file day in Athena (passed) 2026-11-23T02:22:58Z
+data set SIM02 three-days: 2120 files over 3 days, 1440 written now
+moved    2026-11-21: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-21/20261123T110000Z/ (17280 rows before and after)
+count of dt=2026-11-21: 17280 rows, 0 outside compacted/
+files under compacted/trip-events/dt=2026-11-21/: 1
+  athena SUCCEEDED    2858841 B    1345 ms  CREATE TABLE recipe_lake_live_lake.compact_20261121_20261123t110000z WITH (forma
+  athena SUCCEEDED          0 B     410 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.compact_20261121_20261123t110000
+  athena SUCCEEDED          0 B     770 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.trip_events_parquet WHERE dt = '
+  athena SUCCEEDED          0 B     428 ms  SELECT count(*) AS n, count_if("$path" NOT LIKE 's3://recipe-lake-live-lake-3226
+  athena SUCCEEDED          0 B     385 ms  SELECT count(*) AS n, count_if("$path" NOT LIKE 's3://recipe-lake-live-lake-3226
+--- The late file is counted (passed) 2026-11-23T02:23:19Z
+data set SIM02 three-days: 2120 files over 3 days, 0 written now
+moved    2026-11-21: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-21/20261123T110500Z/ (17280 rows before and after)
+copied   1 late file(s) into the location of 2026-11-21
+moved    2026-11-23: 600 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-23/20261124T110000Z/ (7200 rows before and after)
+count of dt=2026-11-21: 17292 rows; the day's location s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-21/20261123T110500Z/
+  athena SUCCEEDED    2858841 B    1215 ms  CREATE TABLE recipe_lake_live_lake.compact_20261121_20261123t110500z WITH (forma
+  athena SUCCEEDED          0 B     318 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.compact_20261121_20261123t110500
+  athena SUCCEEDED          0 B     795 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.trip_events_parquet WHERE dt = '
+  athena SUCCEEDED          0 B     352 ms  SELECT count(*) AS n, count_if("$path" NOT LIKE 's3://recipe-lake-live-lake-3226
+  athena SUCCEEDED    1186399 B    1007 ms  CREATE TABLE recipe_lake_live_lake.compact_20261123_20261124t110000z WITH (forma
+  athena SUCCEEDED          0 B     276 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.compact_20261123_20261124t110000
+  athena SUCCEEDED          0 B     557 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.trip_events_parquet WHERE dt = '
+  athena SUCCEEDED          0 B     546 ms  SELECT count(*) AS n, count_if("$path" NOT LIKE 's3://recipe-lake-live-lake-3226
+  athena SUCCEEDED          0 B     336 ms  SELECT count(*) AS n FROM recipe_lake_live_lake.trip_events_parquet WHERE dt = '
+--- Thirty days of small files, compacted (passed) 2026-11-23T02:29:52Z
+data set SIM01 thirty-days: 43200 files over 30 days, 43200 written now
+  printed: estimated 0.08 USD (MAX_MEASURE_USD 0.10): 43200 files, 30 days to compact
+  printed: moved    2026-10-24: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-24/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-25: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-25/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-26: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-26/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-27: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-27/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-28: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-28/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-29: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-29/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-30: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-30/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-10-31: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-10-31/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-01: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-01/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-02: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-02/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-03: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-03/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-04: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-04/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-05: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-05/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-06: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-06/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-07: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-07/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-08: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-08/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-09: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-09/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-10: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-10/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-11: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-11/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-12: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-12/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-13: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-13/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-14: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-14/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-15: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-15/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-16: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-16/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-17: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-17/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-18: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-18/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-19: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-19/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-20: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-20/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-21: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-21/20261123T110000Z/ (2515 rows before and after)
+  printed: moved    2026-11-22: 1440 files to s3://recipe-lake-live-lake-111122223333/compacted/trip-events/dt=2026-11-22/20261123T110000Z/ (2515 rows before and after)
+  printed:            files    data scanned   run time
+  printed: before     43200       3949860 B    4817 ms
+  printed: after         30         41015 B     550 ms
+  printed: count by zone before: [{"pickup_zone_id": "48", "trips": "9150"}, {"pickup_zone_id": "161", "trips": "5730"}, {"pickup_zone_id": "230", "trips": "10350"}]
+  printed: count by zone after:  [{"pickup_zone_id": "48", "trips": "9150"}, {"pickup_zone_id": "161", "trips": "5730"}, {"pickup_zone_id": "230", "trips": "10350"}]
+  printed: same answer before and after: True
+  printed: spent: 122 statements, 53409559 B Data scanned in all (failed or cancelled ones included)

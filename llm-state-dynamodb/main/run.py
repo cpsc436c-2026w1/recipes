@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> None:
         for line in scenario(s, resource):
             print(line)
     if args.target == "aws":
-        print("remove the tables when you are done: uv run python clean_up.py", file=sys.stderr)
+        print("remove the tables when you are done: uv run python clean_up.py --yes", file=sys.stderr)
 
 
 if __name__ == "__main__":

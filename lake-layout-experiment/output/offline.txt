@@ -1,0 +1,41 @@
+# lake-layout-experiment, offline run 2026-11-23: local stand-in (DuckDB over local Parquet folders; Iceberg is a labelled stand-in), SIM01 as DS01. The live run: output/live.txt.
+$ uv run python experiment.py build --offline
+ds01: 5 rows
+probe at 1: 0.00 MB
+upper bound of the plan [1, 2, 4]: 0.02 USD
+growth: 10 MB not reached: probe 0.00123882 MB at 1 copy (copies capped at 4); sizes [1, 2, 4]
+$ uv run python experiment.py run --offline
+50/450 runs
+100/450 runs
+150/450 runs
+200/450 runs
+250/450 runs
+300/450 runs
+350/450 runs
+400/450 runs
+450/450 runs
+450 runs stored in results.duckdb
+$ uv run python experiment.py late --offline
+{"before": {"hive-flat": 2, "hive-by-day": 2, "iceberg-flat": 2, "iceberg-by-day": 2}, "after": {"hive-flat": 3, "hive-by-day": 3, "iceberg-flat": 3, "iceberg-by-day": 3}, "agree": true}
+$ uv run python experiment.py summary --offline  (first 6 cells)
+# Summary of the lake layout experiment
+
+Every number below is a value of `summary.sql` over `results.duckdb`. Growth: 10 MB not reached: probe 0.00123882 MB at 1 copy (copies capped at 4).
+
+| engine | layout | copies | query | runs_kept | runs | median_ms | q25_ms | q75_ms | p90_ms | engine_median_ms | engine_q25_ms | engine_q75_ms | engine_p90_ms | median_scanned_mb | median_billed_mb | spend_mb | spend_usd | median_billed_gb_s | median_s3_gets | median_s3_lists | mark | cost_per_1000_usd | ranges_overlap_with | price_date |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| athena | hive-by-day | 1 | one-day | 10 | 10 | 2.6 | 2.5 | 2.8 | 2.9 | 2.6 | 2.5 | 2.8 | 2.9 | 0.0 | 10.0 | 100 | 0.000525 |  |  |  |  | 0.0525 | athena hive-flat; athena iceberg-by-day; athena iceberg-flat; duckdb hive-by-day | 2026-11-18 |
+| athena | hive-flat | 1 | one-day | 10 | 10 | 2.8 | 2.7 | 2.8 | 2.9 | 2.8 | 2.7 | 2.8 | 2.9 | 0.0 | 10.0 | 100 | 0.000525 |  |  |  |  | 0.0525 | athena hive-by-day; athena iceberg-by-day; athena iceberg-flat | 2026-11-18 |
+| athena | iceberg-by-day | 1 | one-day | 10 | 10 | 2.7 | 2.7 | 2.8 | 3.1 | 2.7 | 2.7 | 2.8 | 3.1 | 0.0 | 10.0 | 100 | 0.000525 |  |  |  |  | 0.0525 | athena hive-by-day; athena hive-flat; athena iceberg-flat | 2026-11-18 |
+| athena | iceberg-flat | 1 | one-day | 10 | 10 | 2.7 | 2.7 | 2.8 | 3.5 | 2.7 | 2.7 | 2.8 | 3.5 | 0.0 | 10.0 | 100 | 0.000525 |  |  |  |  | 0.0525 | athena hive-by-day; athena hive-flat; athena iceberg-by-day | 2026-11-18 |
+| duckdb | hive-by-day | 1 | one-day | 10 | 10 | 2.5 | 2.5 | 2.6 | 2.8 | 2.5 | 2.5 | 2.6 | 2.8 |  |  | 0 | 0.0 | 0.006 | 1.0 |  |  | 0.0007 | athena hive-by-day | 2026-11-18 |
+$ uv run python clean_up.py
+would remove glue tables of recipe_layout and the database
+would remove s3 prefix layout/ in <PREFIX>-lake-<account>
+would remove lambda function recipe-duckdb-query
+would remove log group /aws/lambda/recipe-duckdb-query
+would remove iam role recipe-duckdb-role
+dry run: nothing was contacted or deleted; add --yes
+$ uv run python experiment.py clean --offline --yes
+removed build/local/layout
+removed build/local/ds01.parquet

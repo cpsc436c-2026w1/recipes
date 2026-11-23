@@ -1,0 +1,133 @@
+# ext-source-poller in AWS, 2026-11-23T05:56Z to 06:50Z, PREFIX=recipe-poller, ca-central-1, 3 slots of the feed day published live
+# (the account is masked as 111122223333; the feed day is synthetic: sim/stand_in.py)
+== main/run.py --target aws --keep (the stream, the consumer and its table: 300 updates of its own)
+part of the lag                             median s     p95 s
+lag: event to stored                          65.171   135.699
+event to entered (before the broker)           0.248    75.819
+entered to stored (broker and consumer)       63.598    73.557
+== ext-source-poller/run.py --target aws
+created  s3://recipe-poller-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+created: arn:aws:lambda:ca-central-1:111122223333:function:recipe-poller-feed-poller every 15 minutes, slots in recipe-poller-feed-slots, feed s3://recipe-poller-lake-111122223333/feed/
+next: uv run python ext-source-poller/feed.py --to aws --live --slots 8   (2 h 15 min; 96 for the day)
+== feed.py --to aws --live --slots 3
+exists   s3://recipe-poller-lake-111122223333 (created by lake.py up)
+published 2026-11-23T05:45Z (123 trips) at 2026-11-23T06:02:00Z
+published 2026-11-23T06:00Z (122 trips) at 2026-11-23T06:17:00Z
+published 2026-11-23T06:15Z (121 trips) at 2026-11-23T06:32:00Z
+done; publication times in evidence/feed-20261123T0545Z/published.jsonl
+== two runs started by hand at 06:29:24 (nothing due) and at 06:32:12 (slot 06:15 due), each pair at the same moment
+   (between them the poller was redeployed with run-log ids that carry the Lambda request id: see README, What the live run showed)
+== latency.py
+2026-11-23T05:45Z 10.6 min
+2026-11-23T06:00Z 10.6 min
+2026-11-23T06:15Z 0.3 min
+3 latencies; p95 10.6 min (nearest rank 3 of 3); target under 20 min: met
+== the poller's log lines (one per slot loaded, one per run)
+{"run": "2026-11-23T05:58:09Z", "loaded": 0, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T05:58:13Z", "run_state": "finished"}
+{"slot": "2026-11-23T05:45Z", "slot_state": "loaded", "record_total": 123, "calls": [123], "published_time": "2026-11-23T06:02:00Z", "first_seen_time": "2026-11-23T06:02:00Z", "last_accepted": "2026-11-23T06:12:37.536Z"}
+{"run": "2026-11-23T06:12:34Z", "loaded": 1, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:12:37Z", "run_state": "finished"}
+{"slot": "2026-11-23T06:00Z", "slot_state": "loaded", "record_total": 122, "calls": [122], "published_time": "2026-11-23T06:17:00Z", "first_seen_time": "2026-11-23T06:17:00Z", "last_accepted": "2026-11-23T06:27:37.572Z"}
+{"run": "2026-11-23T06:27:34Z", "loaded": 1, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:27:37Z", "run_state": "finished"}
+{"run": "2026-11-23T06:29:24Z", "loaded": 0, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:29:24Z", "run_state": "finished"}
+{"run": "2026-11-23T06:29:24Z", "loaded": 0, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:29:27Z", "run_state": "finished"}
+{"run": "2026-11-23T06:32:12Z", "run_id": "2026-11-23T06:32:12Z-d3cb6a8f-3b8e-4b88-91a5-ddccfc55a38a", "loaded": 0, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "run_state": "skipped", "why": "the previous run holds the lock"}
+{"slot": "2026-11-23T06:15Z", "slot_state": "loaded", "record_total": 121, "calls": [121], "published_time": "2026-11-23T06:32:00Z", "first_seen_time": "2026-11-23T06:32:00Z", "last_accepted": "2026-11-23T06:32:15.638Z"}
+{"run": "2026-11-23T06:32:12Z", "run_id": "2026-11-23T06:32:12Z-4cce643c-5ca0-4a86-b488-956088ca0760", "loaded": 1, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:32:15Z", "run_state": "finished"}
+{"run": "2026-11-23T06:42:34Z", "run_id": "2026-11-23T06:42:34Z-fc6b03e0-54fa-4fd0-a571-28e07850a4db", "loaded": 0, "late": 0, "failed": 0, "skipped_claims": 0, "left_for_next": 0, "ended_at": "2026-11-23T06:42:34Z", "run_state": "finished"}
+== REPORT lines (duration, billed)
+Duration: 3249.97 ms Billed Duration: 3562 ms
+Duration: 3245.45 ms Billed Duration: 3484 ms
+Duration: 3180.97 ms Billed Duration: 3413 ms
+Duration: 517.97 ms Billed Duration: 518 ms
+Duration: 3202.68 ms Billed Duration: 3499 ms
+Duration: 2652.29 ms Billed Duration: 2893 ms
+Duration: 3190.74 ms Billed Duration: 3427 ms
+Duration: 613.66 ms Billed Duration: 614 ms
+== slot items (Query slot_day 2026-11-23) and the page's slot list
+GET /api/slots?day=2026-11-23 at 06:46: 200, 96 slots: 3 loaded, 23 missing, 70 not due
+{'slot_start': '2026-11-23T05:45Z', 'slot_state': 'loaded', 'record_total': 123}
+{'slot_start': '2026-11-23T06:00Z', 'slot_state': 'loaded', 'record_total': 122}
+{'slot_start': '2026-11-23T06:15Z', 'slot_state': 'loaded', 'record_total': 121}
+missing: ['2026-11-23T00:00Z', '2026-11-23T00:15Z', '2026-11-23T00:30Z'] ...
+== records the stream took in, and items the main consumer stored
+IncomingRecords per 5 min: [('05:55Z', 300), ('06:10Z', 123), ('06:25Z', 122), ('06:30Z', 121)]
+main/run.py's updates (before 06:05): 300; the poller's (after): 366 = 123 + 122 + 121 trips
+table recipe-poller-updates: 666 items = 300 + 366
+== run.py stop
+schedule group recipe-poller-source-poller deleted, with its schedule: the poller is not called again
+== clean_up.py --dry-run
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-poller' in ca-central-1
+would remove schedule group recipe-poller-source-poller (and its schedule recipe-poller-feed-schedule)
+would remove mapping 84cdf690-450f-4239-94cd-938d26f1e506 of recipe-poller-consumer
+would remove function recipe-poller-consumer
+would remove log group /aws/lambda/recipe-poller-consumer
+would remove policy of role recipe-poller-consumer-role
+would remove role recipe-poller-consumer-role
+would remove function recipe-poller-feed-poller
+would remove log group /aws/lambda/recipe-poller-feed-poller
+would remove policy of role recipe-poller-feed-poller-role
+would remove role recipe-poller-feed-poller-role
+would remove policy of role recipe-poller-feed-scheduler-role
+would remove role recipe-poller-feed-scheduler-role
+would remove queue recipe-poller-consumer-failures
+would remove table recipe-poller-updates
+would remove table recipe-poller-feed-slots
+would remove stream recipe-poller-updates
+would remove 4 objects under s3://recipe-poller-lake-111122223333/feed/
+would remove table recipe-poller-runs (the ledger says this folder created it)
+== lake.py down (dry run)
+REFUSED  s3://recipe-poller-lake-111122223333 holds 4 objects outside raw/trip-events/, athena-results/: run the clean-up of the recipe that wrote them first
+         feed/manifest.json
+         feed/trips-2026-11-23T0545Z.jsonl
+         feed/trips-2026-11-23T0600Z.jsonl
+         feed/trips-2026-11-23T0615Z.jsonl
+== clean_up.py --dry-run (after the fix)
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-poller' in ca-central-1
+would remove mapping 84cdf690-450f-4239-94cd-938d26f1e506 of recipe-poller-consumer
+would remove function recipe-poller-consumer
+== clean_up.py --yes
+removing the streaming-ingestion resources with prefix 'recipe-poller' in ca-central-1
+removed  mapping 84cdf690-450f-4239-94cd-938d26f1e506 of recipe-poller-consumer
+removed  function recipe-poller-consumer
+removed  log group /aws/lambda/recipe-poller-consumer
+removed  policy of role recipe-poller-consumer-role
+removed  role recipe-poller-consumer-role
+removed  function recipe-poller-feed-poller
+removed  log group /aws/lambda/recipe-poller-feed-poller
+removed  policy of role recipe-poller-feed-poller-role
+removed  role recipe-poller-feed-poller-role
+removed  policy of role recipe-poller-feed-scheduler-role
+removed  role recipe-poller-feed-scheduler-role
+removed  queue recipe-poller-consumer-failures
+removed  table recipe-poller-updates
+removed  table recipe-poller-feed-slots
+removed  stream recipe-poller-updates
+removed  4 objects under s3://recipe-poller-lake-111122223333/feed/
+removed  table recipe-poller-runs (the ledger says this folder created it)
+exit 0
+== lake.py down (dry run), then --yes
+absent   Athena workgroup recipe-poller-wg
+absent   Athena workgroup recipe-poller-ctas-wg
+would remove s3://recipe-poller-lake-111122223333 and its 0 object versions
+absent   Athena workgroup recipe-poller-wg
+absent   Athena workgroup recipe-poller-ctas-wg
+removed  s3://recipe-poller-lake-111122223333 and its 0 object versions
+== proof, 2026-11-23T08:11Z: nothing named recipe-queue* or recipe-poller* is left
+queues:            0
+mappings:          0
+functions:         0
+tables:            0
+roles:             0
+log groups:        0
+streams:           0
+buckets:           0
+trails:            0
+schedule groups:   0
+schedules:         0
+athena workgroups: 0
+tagged purpose=recipe: 0
+tagged purpose=recipe-streaming-ingestion: 0
+tagged Team=recipe-queue: 0
+tagged Team=recipe-queue-w0: 0
+tagged Team=recipe-queue-smoke: 0
+tagged Team=recipe-poller: 0

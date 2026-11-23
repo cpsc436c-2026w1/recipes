@@ -615,7 +615,9 @@ def teammate_things(context, table, queue):
 def clean_options(context, options):
     import clean_up
 
-    run(context, clean_up.main, options.split())
+    # the clean-up contract: a bare run only lists; a run that deletes passes --yes
+    argv = options.split()
+    run(context, clean_up.main, argv if "--dry-run" in argv else argv + ["--yes"])
 
 
 @when("clean_up.py runs")

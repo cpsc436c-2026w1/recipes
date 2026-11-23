@@ -1,0 +1,92 @@
+# Captured 2026-11-23 right after output/main.txt (account masked). Dry run, clean-up, lake.py down, then the proof:
+# by schedule group, by the Team tag, by name prefix, and each service asked by name.
+
+2026-11-23T08:06:58Z clean-up
+$ uv run python clean_up.py
+would remove schedule group recipe-simruns-simulated-runs and its schedules
+would remove alarm recipe-simruns-check-failed
+would remove Lambda function recipe-simruns-live-check
+would remove log group /aws/lambda/recipe-simruns-live-check
+would remove SNS topic recipe-simruns-check-alerts and its subscriptions
+would remove IAM role recipe-simruns-check-role
+would remove IAM role recipe-simruns-check-scheduler-role
+would remove DynamoDB table recipe-simruns-runs
+would remove 136 objects under s3://recipe-simruns-lake-111122223333/raw/trip-events/
+absent   DynamoDB table recipe-simruns-sim-events
+nothing was deleted: run again with --yes
+$ uv run python clean_up.py --yes
+removed  schedule group recipe-simruns-simulated-runs and its schedules
+removed  alarm recipe-simruns-check-failed
+removed  Lambda function recipe-simruns-live-check
+removed  log group /aws/lambda/recipe-simruns-live-check
+removed  SNS topic recipe-simruns-check-alerts and its subscriptions
+removed  IAM role recipe-simruns-check-role
+removed  IAM role recipe-simruns-check-scheduler-role
+removed  DynamoDB table recipe-simruns-runs
+removed  136 objects under s3://recipe-simruns-lake-111122223333/raw/trip-events/
+absent   DynamoDB table recipe-simruns-sim-events
+$ uv run python scripts/lake.py down
+absent   Athena workgroup recipe-simruns-wg
+absent   Athena workgroup recipe-simruns-ctas-wg
+would remove s3://recipe-simruns-lake-111122223333 and its 0 object versions
+$ uv run python scripts/lake.py down --yes
+absent   Athena workgroup recipe-simruns-wg
+absent   Athena workgroup recipe-simruns-ctas-wg
+removed  s3://recipe-simruns-lake-111122223333 and its 0 object versions
+2026-11-23T08:07:04Z proof
+$ uv run python clean_up.py --check
+tagged   arn:aws:scheduler:ca-central-1:111122223333:schedule-group/recipe-simruns-simulated-runs
+tagged   arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-simruns-runs
+LEFT     schedule group recipe-simruns-simulated-runs
+LEFT     DynamoDB table recipe-simruns-runs
+check: 2 left by schedule group and by name prefix recipe-simruns-
+$ aws scheduler list-schedule-groups --name-prefix recipe-simruns --region ca-central-1 --query ScheduleGroups[].Name
+[
+    "recipe-simruns-simulated-runs"
+]
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-simruns --region ca-central-1 --query ResourceTagMappingList[].ResourceARN
+[
+    "arn:aws:scheduler:ca-central-1:111122223333:schedule-group/recipe-simruns-simulated-runs"
+]
+$ aws kinesis describe-stream-summary --stream-name recipe-simruns-trip-events --region ca-central-1
+
+aws: [ERROR]: An error occurred (ResourceNotFoundException) when calling the DescribeStreamSummary operation: Stream recipe-simruns-trip-events under account 111122223333 not found.
+$ aws lambda get-function --function-name recipe-simruns-live-check --region ca-central-1
+
+aws: [ERROR]: An error occurred (ResourceNotFoundException) when calling the GetFunction operation: Function not found: arn:aws:lambda:ca-central-1:111122223333:function:recipe-simruns-live-check
+
+Additional error details:
+Type: User
+$ aws dynamodb describe-table --table-name recipe-simruns-runs --region ca-central-1
+
+aws: [ERROR]: An error occurred (ResourceNotFoundException) when calling the DescribeTable operation: Requested resource not found: Table: recipe-simruns-runs not found
+$ aws s3api head-bucket --bucket recipe-simruns-lake-111122223333 --region ca-central-1
+
+aws: [ERROR]: An error occurred (404) when calling the HeadBucket operation: Not Found
+$ aws athena get-work-group --work-group recipe-simruns-wg --region ca-central-1
+
+aws: [ERROR]: An error occurred (InvalidRequestException) when calling the GetWorkGroup operation: WorkGroup is not found.
+
+Additional error details:
+AthenaErrorCode: INVALID_INPUT
+$ aws scheduler get-schedule-group --name recipe-simruns-simulated-runs --region ca-central-1
+
+aws: [ERROR]: An error occurred (ResourceNotFoundException) when calling the GetScheduleGroup operation: Schedule group recipe-simruns-simulated-runs does not exist.
+$ aws iam get-role --role-name recipe-simruns-check-role
+
+aws: [ERROR]: An error occurred (NoSuchEntity) when calling the GetRole operation: The role with name recipe-simruns-check-role cannot be found.
+$ aws iam get-role --role-name recipe-simruns-check-scheduler-role
+
+aws: [ERROR]: An error occurred (NoSuchEntity) when calling the GetRole operation: The role with name recipe-simruns-check-scheduler-role cannot be found.
+$ aws sns get-topic-attributes --topic-arn arn:aws:sns:ca-central-1:111122223333:recipe-simruns-check-alerts --region ca-central-1
+
+aws: [ERROR]: An error occurred (NotFound) when calling the GetTopicAttributes operation: Topic does not exist
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-simruns- --region ca-central-1 --query logGroups[].logGroupName
+[]
+$ aws cloudwatch describe-alarms --alarm-name-prefix recipe-simruns- --region ca-central-1 --query MetricAlarms[].AlarmName
+[]
+2026-11-23T08:08:27Z proof again, after the schedule group and the table finished deleting
+$ uv run python clean_up.py --check
+check: 0 left by schedule group and by name prefix recipe-simruns- (empty)
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-simruns --region ca-central-1 --query ResourceTagMappingList[].ResourceARN
+[]

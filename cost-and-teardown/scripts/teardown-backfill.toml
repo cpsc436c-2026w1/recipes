@@ -1,0 +1,12 @@
+# The steps for project-skeleton's ext-backfill, run with PREFIX, TEAM and LEDGER of that system:
+#   PREFIX=backfill-yourname LEDGER=../project-skeleton/state/ledger.jsonl bash scripts/teardown.sh --steps scripts/teardown-backfill.toml
+# A step in another recipe's folder runs in that folder's environment (uv run), not in this process.
+
+[[step]]
+name = "ext-backfill"
+command = "cd ../project-skeleton && env -u VIRTUAL_ENV uv run python ext-backfill/clean_up.py --yes"
+
+[[step]]
+name = "shared bucket and workgroups"
+command = "scripts/lake.py down --yes"
+last = true

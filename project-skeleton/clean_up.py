@@ -1,7 +1,8 @@
 """Remove everything this recipe creates for one $PREFIX, in AWS (ca-central-1) or on this machine.
 
-    PREFIX=recipe-yourname uv run python clean_up.py            # AWS: all three representatives, then .local/
-    uv run python clean_up.py --local                        # only the offline files in .local/
+    PREFIX=recipe-yourname uv run python clean_up.py            # lists what it would delete; deletes nothing
+    PREFIX=recipe-yourname uv run python clean_up.py --yes      # AWS: all three representatives, then .local/
+    uv run python clean_up.py --local --yes                  # only the offline files in .local/
 
 Every step is attempted, also after one fails. Each line says what was removed, what was absent (already gone), or
 what FAILED and why; with a failed step the exit code is 1. Running it twice is safe.
@@ -99,10 +100,10 @@ def delete_role(iam, name: str) -> None:
     iam.delete_role(RoleName=name)
 
 
-def clean_aws(sess, n: dict, log=print) -> Steps:
+def clean_aws(sess, n: dict, log=print, dry_run: bool = False) -> Steps:
     fh, kin, lam, logs = (sess.client(s) for s in ("firehose", "kinesis", "lambda", "logs"))
     ddb, glue, athena, s3, iam = (sess.client(s) for s in ("dynamodb", "glue", "athena", "s3", "iam"))
-    steps = Steps()
+    steps = Steps(dry_run)
 
     def unless_deleting(what: str, status: str, fn, **kw) -> None:
         """A resource an earlier clean-up is still deleting needs no second delete. A Kinesis or Firehose stream would
@@ -150,23 +151,31 @@ def clean_aws(sess, n: dict, log=print) -> Steps:
     return steps
 
 
-def clean_local(log=print) -> None:
+def clean_local(log=print, dry_run: bool = False) -> None:
     if LOCAL_ROOT.exists():
+        if dry_run:
+            log(f"would remove {LOCAL_ROOT}/")
+            return
         shutil.rmtree(LOCAL_ROOT)
         log(f"removed  {LOCAL_ROOT}/")
     else:
         log(f"absent   {LOCAL_ROOT}/")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--local", action="store_true", help="only remove the offline files")
-    args = p.parse_args()
+    p.add_argument("--dry-run", action="store_true", help="list what would be deleted (the default)")
+    p.add_argument("--yes", action="store_true", help="delete; without it, only list what would be deleted")
+    args = p.parse_args(argv)
+    dry = args.dry_run or not args.yes
     failed = []
     if not args.local:
         sess = session()
-        failed = clean_aws(sess, names(account=account_id(sess))).failed
-    clean_local()
+        failed = clean_aws(sess, names(account=account_id(sess)), dry_run=dry).failed
+    clean_local(dry_run=dry)
+    if dry:
+        print("Nothing deleted. Run again with --yes to delete these.")
     if failed:
         print(f"{len(failed)} steps FAILED: the clean-up is NOT complete. Fix what they say, then run it again")
     return 1 if failed else 0

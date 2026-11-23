@@ -226,7 +226,7 @@ def test_the_command_exits_non_zero_when_a_step_failed(monkeypatch, capsys):
         session.client = lambda service, **kw: aoss if service == "opensearchserverless" else session.real_client(
             service, **kw)
         monkeypatch.setattr(cu.boto3, "Session", lambda **kw: session)
-        monkeypatch.setattr("sys.argv", ["clean_up.py"])
+        monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
         with pytest.raises(SystemExit) as done:
             cu.main()
     out = capsys.readouterr().out

@@ -45,7 +45,7 @@ test = "uv run pytest -q"
 scenarios = "uv run behave"
 run = "uv run python main/run.py --target aws"
 run_offline = "uv run python main/run.py --target local"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [extension_commands]
 ext-answer-cache = "uv run python ext-answer-cache/cache_run.py --target aws"

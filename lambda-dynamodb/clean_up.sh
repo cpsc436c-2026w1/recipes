@@ -1,8 +1,11 @@
 #!/bin/bash
 # lambda-dynamodb: remove the API (URL, function, logs, role) after a KEEP=1 run. The tables stay:
 # ../dynamodb/clean_up.sh removes them.
-#   bash clean_up.sh
+#   bash clean_up.sh          # lists what it would delete; deletes nothing
+#   bash clean_up.sh --yes    # deletes
 # Every delete is attempted; if AWS refused one, the script prints FAILED lines and ends with exit code 1.
+# A bare run lists what it would delete (the commands, as DRY=1 prints them) and deletes nothing; --yes deletes.
+if [ "${1:-}" = "--yes" ]; then shift; else export DRY=1; fi
 source "$(dirname "$0")/lib.sh"
 say "Remove the URL, the function, its log group and its role"
 clean_api || FAILED=1
@@ -11,4 +14,5 @@ left "log group" aws logs describe-log-groups --log-group-name-prefix "/aws/lamb
   --query "logGroups[?logGroupName=='/aws/lambda/$FN'].logGroupName"
 [ -n "$ROLE_ARN" ] || left "role" aws iam list-roles --output text --query "Roles[?RoleName=='$ROLE'].RoleName"
 left "function" aws lambda list-functions --output text --query "Functions[?FunctionName=='$FN'].FunctionName"
+[ -z "${DRY:-}" ] || echo "Nothing deleted. Run again with --yes to delete these."
 [ "$FAILED" = 0 ]

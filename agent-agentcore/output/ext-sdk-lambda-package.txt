@@ -1,0 +1,15 @@
+# ext-sdk-lambda package, measured 2026-11-23 in a cloud build container (x86_64 host, wheels for aarch64-manylinux_2_28, Python 3.12),
+# with the synthetic SIM01 stand-in as trips.parquet (845,291 bytes); the zip with SIM01 from DS01 is not measured yet.
+
+$ uv run python ext-sdk-lambda/deploy.py package
+build/agent-sdk.zip: 44,730,563 bytes zipped, 141,465,355 unzipped (Lambda limits: 250 MB unzipped; over 50 MB zipped goes through S3)
+
+# Largest parts, MiB (du -sm build/agent-sdk-site/*)
+60	_duckdb.abi3.so
+16	openai
+14	cryptography
+12	pydantic_ai
+5	strands
+5	pydantic_core
+4	tiktoken
+4	sqlglot

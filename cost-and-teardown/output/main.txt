@@ -1,0 +1,144 @@
+$ scripts/inventory.py --probe
+allowed  tag:GetResources
+allowed  iam:ListRoles
+allowed  scheduler:ListScheduleGroups
+allowed  glue:GetDatabases
+allowed  athena:ListDataCatalogs
+allowed  lambda:ListEventSourceMappings
+allowed  logs:DescribeLogGroups
+exit 0
+$ scripts/demo_up.py
+created  s3://recipe-teardown-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+created  workgroup recipe-teardown-wg
+created  stream recipe-teardown-cost-events (1 shard, 0.0165 USD an hour while it exists)
+created  table recipe-teardown-cost-counts (on demand)
+created  role recipe-teardown-cost-role
+created  log group /aws/lambda/recipe-teardown-cost-count (7 days)
+created  function recipe-teardown-cost-count (arm64, 128 MB, timeout 60 s)
+created  event source mapping recipe-teardown-cost-events to recipe-teardown-cost-count
+created  Glue database recipe_teardown_cost and table trip_events_demo (no tags: found by name)
+next: uv run python sim/replay.py SIM01 --to kinesis --target <stream> ...; see README, Run it live
+exit 0
+$ scripts/demo_run.py --run-id run-20261123T035517Z
+SIM01 rush-hour: 2511 events, 2515 deliveries; injected 0 changed, 2 late, 0 never, 4 twice; truth 2511 events, 837 trips, requested per zone {'161': 191, '230': 342, '48': 304} -> sim/data/SIM01
+replay SIM01 run run-20261123T035517Z to kinesis:recipe-teardown-cost-events: 2515 sent, 0 failed, 1916 calls, 823.236 s, latest send 0.001 s after its planned time -> evidence/run-20261123T035517Z/run-20261123T035517Z/sent.jsonl
+replay SIM01 run run-20261123T035517Z to s3:recipe-teardown-lake-111122223333: 2515 sent, 0 failed, 111 calls, 3.618 s, latest send 3.586 s after its planned time -> evidence/run-20261123T035517Z/s3/run-20261123T035517Z/sent.jsonl
+athena   SUCCEEDED: 2515 deliveries in the lake
+exit 0
+$ scripts/units.py --run-id run-20261123T035517Z
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+units    {'part': 'Lambda requests', 'units': 468, 'how': 'measured', 'source': "REPORT lines of the function's log group", 'resource': 'recipe-teardown-cost-count'}
+units    {'part': 'Lambda GB-seconds, arm64', 'units': 2.9975, 'how': 'measured', 'source': "REPORT lines of the function's log group", 'resource': 'recipe-teardown-cost-count'}
+units    {'part': 'DynamoDB write units', 'units': 2932.0, 'how': 'measured', 'source': 'UNITS lines of /aws/lambda/recipe-teardown-cost-count (ConsumedCapacity)'}
+units    {'part': 'Athena Data scanned, MB', 'units': 10.0, 'how': 'measured', 'source': 'GetQueryExecution DataScannedInBytes, each query billed at least 10 MB', 'queries': 1}
+units    {'part': 'Kinesis shard-hours', 'units': 1, 'how': 'computed', 'source': "the ledger's create and delete times, whole hours", 'resource': 'recipe-teardown-cost-events', 'hourly': True, 'count': 1}
+-> evidence/run-20261123T035517Z/units.json
+exit 0
+$ scripts/cost.py --run-id run-20261123T035517Z
+# Cost of run run-20261123T035517Z
+
+Rates: price sheet, ca-central-1, 2026-11-18; CAD at 1.45. Units: evidence/run-20261123T035517Z/units.json.
+
+| Part | Units | Rate | USD | CAD | Source |
+|---|---|---|---|---|---|
+| Lambda requests | 468 | 0.2 USD per 1,000,000 | 0.000094 | 0.000136 | price sheet, ca-central-1, 2026-11-18 (measured) |
+| Lambda GB-seconds, arm64 | 2.9975 | 1.33334e-05 USD each | 0.000040 | 0.000058 | price sheet, ca-central-1, 2026-11-18 (measured) |
+| DynamoDB write units | 2932 | 0.6875 USD per 1,000,000 | 0.002016 | 0.002923 | price sheet, ca-central-1, 2026-11-18 (measured) |
+| Athena, billed 10 MB | 10 | 5.5 USD per 1,048,576 | 0.000052 | 0.000076 | price sheet, ca-central-1, 2026-11-18 (measured) |
+| Kinesis shard-hours | 1 | 0.0165 USD each | 0.016500 | 0.023925 | price sheet, ca-central-1, 2026-11-18 (computed) |
+| **Total** | | | **0.018702** | **0.027118** | |
+
+## 30 days (1 run a day left on; 10 demonstration hours)
+
+| Column | USD | CAD | of which hourly parts | % of the limit |
+|---|---|---|---|---|
+| Always on | 11.9461 | 17.3218 | 11.8800 | 39.8% |
+| Demonstrations only | 0.1870 | 0.2712 | 0.1650 | 0.6% |
+
+## Horizon: 365 days, 4 busy months of 30 days, limit 30 USD
+
+| Column | Busy month | Idle month | Horizon USD | Horizon CAD | Passes the limit |
+|---|---|---|---|---|---|
+| Always on | 11.9461 | 11.8800 | 144.80 | 209.97 | in the 3rd month |
+| Demonstrations only | 0.1870 | 0.0000 | 0.75 | 1.08 | never |
+
+exit 0
+$ scripts/inventory.py
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 10 in the ledger, 0 not in the ledger -> docs/resources.md
+exit 0
+# Resources of team recipe-teardown (PREFIX recipe-teardown)
+
+Written by scripts/inventory.py at 2026-11-23 04:11 UTC: 10 in the ledger, 0 not.
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Kinesis data stream | `recipe-teardown-cost-events` | created | hourly | clean_up.py --yes | ledger, tag | — |
+| Athena workgroup | `recipe-teardown-wg` | created | per use | scripts/lake.py down | ledger, tag | — |
+| DynamoDB table | `recipe-teardown-cost-counts` | created | monthly | clean_up.py --yes | ledger, tag | — |
+| Glue database | `recipe_teardown_cost` | created | per use | clean_up.py --yes | ledger, name | — |
+| Glue table | `recipe_teardown_cost.trip_events_demo` | created | per use | clean_up.py --yes | ledger, name | — |
+| IAM role | `recipe-teardown-cost-role` | created | per use | clean_up.py --yes | ledger, IAM | — |
+| Lambda event source mapping | `recipe-teardown-cost-events to recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag, name | — |
+| Lambda function | `recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag | — |
+| CloudWatch log group | `/aws/lambda/recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag, name | — |
+| S3 bucket | `recipe-teardown-lake-111122223333` | created | monthly | scripts/lake.py down | ledger, tag | — |
+
+## Not in the ledger
+
+None.
+$ scripts/teardown.sh
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 10 resources before the teardown
+removed  Kinesis data stream recipe-teardown-cost-events
+removed  Lambda event source mapping recipe-teardown-cost-events to recipe-teardown-cost-count
+removed  Lambda function recipe-teardown-cost-count
+removed  CloudWatch log group /aws/lambda/recipe-teardown-cost-count
+removed  DynamoDB table recipe-teardown-cost-counts
+removed  IAM role recipe-teardown-cost-role
+removed  Glue table recipe_teardown_cost.trip_events_demo
+removed  Glue database recipe_teardown_cost
+step     demonstration system: exit 0
+removed  Athena workgroup recipe-teardown-wg
+absent   Athena workgroup recipe-teardown-ctas-wg
+removed  s3://recipe-teardown-lake-111122223333 and its 113 object versions
+step     shared bucket and workgroups: exit 0
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+teardown complete: 0 still there, 0 by hand -> docs/resources.md
+exit 0
+# Resources of team recipe-teardown (PREFIX recipe-teardown)
+
+Torn down: every resource the team created was asked for by its own service after the deletes, and answered not found.
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Athena workgroup | `recipe-teardown-wg` | created | per use | scripts/lake.py down | ledger, tag | deleted 2026-11-23T04:11:11Z |
+| DynamoDB table | `recipe-teardown-cost-counts` | created | monthly | clean_up.py --yes | ledger, tag | deleted 2026-11-23T04:11:11Z |
+| Glue database | `recipe_teardown_cost` | created | per use | clean_up.py --yes | ledger, name | deleted 2026-11-23T04:11:12Z |
+| Glue table | `recipe_teardown_cost.trip_events_demo` | created | per use | clean_up.py --yes | ledger, name | deleted 2026-11-23T04:11:12Z |
+| IAM role | `recipe-teardown-cost-role` | created | per use | clean_up.py --yes | ledger, IAM | deleted 2026-11-23T04:11:12Z |
+| Kinesis data stream | `recipe-teardown-cost-events` | created | hourly | clean_up.py --yes | ledger, tag | deleted 2026-11-23T04:11:11Z |
+| Lambda event source mapping | `recipe-teardown-cost-events to recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag, name | deleted 2026-11-23T04:11:12Z |
+| Lambda function | `recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag | deleted 2026-11-23T04:11:12Z |
+| CloudWatch log group | `/aws/lambda/recipe-teardown-cost-count` | created | per use | clean_up.py --yes | ledger, tag, name | deleted 2026-11-23T04:11:12Z |
+| S3 bucket | `recipe-teardown-lake-111122223333` | created | monthly | scripts/lake.py down | ledger, tag | deleted 2026-11-23T04:11:12Z |
+
+## Not in the ledger
+
+None.
+
+$ what is left of recipe-teardown (by tag, schedule group, name prefix, Glue database, workgroup, role ...)
+== recipe-teardown
+tag Team=recipe-teardown:        
+schedule groups:    
+buckets:            
+Glue databases:     
+workgroups:         
+IAM roles:          
+functions:          
+tables:             
+Glue jobs:          
+topics:             
+streams:            
+log groups:         

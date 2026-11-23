@@ -126,7 +126,7 @@ def send_requests(s: Settings, lam, n: int = 12) -> str:
             wrong.append(f"request {i + 1} (sent to {'fail' if fail else 'succeed'}) answered {code}: {text[:200]}")
     if broken:
         raise SystemExit(f"{len(broken)} of {n} requests broke the function {s.function_name} and wrote no metric "
-                         f"line: {broken[0]}\nFix main/app.py and run again, or clean up: uv run python clean_up.py")
+                         f"line: {broken[0]}\nFix main/app.py and run again, or clean up: uv run python clean_up.py --yes")
     if wrong:
         seen = ", ".join(f"{v} answered {k}" for k, v in sorted(codes.items(), key=lambda kv: str(kv[0])))
         raise SystemExit(f"sent {n} requests, {failing} of them meant to fail; {seen}. {len(wrong)} did not answer "
@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(("  " + line).rstrip())
         else:
             print(send_requests(s, c["lam"]))
-            print("next: uv run python main/fire.py --target aws    then: uv run python clean_up.py")
+            print("next: uv run python main/fire.py --target aws    then: uv run python clean_up.py --yes")
 
 
 if __name__ == "__main__":

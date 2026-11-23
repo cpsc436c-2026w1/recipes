@@ -64,7 +64,8 @@ def local(tmp_path, moto_url):
 
     def _run(script, check=True, **extra):
         env = _base_env(tmp_path) | {"AWS_ENDPOINT_URL": moto_url} | extra
-        p = subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=180)
+        args = ["--yes"] if script == "clean_up.sh" else []      # a clean-up deletes only with --yes
+        p = subprocess.run(["bash", str(RECIPE / script), *args], env=env, capture_output=True, text=True, timeout=180)
         if check:
             assert p.returncode == 0, p.stdout + p.stderr
         return p

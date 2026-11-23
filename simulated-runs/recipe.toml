@@ -1,0 +1,65 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "simulated-runs"
+format = "main-scenario"
+task = "Generate a simulated hour of rides events with injected faults and its known answer, replay it into a stream, queue, URL, bucket or handler at a chosen speed, check the tables against the answer offline and on AWS, and check the deployed system every day"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = ["streaming-ingestion"]
+lectures = ["L13", "L14"]
+core = ["Kinesis Data Streams", "S3", "Lambda", "EventBridge Scheduler", "SNS", "DynamoDB", "CloudWatch"]
+secondary = ["Athena", "SQS", "Pydantic", "behave", "moto", "DuckDB"]
+region = "ca-central-1"
+cost_one_run = "0.018 USD (0.026 CAD): SIM01 replayed into a 1-shard stream and into the lake bucket, read back, and the daily check deployed, called and removed; units measured in output/main.txt, priced from the course price sheet (the shard counted as one hour)"
+summary = "Seeded simulated data with injected faults (twice, late, never, changed) with the events and faults under _truth/ (the answer computed from them), one replayer for every target with send times in sent.jsonl, whole-run scenarios offline and @live, and a daily check of the deployed system that emails when the count is wrong or the check did not run"
+
+[[practices]]
+name = "a test whose right answer is written down before the run, from the events, counting each event once"
+source = "L13; DDIA 2e ch. 12 (event time against processing time)"
+
+[[practices]]
+name = "inject the faults a stream produces (a repeat, a late event, a lost one, a correction) and record them"
+source = "L14 (at-least-once delivery, idempotent writes)"
+
+[[practices]]
+name = "measure data latency from when each delivery was sent, under a run id that no earlier run shares"
+source = "L13 (data latency, p95)"
+
+[[practices]]
+name = "one schema for producer, consumer and test; refuse a line that does not match, naming file, line and field"
+source = "DDIA 2e ch. 5 (encoding and evolution)"
+
+[[practices]]
+name = "a scheduled check of the deployed system, with an alert when it fails and a backstop when it does not run"
+source = "OPS08-BP04"
+
+[[practices]]
+name = "every create tagged in its call and recorded in a ledger; clean-up deletes what was created, keeps what was borrowed"
+source = "AWS tagging best practices; course constraint 3"
+
+[instruments]
+files = ["src/rides/events.py", "sim/generate.py", "sim/truth.py", "sim/replay.py", "sim/datasets.toml",
+         "scripts/lake.py", "scripts/tags.py", "scripts/run_log.py", "scripts/check.py", "scripts/live_check.py",
+         "scripts/live_run.py", "features/steps/sim_steps.py", "experiments/latency.py", "clean_up.py",
+         ".github/workflows/offline.yml"]
+
+[validates]
+command = "uv run pytest -q && uv run behave"
+shows = "the generator writes the counts the README states and the same bytes from the same seed; a bad line is refused with its file, line and field; each target receives every delivery under the run id within 1 s of its time; the whole run equals the answer from _truth/; the check counts 20 probe trips, emails a wrong, failed or missing day only when a send was due, and its role names only its own resources; clean-up leaves nothing"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+generate = "uv run python sim/generate.py --all"
+replay = "uv run python sim/replay.py SIM01 --speed 60 --run-id <id> --to kinesis"
+run = "uv run python scripts/live_run.py run SIM01 --to s3 --run-id <id>"
+check = "uv run python scripts/check.py up"
+clean = "uv run python clean_up.py --yes && uv run python scripts/lake.py down --yes"
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+shared_helpers_copied_unchanged = ["src/rides/events.py", "sim/replay.py", "scripts/lake.py", "scripts/tags.py", "scripts/run_log.py"]
+function_needs_only_boto3 = "scripts/live_check.py and sim/replay.py are zipped as they are"
+every_create_recorded = "scripts/tags.py record(); clean_up.py deletes what the ledger records created"
+offline_tests = "moto; a test clock in the replay scenarios"

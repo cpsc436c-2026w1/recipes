@@ -4,7 +4,7 @@ name = "project-skeleton"
 format = "task-class"             # rep-*/ folders, one per representative
 task = "Live updates arrive, are stored, reach the lake and show as one number to users (updates in the last hour)"
 shapes = ["lakehouse-first", "operational-first", "genai-first"]
-extensions = []                   # the first slice (Checkpoint 2); every extension recipe starts from one rep-*/ folder
+extensions = ["backfill"]         # ext-backfill/ is in this folder; every other extension recipe starts from one rep-*/ folder
 lectures = ["L3", "L8", "L10", "L11", "L12", "L13", "L14", "L15", "L16", "L17"]
 core = ["Kinesis Data Streams", "Amazon Data Firehose", "S3", "AWS Glue Data Catalog", "Athena", "Lambda",
         "Lambda function URLs", "DynamoDB", "DynamoDB export to S3", "course LLM gateway"]
@@ -43,7 +43,9 @@ source = "L16, L17; AI Engineering ch. 6; Agentic AI Lens AGENTREL02-BP02, AGENT
 files = ["skeleton/events.py", "skeleton/number.py", "skeleton/config.py", "skeleton/aws.py",
          "rep-lakehouse-first/lakehouse.py", "rep-operational-first/handler.py",
          "rep-operational-first/operational.py", "rep-genai-first/genai.py", "rep-genai-first/lake_example.py",
-         "clean_up.py"]
+         "clean_up.py", "ext-backfill/backfill.py", "ext-backfill/statements.py", "ext-backfill/engines.py",
+         "ext-backfill/dynamo_load.py", "ext-backfill/history.toml", "ext-backfill/clean_up.py",
+         "scripts/tags.py", "scripts/lake.py"]
 
 [validates]                       # how a team shows it works
 command = "uv run pytest -q"
@@ -60,7 +62,7 @@ test = "uv run pytest -q"          # offline, no AWS account
 scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
 run = "uv run python rep-lakehouse-first/run.py --target aws"   # likewise rep-operational-first/run.py, rep-genai-first/run.py --llm gateway
 run_offline = "uv run python rep-lakehouse-first/run.py"        # no account, no token
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [constraints]                       # what an assistant must keep when it changes this recipe
 no_keys_in_code = true
@@ -71,3 +73,12 @@ role_override_env = ["FIREHOSE_ROLE_ARN", "API_ROLE_ARN"]   # optional: the scri
 llm_tool_read_only = true            # rep-genai-first: one tool, BatchGetItem only (tool_policy()); the lake example has no model
 same_number_everywhere = true        # tests compare every representative with plain Python on the same updates
 clean_up_removes_everything = true   # a new resource needs a step in clean_up.py and in tests/test_clean_up.py
+
+[extension.backfill]
+folder = "ext-backfill/"
+task = "Copy a history into the lake (CTAS, one statement a month), count it per day against the source, view it beside the live table, and load it into DynamoDB by an import from S3 or by batch writes"
+run = "uv run python ext-backfill/backfill.py --target aws --source course --from 2024-03-01 --to 2024-03-30"
+live = "bash ext-backfill/live_run.sh"
+clean = "uv run python ext-backfill/clean_up.py --yes"
+cost_one_run = "about 0.038 USD (0.056 CAD) for 30 days of DS01 and a new DynamoDB table (Athena 0.003 and the import 0.035, from the live run of 2026-11-23); the whole live session, with a re-copied day and a batch load, 0.067 USD"
+

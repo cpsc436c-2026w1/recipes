@@ -1,6 +1,7 @@
 """Remove everything this recipe creates: the tables $PREFIX-race-trips and $PREFIX-race-requests.
 
-    PREFIX=recipe-ana uv run python clean_up.py
+    PREFIX=recipe-ana uv run python clean_up.py    # lists what it would delete; deletes nothing
+    PREFIX=recipe-ana uv run python clean_up.py --yes
 
 Only these exact names are touched. Safe to run twice. Both tables are attempted, also when the first is refused;
 a refused step is printed as FAILED and the exit code is then 1.
@@ -77,9 +78,9 @@ def delete_table(ddb, name: str, poll_s: float = 2.0) -> None:
     ddb.get_waiter("table_not_exists").wait(TableName=name, WaiterConfig={"Delay": poll_s, "MaxAttempts": int(300 / max(poll_s, 1))})
 
 
-def clean(session, prefix: str) -> Steps:
+def clean(session, prefix: str, dry_run: bool = False) -> Steps:
     ddb = session.client("dynamodb")
-    steps = Steps()
+    steps = Steps(dry_run)
     for name in (trips.table_name(prefix), tips.requests_table_name(prefix)):
         with steps.part(f"table {name}"):
             if ddb.describe_table(TableName=name)["Table"]["TableStatus"] == "DELETING":
@@ -93,8 +94,21 @@ def clean(session, prefix: str) -> Steps:
     return steps
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--dry-run", action="store_true", help="list what would be deleted (the default)")
+    p.add_argument("--yes", action="store_true", help="delete; without it, only list what would be deleted")
+    args = p.parse_args(argv)
+    dry = args.dry_run or not args.yes
     prefix = os.environ.get("PREFIX", "recipe")
     region = os.environ.get("AWS_REGION", "ca-central-1")
-    print(f"removing the concurrency-correctness tables with prefix {prefix!r} in {region}")
-    sys.exit(1 if clean(boto3.Session(region_name=region), prefix).failed else 0)
+    print(f"{'would remove' if dry else 'removing'} the concurrency-correctness tables with prefix {prefix!r} in {region}")
+    steps = clean(boto3.Session(region_name=region), prefix, dry_run=dry)
+    if dry:
+        print("Nothing deleted. Run again with --yes to delete these.")
+    return 1 if steps.failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

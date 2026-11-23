@@ -24,7 +24,7 @@ athena() {  # $1 SQL; prints the result rows
     --query 'QueryExecution.{state: Status.State, reason: Status.StateChangeReason, scanned_bytes: Statistics.DataScannedInBytes}'
   if [ "$s" != SUCCEEDED ]; then
     # A query that did not succeed ends the run here, with what stays said, instead of a later step reading nothing.
-    echo "FAILED: the Athena query ended in state ${s:-(none)}. Nothing was cleaned up: fix the cause and run again, or run: BUCKET=$BUCKET bash clean_up.sh" >&2
+    echo "FAILED: the Athena query ended in state ${s:-(none)}. Nothing was cleaned up: fix the cause and run again, or run: BUCKET=$BUCKET bash clean_up.sh --yes" >&2
     exit 1
   fi
   aws athena get-query-results --query-execution-id "$id" --query 'ResultSet.Rows[].Data[*].VarCharValue' --output text
@@ -56,7 +56,7 @@ while s=$(aws dynamodb describe-export --export-arn "$EXP" --query ExportDescrip
 echo "status $s after $(( $(date +%s) - start )) s of waiting"
 if [ "$s" != COMPLETED ]; then
   # An export that did not complete has no data files: the later steps would build a table over nothing.
-  echo "FAILED: the export ended with status ${s:-(none)}, not COMPLETED. Nothing was cleaned up: look at the export in the console, then run again, or run: BUCKET=$BUCKET bash clean_up.sh" >&2
+  echo "FAILED: the export ended with status ${s:-(none)}, not COMPLETED. Nothing was cleaned up: look at the export in the console, then run again, or run: BUCKET=$BUCKET bash clean_up.sh --yes" >&2
   exit 1
 fi
 fi

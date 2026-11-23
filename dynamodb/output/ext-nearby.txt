@@ -1,0 +1,327 @@
+ext-nearby, live run of 2026-11-23 (UTC), ca-central-1, PREFIX=recipe-nearby PURPOSE=recipe.
+Run from a machine in ca-central-1 (an EC2 instance, the same Region a Lambda function or CloudShell would use), with
+`uv run` (Python 3.15.2, boto3 1.44.2). Before it: KEEP=1 bash main/run.sh and KEEP=1 bash ext-riders-and-drivers/run.sh,
+both exit 0. The account is the course's own, not a 30 USD sandbox lease; the cost is set against the lease below.
+
+== 0. Probe: the same step with the machine's system python3 (boto3 1.34.46), as `python3 ext-nearby/nearby.py tables`
+Before the fix it wrote a `borrowed` line to the ledger and stopped in a traceback:
+  botocore.exceptions.ParamValidationError: Parameter validation failed:
+  Unknown parameter in input: "OnDemandThroughput", must be one of: AttributeDefinitions, TableName, KeySchema, ...
+Fixed (nearby.py need_sdk): the check runs before any call to AWS and any ledger line; after the fix it prints:
+FAILED: this boto3 (1.34.46) does not know OnDemandThroughput, the ceiling of MAX_UNITS request units a second that every table here gets. Nothing was created. Run it with the project's boto3 (uv run bash ext-nearby/run.sh) or a newer boto3, then run again
+exit 1
+
+== The run: KEEP=1 uv run bash ext-nearby/run.sh (exit 0)
+== 1. Create recipe-nearby-drivers-by-cell and recipe-nearby-points-by-cell (kept when there); borrow recipe-nearby-drivers
+
+$ python3 ext-nearby/nearby.py tables
+(table recipe-nearby-drivers is there: borrowed; its drivers get the attributes cell, car_type, lat, lon, position_time)
+created table recipe-nearby-drivers-by-cell: partition key cell_type, sort key driver_id, on demand, at most 100 units a second
+created table recipe-nearby-points-by-cell: partition key cell_type, sort key point_id, on demand, at most 100 units a second
+{"units": {"read_units": 0, "write_units": 0, "usd": 0.0, "cad": 0.0, "read_by_kind": {}, "write_by_kind": {}}}
+
+== 2. The check answers of SIM01, from SIM01 and SIM02 alone, before AWS is called
+
+$ python3 ext-nearby/nearby.py expect
+wrote 837 expected answers to sim/data/SIM01/nearby_expected.jsonl
+
+== 3. Put SIM02's 60 drivers at their start positions (one transaction of 2 items each)
+
+$ python3 ext-nearby/nearby.py seed
+seeded 60 drivers
+{"units": {"read_units": 60.0, "write_units": 240.0, "usd": 0.000173, "cad": 0.000251, "read_by_kind": {"get driver": 60.0}, "write_by_kind": {"position transaction": 240.0}}}
+
+== 4. Replay SIM02's 7,200 positions and SIM01's 837 requests at speed 5; check each answer (about 12 minutes at speed 5)
+
+$ python3 ext-nearby/nearby.py replay --speed 5
+{
+  "positions": 7200,
+  "stored": 7131,
+  "older_kept": 69,
+  "moves": 96,
+  "retries": 0,
+  "requests": 837,
+  "equal_check": 837,
+  "equal_expected": 837,
+  "differ": [],
+  "units": {
+    "read_units": 18081.0,
+    "write_units": 28994.0,
+    "usd": 0.02242,
+    "cad": 0.032508,
+    "read_by_kind": {
+      "get driver": 7200.0,
+      "query strong": 7533.0,
+      "check scan": 3348.0
+    },
+    "write_by_kind": {
+      "position transaction": 28716.0,
+      "cancelled transaction (estimated)": 278
+    }
+  }
+}
+837 of 837 answers equal nearby_expected.jsonl and the Scan check
+{"units": {"read_units": 18081.0, "write_units": 28994.0, "usd": 0.02242, "cad": 0.032508, "read_by_kind": {"get driver": 7200.0, "query strong": 7533.0, "check scan": 3348.0}, "write_by_kind": {"position transaction": 28716.0, "cancelled transaction (estimated)": 278}}}
+
+== 5. Store SIM04's four weather stations under cells of a precision chosen from their spacing
+
+$ python3 ext-nearby/nearby.py load
+(table recipe-nearby-points-by-cell is already there: kept as it is)
+{
+  "precision": 4,
+  "median_m": 13019.2962641942,
+  "side_m": 19546.010197300708,
+  "stored": {
+    "s-cpk": "dr5r#weather",
+    "s-lga": "dr5r#weather",
+    "s-jfk": "dr5x#weather",
+    "s-ewr": "dr5r#weather"
+  }
+}
+{"units": {"read_units": 0, "write_units": 5.0, "usd": 3e-06, "cad": 5e-06, "read_by_kind": {}, "write_by_kind": {"load": 5.0}}}
+
+== 6. The 3, then the 4 stations nearest to Times Square; then 4 with MAX_RINGS=1
+
+$ python3 ext-nearby/nearby.py nearest 40.7580 -73.9855 weather 3
+{
+  "points": [
+    {
+      "point_id": "s-cpk",
+      "distance_m": 2699,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-lga",
+      "distance_m": 9173,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-ewr",
+      "distance_m": 17626,
+      "cell": "dr5r"
+    }
+  ],
+  "complete": true,
+  "covered_m": 19546,
+  "rings": 1,
+  "queries": 9,
+  "precision": 4
+}
+{"units": {"read_units": 5.0, "write_units": 0, "usd": 1e-06, "cad": 1e-06, "read_by_kind": {"settings": 0.5, "query": 4.5}, "write_by_kind": {}}}
+
+$ python3 ext-nearby/nearby.py nearest 40.7580 -73.9855 weather 4
+{
+  "points": [
+    {
+      "point_id": "s-cpk",
+      "distance_m": 2699,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-lga",
+      "distance_m": 9173,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-ewr",
+      "distance_m": 17626,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-jfk",
+      "distance_m": 23036,
+      "cell": "dr5x"
+    }
+  ],
+  "complete": true,
+  "covered_m": 39092,
+  "rings": 2,
+  "queries": 25,
+  "precision": 4
+}
+{"units": {"read_units": 13.0, "write_units": 0, "usd": 2e-06, "cad": 3e-06, "read_by_kind": {"settings": 0.5, "query": 12.5}, "write_by_kind": {}}}
+
+$ env MAX_RINGS=1 python3 ext-nearby/nearby.py nearest 40.7580 -73.9855 weather 4
+{
+  "points": [
+    {
+      "point_id": "s-cpk",
+      "distance_m": 2699,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-lga",
+      "distance_m": 9173,
+      "cell": "dr5r"
+    },
+    {
+      "point_id": "s-ewr",
+      "distance_m": 17626,
+      "cell": "dr5r"
+    }
+  ],
+  "complete": false,
+  "covered_m": 19546,
+  "rings": 1,
+  "queries": 9,
+  "precision": 4
+}
+{"units": {"read_units": 5.0, "write_units": 0, "usd": 1e-06, "cad": 1e-06, "read_by_kind": {"settings": 0.5, "query": 4.5}, "write_by_kind": {}}}
+
+== 7. Errors before any read: a point at the airport, and a car type the system does not have
+
+$ python3 ext-nearby/nearby.py nearby 40.6413 -73.7781 standard
+{
+  "error": "outside coverage"
+}
+{"units": {"read_units": 0, "write_units": 0, "usd": 0.0, "cad": 0.0, "read_by_kind": {}, "write_by_kind": {}}}
+
+$ python3 ext-nearby/nearby.py nearby 40.7580 -73.9855 limo
+{
+  "error": "unknown car type"
+}
+{"units": {"read_units": 0, "write_units": 0, "usd": 0.0, "cad": 0.0, "read_by_kind": {}, "write_by_kind": {}}}
+
+== 8. Bench: SIM01's 837 requests one at a time; p99 against 1,000 ms (run it from CloudShell in ca-central-1)
+
+$ python3 ext-nearby/nearby.py bench
+{
+  "requests": 837,
+  "failures": 0,
+  "p50_ms": 19.7,
+  "p99_ms": 39.7,
+  "slo_ms": 1000,
+  "pass": true,
+  "rate_per_s": 15
+}
+PASS: p99 39.7 ms against 1,000 ms over 837 requests
+
+== Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh
+
+The bench above printed no read units and no p95: `nearby.py bench` returned before its {"units": ...} line. Fixed
+(the units line before the verdict, p95 in the summary); the bench run again with the fix:
+
+$ uv run python3 ext-nearby/nearby.py bench     # boto3 1.44.2
+{
+  "requests": 837,
+  "failures": 0,
+  "p50_ms": 19.8,
+  "p95_ms": 22.9,
+  "p99_ms": 33.8,
+  "slo_ms": 1000,
+  "pass": true,
+  "rate_per_s": 15
+}
+{"units": {"read_units": 3766.5, "write_units": 0, "usd": 0.000518, "cad": 0.000751, "read_by_kind": {"query": 3766.5}, "write_by_kind": {}}}
+PASS: p50 19.8 ms, p95 22.9 ms, p99 33.8 ms against 1,000 ms over 837 requests
+exit 0
+
+== Correctness, after the replay (strongly consistent Scans of both tables, compared with SIM02 read offline)
+cell items 60, drivers with a position 60, offline newest position equal in both tables: 60 of 60
+(each driver is in exactly one cell item, under the cell and car type of its newest position, R81)
+
+== Clean-up: dry runs first
+$ python3 ext-nearby/clean_up.py     # dry run
+ext-nearby clean-up, PREFIX=recipe-nearby (dry run: add --yes to delete)
+tables to delete (created by this extension, from the ledger): recipe-nearby-drivers-by-cell, recipe-nearby-points-by-cell
+table recipe-nearby-drivers: borrowed, kept; attributes cell, car_type, lat, lon, position_time removed from the SIM02 drivers
+
+$ DRY=1 bash clean_up.sh
+
+== 0. ext-nearby: its two tables, from its ledger
+
+$ python3 ext-nearby/clean_up.py --yes
+
+== 1. Delete the three tables, and wait until each is gone (a run right after this can then create them again)
+
+$ aws dynamodb delete-table --table-name recipe-nearby-trips --query TableDescription.TableStatus
+
+$ aws dynamodb delete-table --table-name recipe-nearby-rider-trips --query TableDescription.TableStatus
+
+$ aws dynamodb delete-table --table-name recipe-nearby-drivers --query TableDescription.TableStatus
+
+== 2. Delete what ext-nightly-report made: the Athena table and its database, the export and the Athena results in S3
+
+$ aws glue delete-table --database-name recipe_nearby_lake --name trips_export
+
+$ aws glue delete-database --name recipe_nearby_lake
+
+(BUCKET is not set, so nothing was deleted from S3. If you ran ext-nightly-report, run this again with
+ BUCKET=<your bucket>: the export under recipe-nearby/exports/ and the results under recipe-nearby/athena-results/ stay until then)
+
+== 3. Check: none of this recipe's tables and no Athena database of it left (each check prints "(no ... left)")
+
+$ aws dynamodb list-tables --output text --query TableNames[?@=='recipe-nearby-trips' || @=='recipe-nearby-rider-trips' || @=='recipe-nearby-drivers']
+
+$ aws glue get-databases --output text --query DatabaseList[?Name=='recipe_nearby_lake'].Name
+
+== Clean-up
+$ bash clean_up.sh
+
+== 0. ext-nearby: its two tables, from its ledger
+
+$ python3 ext-nearby/clean_up.py --yes
+ext-nearby clean-up, PREFIX=recipe-nearby
+tables to delete (created by this extension, from the ledger): recipe-nearby-drivers-by-cell, recipe-nearby-points-by-cell
+table recipe-nearby-drivers: borrowed, kept; attributes cell, car_type, lat, lon, position_time removed from the SIM02 drivers
+recipe-nearby-drivers: 60 deleted
+deleting table recipe-nearby-drivers-by-cell
+deleting table recipe-nearby-points-by-cell
+(no table recipe-nearby-drivers-by-cell left)
+(no table recipe-nearby-points-by-cell left)
+
+== 1. Delete the three tables, and wait until each is gone (a run right after this can then create them again)
+
+$ aws dynamodb delete-table --table-name recipe-nearby-trips --query TableDescription.TableStatus
+"DELETING"
+
+$ aws dynamodb delete-table --table-name recipe-nearby-rider-trips --query TableDescription.TableStatus
+"DELETING"
+
+$ aws dynamodb delete-table --table-name recipe-nearby-drivers --query TableDescription.TableStatus
+"DELETING"
+
+== 2. Delete what ext-nightly-report made: the Athena table and its database, the export and the Athena results in S3
+
+$ aws glue delete-table --database-name recipe_nearby_lake --name trips_export
+(Athena table recipe_nearby_lake.trips_export not found: already gone)
+
+$ aws glue delete-database --name recipe_nearby_lake
+(database recipe_nearby_lake not found: already gone)
+
+(BUCKET is not set, so nothing was deleted from S3. If you ran ext-nightly-report, run this again with
+ BUCKET=<your bucket>: the export under recipe-nearby/exports/ and the results under recipe-nearby/athena-results/ stay until then)
+
+== 3. Check: none of this recipe's tables and no Athena database of it left (each check prints "(no ... left)")
+
+$ aws dynamodb list-tables --output text --query TableNames[?@=='recipe-nearby-trips' || @=='recipe-nearby-rider-trips' || @=='recipe-nearby-drivers']
+(no table left)
+
+$ aws glue get-databases --output text --query DatabaseList[?Name=='recipe_nearby_lake'].Name
+(no database left)
+exit 0
+
+## proof, 2026-11-23T06:09Z
+$ aws dynamodb list-tables --query "TableNames[?starts_with(@, 'recipe-nearby')]" --output text
+(tables: 0)
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=prefix,Values=recipe-nearby --query "ResourceTagMappingList[].ResourceARN"
+[]
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-nearby --query "ResourceTagMappingList[].ResourceARN"
+[]
+$ aws lambda list-functions --query "Functions[?starts_with(FunctionName, 'recipe-nearby')].FunctionName"
+[]
+$ aws iam list-roles --query "Roles[?starts_with(RoleName, 'recipe-nearby')].RoleName"
+[]
+$ aws glue get-databases --query "DatabaseList[?starts_with(Name, 'recipe_nearby')].Name"
+[]
+
+== Cost, from the units the run printed (ReturnConsumedCapacity), 0.6875 USD per million write units and 0.1375 USD
+   per million read units (ca-central-1, on demand), CAD at 1.45
+  seed           60 read, 240 write
+  replay         18,081 read (7,200 driver reads, 7,533 strong Queries, 3,348 for 837 strong Scans: 4 units each),
+                 28,716 write measured + 278 for 69 cancelled transactions (estimated: 2 units per item, not in a reply)
+  load, nearest  23 read, 5 write
+  two benches    7,533 read (3,766.5 each, measured in the second; the first printed none)
+  main/, ext-riders-and-drivers, clean-up, checks   about 30 read and 300 write (printed units, and 120 clean-up writes)
+  total          about 25,730 read units (0.0035 USD) and 29,540 write units (0.0203 USD):
+                 0.024 USD, 0.035 CAD; 0.08% of a 30 USD lease

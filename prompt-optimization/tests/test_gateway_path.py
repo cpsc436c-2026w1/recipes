@@ -81,12 +81,12 @@ def test_missing_settings_stop_before_any_call():
         make_lm("qwen3.6-35b-a3b", "task", Budget(), offline=False)
 
 
-def test_each_role_has_its_own_output_cap(fake_gateway):
-    # a thinking reflection model needs room to reason before it writes the instruction text
+def test_every_gateway_call_asks_for_16384_output_tokens(fake_gateway):
+    # course rule: a reasoning model needs room to reason before it writes the reply; 4,000 left replies empty
     gateway_chat("qwen3.8-27b", "", "a reflection prompt", "reflect", Budget())
     gateway_chat("qwen3.6-35b-a3b", "", "a question", "task", Budget())
     assert [r["body"]["max_tokens"] for r in fake_gateway] == [models.REFLECTION_MAX_TOKENS, models.TASK_MAX_TOKENS]
-    assert models.REFLECTION_MAX_TOKENS == 16384 and models.TASK_MAX_TOKENS < models.REFLECTION_MAX_TOKENS
+    assert {r["body"]["max_tokens"] for r in fake_gateway} == {16384}
 
 
 def test_the_reserve_holds_the_reflection_cap():

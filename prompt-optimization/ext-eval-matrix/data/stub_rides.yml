@@ -1,0 +1,59 @@
+# Fixed replies of the offline stub SQL step for the rides questions (ext-eval-matrix/rides.py). Not used with the
+# course LLM gateway. For each question the stub writes `reply`, unless one of its habits applies and the system
+# prompt does not carry the words that stop it (rides.STOPPED_BY):
+#   inclusive-end  BETWEEN for a time window, so a request at the end time is counted
+#   first-zone     a question about two zones answered for the first zone only
+#   guess          a query for a question the table cannot answer, instead of CANNOT_ANSWER
+# A reply that is wrong in `reply` stays wrong whatever the prompt says (o4).
+- question: How many trips were requested in zone 161?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161
+- question: How many trips were requested in zone 48?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48
+- question: What is the longest trip, in miles, among the trips requested in zone 230?
+  reply: SELECT MAX(trip_miles) FROM trips WHERE pickup_zone_id = 230
+- question: How many trips requested in zone 230 were longer than 5 miles?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 230 AND trip_miles > 5 * 1.609
+- question: How many trips requested in zone 161 were shared with another rider?
+  reply: CANNOT_ANSWER
+  guess: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND trip_state = 'completed'
+- question: How many trips were requested between 08:00 and 08:15?
+  reply: SELECT COUNT(*) FROM trips WHERE requested_time >= TIMESTAMP '2024-03-14 08:00:00' AND requested_time < TIMESTAMP '2024-03-14 08:15:00'
+  inclusive-end: SELECT COUNT(*) FROM trips WHERE requested_time BETWEEN TIMESTAMP '2024-03-14 08:00:00' AND TIMESTAMP '2024-03-14 08:15:00'
+- question: How many trips were requested in zone 161 between 08:00 and 09:00?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_time >= TIMESTAMP '2024-03-14 08:00:00' AND requested_time < TIMESTAMP '2024-03-14 09:00:00'
+  inclusive-end: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_time BETWEEN TIMESTAMP '2024-03-14 08:00:00' AND TIMESTAMP '2024-03-14 09:00:00'
+- question: How many trips were requested in zone 230 between 08:30 and 08:45?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 230 AND requested_time >= TIMESTAMP '2024-03-14 08:30:00' AND requested_time < TIMESTAMP '2024-03-14 08:45:00'
+  inclusive-end: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 230 AND requested_time BETWEEN TIMESTAMP '2024-03-14 08:30:00' AND TIMESTAMP '2024-03-14 08:45:00'
+- question: How many trips were requested in zone 48 between 08:15 and 08:30?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48 AND requested_time >= TIMESTAMP '2024-03-14 08:15:00' AND requested_time < TIMESTAMP '2024-03-14 08:30:00'
+  inclusive-end: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48 AND requested_time BETWEEN TIMESTAMP '2024-03-14 08:15:00' AND TIMESTAMP '2024-03-14 08:30:00'
+- question: How many trips were requested between 08:00 and 09:00 on 2024-03-15?
+  reply: CANNOT_ANSWER
+  guess: SELECT COUNT(*) FROM trips WHERE requested_time >= TIMESTAMP '2024-03-15 08:00:00' AND requested_time < TIMESTAMP '2024-03-15 09:00:00'
+- question: How many more trips were requested in zone 161 than in zone 48?
+  reply: SELECT COUNT(*) FILTER (WHERE pickup_zone_id = 161) - COUNT(*) FILTER (WHERE pickup_zone_id = 48) FROM trips
+  first-zone: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161
+- question: By how many dollars is the average fare in zone 230 higher than in zone 161?
+  reply: SELECT AVG(fare) FILTER (WHERE pickup_zone_id = 230) - AVG(fare) FILTER (WHERE pickup_zone_id = 161) FROM trips
+  first-zone: SELECT AVG(fare) FROM trips WHERE pickup_zone_id = 230
+- question: How many trips were requested in zones 48 and 230 together?
+  reply: SELECT COUNT(*) FROM trips WHERE pickup_zone_id IN (48, 230)
+  first-zone: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48
+- question: Of the trips requested in zones 161 and 230, what percentage were requested in zone 161?
+  reply: SELECT 100.0 * COUNT(*) FILTER (WHERE pickup_zone_id = 161) / COUNT(*) FROM trips WHERE pickup_zone_id IN (161, 230)
+  first-zone: SELECT 100.0 * COUNT(*) FILTER (WHERE pickup_zone_id = 161) / COUNT(*) FROM trips
+- question: How many minutes longer did riders wait for their pickup in zone 48 than in zone 161?
+  reply: CANNOT_ANSWER
+  guess: SELECT AVG(trip_miles) FILTER (WHERE pickup_zone_id = 48) - AVG(trip_miles) FILTER (WHERE pickup_zone_id = 161) FROM trips
+- question: What is the total of all fares, in dollars?
+  reply: SELECT SUM(fare) FROM trips
+- question: What is the average fare, in dollars, of the trips requested in zone 48?
+  reply: SELECT AVG(fare) FROM trips WHERE pickup_zone_id = 48
+- question: What is the total distance, in miles, of the trips requested in zone 161?
+  reply: SELECT SUM(trip_miles) FROM trips WHERE pickup_zone_id = 161
+- question: What is the fare per mile, in dollars, over all trips (all fares divided by all miles)?
+  reply: SELECT SUM(fare) / SUM(trip_miles) FROM trips
+- question: What is the total of the tips, in dollars?
+  reply: CANNOT_ANSWER
+  guess: SELECT SUM(fare) * 0.15 FROM trips

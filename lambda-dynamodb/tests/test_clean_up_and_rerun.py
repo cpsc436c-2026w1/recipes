@@ -23,12 +23,13 @@ def fake(tmp_path):
     for tool in bin_dir.iterdir():
         tool.chmod(0o755)
 
-    def _run(script, **extra):
+    def _run(script, bare=False, **extra):
         log.write_text("")
         env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_") and k not in ("KEEP", "DRY", "ROLE_ARN")}
         env |= {"PATH": f"{bin_dir}:{os.environ['PATH']}", "TMPDIR": str(tmp_path), "FAKE_AWS_LOG": str(log),
                 "PREFIX": "recipe"} | extra
-        p = subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=60)
+        args = ["--yes"] if script == "clean_up.sh" and not bare else []     # a clean-up deletes only with --yes
+        p = subprocess.run(["bash", str(RECIPE / script), *args], env=env, capture_output=True, text=True, timeout=60)
         return p, log.read_text().splitlines()
 
     return _run
@@ -131,3 +132,17 @@ def test_a_conflict_that_does_not_say_already_exists_stops_the_run(fake):
     assert p.returncode != 0 and "something else is wrong" in p.stderr
     assert "already there" not in p.stdout
     assert not any("add-permission" in c for c in calls)
+
+
+def test_a_bare_clean_up_deletes_nothing_and_says_so(fake):
+    """The clean-up contract: without --yes the script lists the commands and calls aws for none of them."""
+    p, calls = fake("clean_up.sh", bare=True)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert not [c for c in calls if " delete-" in f" {c}"], calls
+    assert p.stdout.rstrip().endswith("Nothing deleted. Run again with --yes to delete these.")
+
+
+def test_clean_up_with_yes_deletes(fake):
+    p, calls = fake("clean_up.sh")
+    assert [c for c in calls if " delete-" in f" {c}"], calls
+    assert "Nothing deleted. Run again with --yes to delete these." not in p.stdout

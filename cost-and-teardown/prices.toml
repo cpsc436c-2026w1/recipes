@@ -1,0 +1,32 @@
+# The rows of the course price sheet this team uses (ca-central-1), with the date they were read. USD; CAD at the
+# course's planning rate. A part whose name is not here is "unpriced" in scripts/cost.py, and its total a subtotal:
+# read its rate from AWS's price list (the sheet says how) and add a row.
+sheet = "price sheet, ca-central-1, 2026-11-18"
+cad_per_usd = 1.45
+
+# part = [rate in USD, per how many units]
+[rates]
+"Lambda requests" = [0.20, 1_000_000]
+"Lambda GB-seconds, arm64" = [0.0000133334, 1]
+"Lambda GB-seconds, x86" = [0.0000166667, 1]
+"DynamoDB write units" = [0.6875, 1_000_000]
+"DynamoDB read units" = [0.1375, 1_000_000]
+"DynamoDB storage, GB-months" = [0.275, 1]
+"DynamoDB import, GB" = [0.165, 1]
+"Athena Data scanned, MB" = [5.50, 1_048_576]          # 5.50 per TB = 2^20 MB; each query billed at least 10 MB
+"Kinesis shard-hours" = [0.0165, 1]
+"Kinesis PUT payload units" = [0.0154, 1_000_000]
+"S3 PUT, COPY, POST, LIST requests" = [0.0055, 1_000]
+"S3 GET requests" = [0.00044, 1_000]
+"S3 storage, GB-months" = [0.025, 1]
+"Glue DPU-hours" = [0.308, 1]                           # Glue 6.0 and later
+"Glue Data Catalog requests" = [1.00, 1_000_000]
+"CloudWatch Logs ingestion, GB" = [0.55, 1]
+"CloudWatch alarm-months" = [0.10, 1]
+"SQS requests" = [0.40, 1_000_000]
+"Scheduler invocations" = [1.10, 1_000_000]
+"Fargate vCPU-hours" = [0.03565, 1]                     # arm64
+"Fargate GB-hours" = [0.00389, 1]                       # arm64
+"Application Load Balancer hours" = [0.02475, 1]
+"Application Load Balancer LCU-hours" = [0.0088, 1]
+"Public IPv4 hours" = [0.005, 1]

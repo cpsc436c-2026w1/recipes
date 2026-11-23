@@ -1,0 +1,168 @@
+# Captured 2026-11-23, ca-central-1, PREFIX=recipe-simruns, PURPOSE=recipe (account masked).
+# Live replay of SIM01 (sim/data/SIM01/trip-events/dt=*/hour=*/deliveries.jsonl) into a 1-shard provisioned Kinesis
+# stream at speed 60 and into the lake bucket at speed 0, each read back and compared with the answer computed from
+# _truth/; then the daily check deployed, called by hand and judged.
+
+2026-11-23T08:03:04Z start
+$ uv run python scripts/lake.py up
+created  s3://recipe-simruns-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+$ uv run python scripts/live_run.py stream-up
+created  Kinesis stream recipe-simruns-trip-events (1 provisioned shard, billed by the hour until deleted)
+2026-11-23T08:03:11Z stream active
+$ uv run behave --tags=@live --no-capture features/whole_run.feature
+USING RUNNER: behave.runner:Runner
+Feature: A whole run checked against the answer the files give # features/whole_run.feature:1
+  The team's pipeline is the function the step code names (here the stand-in rides.pipeline); the answer is
+  computed from _truth/events.jsonl and _truth/faults.jsonl of the data set (sim/truth.py).
+    Example: The rush hour on AWS                                                                       # features/whole_run.feature:22
+      Given the simulated data set SIM01 "rush-hour"                                                    # features/steps/sim_steps.py:91
+      When the pipeline processes the run in the deployed system with run id "20261123T0900-SIM01"      # features/steps/sim_steps.py:350
+sent     2515 deliveries to kinesis:recipe-simruns-trip-events in 1916 calls, 137.242 s; latest send 0.042 s after its planned time; 0 failed
+read     2515 deliveries back, 2511 events once each, 837 trips; requested per zone {'48': 304, '161': 191, '230': 342}; truth {'48': 304, '161': 191, '230': 342}: same
+      Then the table of trips requested per zone holds 304, 191 and 342 trips for zones 48, 161 and 230 # features/steps/sim_steps.py:358
+      And the run's output is in evidence/20261123T0900-SIM01/                                          # features/steps/sim_steps.py:373
+
+1 feature passed, 0 failed, 0 skipped
+1 rule passed, 0 failed, 1 skipped
+1 scenario passed, 0 failed, 2 skipped
+4 steps passed, 0 failed, 7 skipped
+Took 0min 0.000s
+$ uv run python scripts/live_run.py stream-down
+deleting Kinesis stream recipe-simruns-trip-events
+removed  Kinesis stream recipe-simruns-trip-events (describe-stream: not found)
+2026-11-23T08:05:36Z stream deleted
+$ aws kinesis describe-stream-summary --stream-name recipe-simruns-trip-events --region ca-central-1
+
+aws: [ERROR]: An error occurred (ResourceNotFoundException) when calling the DescribeStreamSummary operation: Stream recipe-simruns-trip-events under account 111122223333 not found.
+$ uv run python scripts/live_run.py run SIM01 --to s3 --speed 0 --run-id 20261123T0900-SIM01-s3
+sent     2515 deliveries to s3:recipe-simruns-lake-111122223333 in 109 calls, 3.182 s; latest send 3.154 s after its planned time; 0 failed
+read     2515 deliveries back, 2511 events once each, 837 trips; requested per zone {'48': 304, '161': 191, '230': 342}; truth {'48': 304, '161': 191, '230': 342}: same
+$ aws s3api list-objects-v2 --bucket recipe-simruns-lake-111122223333 --prefix raw/trip-events/ --query length(Contents) --region ca-central-1
+109
+2026-11-23T08:05:46Z check up
+$ uv run behave --tags=@live --no-capture features/scheduled_check.feature
+USING RUNNER: behave.runner:Runner
+Feature: The deployed system checked every day, and every commit tested offline # features/scheduled_check.feature:1
+  The probe is SIM03 (README, Data). Times are Vancouver time; CHECK_DELAY_MIN is 90, from a data latency of 75 min
+  at p95 (assumed) plus 15. Offline, the deployed system is the stand-in pipeline in moto.
+    @live
+    Example: The deployed function sends the probe, reads it and judges a day without a check                              # features/scheduled_check.feature:75
+      Given the check is deployed with the lake bucket as its target and its query                                         # features/steps/sim_steps.py:632
+created  IAM role recipe-simruns-check-role
+created  Lambda function recipe-simruns-live-check
+created  IAM role recipe-simruns-check-scheduler-role
+schedule recipe-simruns-check-send: cron(0 6 * * ? *) America/Vancouver
+schedule recipe-simruns-check-read: cron(30 7 * * ? *) America/Vancouver
+schedule recipe-simruns-check-verdict: cron(15 0 * * ? *) America/Vancouver
+      When the deployed function sends the probe and then reads it                                                         # features/steps/sim_steps.py:641
+      Then the day's item in the run log is finished with 20 probe trips                                                   # features/steps/sim_steps.py:653
+      And the deployed verdict of 2026-11-20, a day without an item, publishes "2026-11-20: no check" to the check's topic # features/steps/sim_steps.py:659
+
+1 feature passed, 0 failed, 0 skipped
+1 rule passed, 0 failed, 2 skipped
+1 scenario passed, 0 failed, 15 skipped
+4 steps passed, 0 failed, 49 skipped
+Took 0min 0.000s
+$ uv run python scripts/check.py alarm
+created  alarm recipe-simruns-check-failed -> recipe-simruns-check-alerts
+$ aws cloudwatch describe-alarms --alarm-names recipe-simruns-check-failed --region ca-central-1 --query MetricAlarms[0].[StateValue,Statistic,Period,EvaluationPeriods,DatapointsToAlarm,TreatMissingData] --output text
+INSUFFICIENT_DATA	Minimum	3600	26	26	breaching
+
+$ cat evidence/20261123T0900-SIM01/command.txt evidence/20261123T0900-SIM01/summary.json evidence/20261123T0900-SIM01/tables.json
+scripts/live_run.py run SIM01 --to kinesis --speed 60.0 --run-id 20261123T0900-SIM01
+commit 17359cc
+{
+  "calls": 1916,
+  "failed": 0,
+  "late_s": 0.042,
+  "run_id": "20261123T0900-SIM01",
+  "seconds": 137.242,
+  "sent": 2515,
+  "speed": 60.0,
+  "target": "kinesis:recipe-simruns-trip-events"
+}
+{
+ "deliveries_received": 2515,
+ "events": 2511,
+ "matches_truth": true,
+ "requested_per_zone": {
+  "161": 191,
+  "230": 342,
+  "48": 304
+ },
+ "trips": 837,
+ "truth": {
+  "events": 2511,
+  "requested_per_zone": {
+   "161": 191,
+   "230": 342,
+   "48": 304
+  },
+  "trips": 837
+ }
+}
+$ head -3 evidence/20261123T0900-SIM01/sent.jsonl; wc -l
+{"delivery_id": "20261123T0900-SIM01-dl-000001", "event_id": "20261123T0900-SIM01-ev-000001", "result": "ok", "sent_time": "2026-11-23T08:03:13.011Z", "target": "kinesis:recipe-simruns-trip-events"}
+{"delivery_id": "20261123T0900-SIM01-dl-000002", "event_id": "20261123T0900-SIM01-ev-000002", "result": "ok", "sent_time": "2026-11-23T08:03:13.011Z", "target": "kinesis:recipe-simruns-trip-events"}
+{"delivery_id": "20261123T0900-SIM01-dl-000003", "event_id": "20261123T0900-SIM01-ev-000003", "result": "ok", "sent_time": "2026-11-23T08:03:13.011Z", "target": "kinesis:recipe-simruns-trip-events"}
+2515
+$ cat evidence/20261123T0900-SIM01-s3/summary.json evidence/20261123T0900-SIM01-s3/tables.json
+{
+  "calls": 109,
+  "failed": 0,
+  "late_s": 3.154,
+  "run_id": "20261123T0900-SIM01-s3",
+  "seconds": 3.182,
+  "sent": 2515,
+  "speed": 0.0,
+  "target": "s3:recipe-simruns-lake-111122223333"
+}
+{
+ "deliveries_received": 2515,
+ "events": 2511,
+ "matches_truth": true,
+ "requested_per_zone": {
+  "161": 191,
+  "230": 342,
+  "48": 304
+ },
+ "trips": 837,
+ "truth": {
+  "events": 2511,
+  "requested_per_zone": {
+   "161": 191,
+   "230": 342,
+   "48": 304
+  },
+  "trips": 837
+ }
+}
+$ cat evidence/live-check-2026-11-23/{send,read,verdict}.json
+{
+ "calls": 27,
+ "failed": 0,
+ "late_s": 0.968,
+ "run_id": "probe-2026-11-23",
+ "seconds": 0.995,
+ "sent": 60,
+ "speed": 0,
+ "target": "s3:recipe-simruns-lake-111122223333"
+}
+{
+ "checked_count": 20,
+ "ended_at": "2026-11-23T08:06:23.714Z",
+ "error_text": "",
+ "job": "live-check",
+ "run_id": "2026-11-23",
+ "run_state": "finished",
+ "started_at": "2026-11-23T08:06:21.910Z"
+}
+{
+ "date": "2026-11-20",
+ "due": true,
+ "message": "2026-11-20: no check",
+ "published": "78466890-6078-5d50-bf74-0bed9639ba40"
+}
+$ aws cloudwatch get-metric-statistics --namespace LiveCheck --metric-name CheckPassed --dimensions Name=Team,Value=recipe-simruns --start-time 2026-11-23T05:00:00Z --end-time 2026-11-23T09:00:00Z --period 3600 --statistics Minimum --region ca-central-1 --output text
+CheckPassed
+DATAPOINTS	1.0	2026-11-23T00:00:00-08:00	Count

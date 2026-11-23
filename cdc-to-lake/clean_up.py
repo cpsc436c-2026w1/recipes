@@ -1,7 +1,10 @@
 """Remove everything a real run of this recipe created in your AWS account, for this PREFIX.
 
-  PREFIX=recipe-yourname uv run python clean_up.py            delete
-  PREFIX=recipe-yourname uv run python clean_up.py --dry-run  list only
+  PREFIX=recipe-yourname uv run python clean_up.py            list only: nothing is deleted
+  PREFIX=recipe-yourname uv run python clean_up.py --yes      delete
+
+First the clean-ups of ext-maintenance (the nightly compaction function, its schedules, alarms and topic) and of
+ext-scheduled-merge (the hourly merge), each in its folder's clean_up.py; then the rest of the recipe.
 
 Removes, in this order: the nightly schedules (ext-maintenance), the alarms (ext-lag-alarm), the event source
 mapping, the Lambda function and its log group, the Firehose stream, the Glue view, table and database, the lake's
@@ -209,17 +212,47 @@ def clean_up(s: Settings, dry_run: bool = False, session=None, mapping_wait_s: f
     return steps
 
 
+EXTENSION_CLEAN_UPS = ("ext-maintenance", "ext-scheduled-merge")   # each has its own clean_up.py
+
+
+def extension_clean_ups(dry_run: bool, log=print) -> int:
+    """Run the clean-up of each extension that deploys its own resources (the nightly compaction function and its
+    alarms; the hourly merge), first, so no scheduled job runs while the rest goes. Lines about nothing (0 objects,
+    0 items) are left out. Returns 1 when one of them failed."""
+    import importlib.util
+    from pathlib import Path
+
+    code = 0
+    for folder in EXTENSION_CLEAN_UPS:
+        path = Path(__file__).resolve().parent / folder / "clean_up.py"
+        spec = importlib.util.spec_from_file_location(f"{folder.replace('-', '_')}_clean_up", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        lines: list[str] = []
+        code |= module.clean(yes=not dry_run, log=lines.append)
+        for line in lines:
+            if line.startswith(("absent", "kept")) or " 0 objects " in line or " 0 items " in line:
+                continue
+            log(line.replace("would remove ", "would remove ", 1) if dry_run else line)
+    return code
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--dry-run", action="store_true", help="list what would be deleted (the default)")
+    p.add_argument("--yes", action="store_true", help="delete; without it, only list what would be deleted")
     args = p.parse_args()
+    args.dry_run = args.dry_run or not args.yes
     s = Settings()
+    ext_code = extension_clean_ups(args.dry_run)
     steps = clean_up(s, args.dry_run)
-    code = steps.report()
+    code = steps.report() | ext_code
     verb = "would be removed" if args.dry_run else "removed"
     print(f"{len(steps.removed)} resources {verb} for PREFIX={s.prefix} in {s.region}")
     if code:
         print(f"{len(steps.failed)} steps FAILED: the clean-up is NOT complete. Fix what they say, then run it again")
+    if args.dry_run:
+        print("Nothing deleted. Run again with --yes to delete these.")
     return code
 
 

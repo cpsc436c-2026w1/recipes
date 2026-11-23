@@ -95,7 +95,8 @@ Each requirement has one or more scenarios in [`features/`](features/), tagged w
 runs them offline. Read each representative's requirements in its own README. Their numbers go on from here:
 [lakehouse first](rep-lakehouse-first/README.md#requirements) from 40,
 [operational first](rep-operational-first/README.md#requirements) from 50,
-[generative AI first](rep-genai-first/README.md#requirements) from 70. When you change what the recipe does,
+[generative AI first](rep-genai-first/README.md#requirements) from 70,
+[ext-backfill](ext-backfill/README.md#requirements) from 90. When you change what the recipe does,
 change the requirement and its scenario with it: `python3 tools/check_requirements.py` (repo root) fails when
 they do not match.
 
@@ -126,18 +127,18 @@ they do not match.
 
 **Clean-up** (`clean_up.py`)
 
-- **R30** (event) When `clean_up.py` runs, the recipe shall remove every resource the three representatives created
+- **R30** (event) When `clean_up.py --yes` runs, the recipe shall remove every resource the three representatives created
   for `$PREFIX`, and the folder `.local`.
-- **R31** (complex) While nothing of the recipe is left, when `clean_up.py` runs, the recipe shall report every
+- **R31** (complex) While nothing of the recipe is left, when `clean_up.py --yes` runs, the recipe shall report every
   resource as absent and exit with code 0.
 - **R32** (unwanted) If AWS refuses a step of the clean-up, then the recipe shall print that step as `FAILED`,
   attempt every other step, and exit with code 1.
 - **R33** (ubiquitous) The recipe shall remove only resources with the exact names it builds from `$PREFIX`.
 - **R34** (ubiquitous) The recipe shall delete an IAM role only if the role carries the tag `recipe` =
   `project-skeleton`.
-- **R35** (complex) While the stream, the Firehose stream or the table is still being deleted, when `clean_up.py`
+- **R35** (complex) While the stream, the Firehose stream or the table is still being deleted, when `clean_up.py --yes`
   runs, the recipe shall report it as already being deleted and not ask for its deletion again.
-- **R36** (optional) Where `--local` is passed, the recipe shall remove the folder `.local` and make no call to
+- **R36** (optional) Where `--local --yes` is passed, the recipe shall remove the folder `.local` and make no call to
   AWS.
 - **R37** (event) When `clean_up.py` deletes the table, the recipe shall print that DynamoDB keeps a system backup
   of it for 35 days, at no cost.
@@ -161,7 +162,7 @@ that the scripts in your terminal create and ask.
 | Assistant | `rep-genai-first/run.py`, `genai.py`, `stub.py` | the stub model and moto's table | the loop and the tool, reading your table with your credentials | no; the model runs behind the course LLM gateway |
 | Same question of the lake | `rep-genai-first/lake_example.py` | DuckDB over the export on disk | asks Athena, then the table | no |
 | Page | `skeleton/page.py` | writes `.local/<shape>.html` | the same file, on the machine of the terminal | no |
-| Clean-up | `clean_up.py` | `--local` removes `.local/` | yes, with the `PREFIX` of the runs | no |
+| Clean-up | `clean_up.py` | `--local --yes` removes `.local/` | yes, with the `PREFIX` of the runs | no |
 | Tests and scenarios | `tests/`, `features/` | yes, and in CI | never against AWS | no |
 
 This recipe does not have a container or an instance.
@@ -208,7 +209,7 @@ The following list describes what the commands do and what you should see:
 4. Each run ends with a line that starts `updates in the last hour:` or, for the assistant, a reply with the
    number ([What you should see](#what-you-should-see)).
 
-Clean-up and cost: `uv run python clean_up.py --local` removes `.local/`. Nothing is billed.
+Clean-up and cost: `uv run python clean_up.py --local --yes` removes `.local/` (without `--yes` it lists it). Nothing is billed.
 
 ### 2. Sandbox terminal: lakehouse first
 
@@ -285,7 +286,8 @@ Clean-up and cost: it does not create anything in AWS. One question is under 0.0
 In the same terminal, with the same `PREFIX`, the same day:
 
 ```bash
-uv run python clean_up.py
+uv run python clean_up.py    # lists what it would delete; deletes nothing
+uv run python clean_up.py --yes
 ```
 
 It prints one line per resource: `removed`, `absent` or `FAILED` ([Cost and clean-up](#cost-and-clean-up)).
@@ -336,6 +338,7 @@ Each extension is its own recipe and starts from one of these folders.
 | Change data capture | every DynamoDB change reaches the lake by itself, not only at export time | `cdc-to-lake` | the export step of `rep-operational-first/` |
 | Concurrency correctness | two users change the same key at once; one change is accepted, one refused, and a race test shows it | `concurrency-correctness` | `handler.py`: a conditional write on `key#` items |
 | Chat on the dashboard | plain-language questions over your data, with the model writing SQL over the lake | `dashboard-chat` | `rep-genai-first/` grows from one question to a chat; `lake_example.py` is its starting point |
+| Backfill | a month of past trips in the lake beside the live ones, counted per day against the source; the same trips in DynamoDB by id, by an import from S3 | `ext-backfill/` (in this folder) | none: it uses the bucket and Glue database of `rep-lakehouse-first/`; before this folder's `clean_up.py --yes`, run `ext-backfill/clean_up.py` (it lists) and then with `--yes`, or its DynamoDB table `<PREFIX>-trips-by-id` stays |
 | Agent with tools under controlled autonomy | a write tool behind an approval, a step and budget cap, a trace per step | `limits-and-alarms` (`ext-runaway-loop/`) | `genai.py`: a second tool, and the API of operational first as its target |
 
 ## Cost and clean-up
@@ -360,13 +363,14 @@ created when you are done.
 In your sandbox terminal:
 
 ```bash
-PREFIX=recipe-yourname uv run python clean_up.py      # AWS resources for this prefix, then .local/
+PREFIX=recipe-yourname uv run python clean_up.py      # lists what it would delete; deletes nothing
+PREFIX=recipe-yourname uv run python clean_up.py --yes # AWS resources for this prefix, then .local/
 ```
 
 From your local device (laptop) in a terminal:
 
 ```bash
-uv run python clean_up.py --local                  # only the offline files
+uv run python clean_up.py --local --yes            # only the offline files
 ```
 
 The table has point-in-time recovery on, so when `clean_up.py` deletes it DynamoDB keeps a system backup of it,

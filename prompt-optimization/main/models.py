@@ -47,8 +47,10 @@ REFLECTION_MODEL = "qwen3.8-27b"
 STUB_FOR = {TASK_MODEL: "stub-small", REFLECTION_MODEL: "stub-large"}
 
 # qwen3.8-27b is a reasoning model and spends output tokens on reasoning before the reply (../llm-probes);
-# a small max_tokens leaves the reply empty. 4000 is assumed enough for one SQL query.
-TASK_MAX_TOKENS = 4000
+# a small max_tokens leaves the reply empty. Every gateway call asks for 16,384, the course LLM gateway's per-key
+# cap (course rule: a reasoning model's reply did not fit in 4,000 or 8,192). The money cap holds that much output
+# for each call in flight (Budget.reserve), so a run needs a cap with room for it.
+TASK_MAX_TOKENS = 16384
 # A reflection reply is a whole instruction text, written after the model has reasoned over every failure. With a
 # thinking reflection model, a cap of about 4,000 left some replies empty. REFLECTION_MAX_TOKENS changes it. A
 # gateway may clamp a larger request to its own per-key cap without an error (the gateway in ../llm-gateway clamps

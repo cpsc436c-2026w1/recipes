@@ -885,7 +885,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "boto3", specifier = ">=1.35" },
+    { name = "boto3", specifier = ">=1.40" },
     { name = "duckdb", specifier = ">=1.1" },
     { name = "moto", extras = ["s3", "dynamodb", "kinesis", "firehose", "glue", "athena", "iam", "awslambda", "logs"], specifier = ">=5.0" },
     { name = "openai", specifier = ">=1.50" },

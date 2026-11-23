@@ -1,0 +1,48 @@
+Second clean-up, after the one-read merge run and the failing night (2026-11-23). The dry run listed the same entries,
+all created by this run's ledger.
+
+$ PREFIX=recipe-lake uv run python clean_up.py --yes   (absent lines left out), then the kept-by-design leftovers, then scripts/lake.py down --yes
+removed      alarm recipe-lake-compact-errors
+removed      alarm recipe-lake-compact-missed
+removed      schedule group recipe-lake-maintenance-compaction and its schedules
+removed      function recipe-lake-compact-days
+removed      log group /aws/lambda/recipe-lake-compact-days
+removed      role recipe-lake-compact-role
+removed      role recipe-lake-compact-scheduler-role
+removed      topic recipe-lake-maintenance-alerts and its subscriptions
+removed      schedule group recipe-lake-scheduled-merge and its schedules
+removed      function recipe-lake-merge-run
+removed      log group /aws/lambda/recipe-lake-merge-run
+removed      role recipe-lake-merge-role
+removed      role recipe-lake-merge-scheduler-role
+removed      4 items of job merge in recipe-lake-runs
+removed      Glue table recipe_lake_lake.trips
+removed      Glue table recipe_lake_lake.zone_counts
+removed      Glue table recipe_lake_lake.trip_events
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/trips/
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/zone_counts/
+removed      1 objects under s3://recipe-lake-lake-111122223333/lake/merge-state/
+0 resources removed for PREFIX=recipe-lake in ca-central-1
+left in recipe_lake_lake: trip_events_parquet
+removed  Glue table recipe_lake_lake.trip_events_parquet (kept by design)
+removed  Glue database recipe_lake_lake
+removed  run log recipe-lake-runs (kept by design)
+removed  Athena workgroup recipe-lake-wg
+removed  Athena workgroup recipe-lake-ctas-wg
+removed  s3://recipe-lake-lake-111122223333 and its 133 object versions
+
+Proof, 2026-11-23T03:04:28Z:
+tagged purpose=recipe: []
+tagged Team=recipe-lake*: []
+schedule groups recipe-lake*: []
+schedules recipe-lake*: []
+Glue databases recipe_lake*/recipe-lake*: []
+Athena workgroups recipe-lake*: []
+S3 buckets recipe-lake*: []
+Lambda functions recipe-lake*: []
+log groups /aws/lambda/recipe-lake*: []
+IAM roles recipe-lake*: []
+DynamoDB tables recipe-lake*: []
+CloudWatch alarms recipe-lake*: []
+SNS topics recipe-lake*: []
+describe: NoSuchEntity merge-role; NoSuchEntity compact-role; ResourceNotFoundException runs; Not Found bucket

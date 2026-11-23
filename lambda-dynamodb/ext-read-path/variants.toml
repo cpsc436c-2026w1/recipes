@@ -1,0 +1,24 @@
+# The reads the experiment compares: one [[variant]] each, 200 calls a variant, every key the same number of times.
+#   name    the row of the summary
+#   action  the handler's action (main/handler.py): get or rider; a team's own route names its own
+#   keys    a list of keys, or trips:<n> (t-0000 ...) or riders:<n> (r-00 ...), the dynamodb recipe's items
+#   body    other fields of each request ("strong" = a strongly consistent read)
+#   url     optional: another route's address (default: the function URL of $PREFIX-api); $NAME is read from the
+#           environment, so a second store's route is url = "$ATHENA_ROUTE_URL"
+# A team's two key designs: two variants with the same keys, for example name = "topic" and name = "topic-author".
+
+[[variant]]
+name = "get-eventual"
+action = "get"
+keys = "trips:50"
+
+[[variant]]
+name = "get-strong"
+action = "get"
+keys = "trips:50"
+body = { strong = true }
+
+[[variant]]
+name = "rider"
+action = "rider"
+keys = "riders:5"

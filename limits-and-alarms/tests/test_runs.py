@@ -87,7 +87,7 @@ def test_clean_up_goes_on_after_a_step_is_refused(s, monkeypatch, capsys):
 
     monkeypatch.setattr(c["budgets"], "describe_budget", refuse)
     monkeypatch.setattr(clean_up, "clients", lambda s: c)
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     with pytest.raises(SystemExit) as e:
         clean_up.main()
     out = capsys.readouterr()
@@ -176,7 +176,7 @@ def test_an_untagged_budget_with_the_name_is_not_adopted_or_deleted(s, capsys, m
     assert f"budget {s.budget_name} exists but does not carry the tag" in str(e.value)
     acct = c["sts"].get_caller_identity()["Account"]
     monkeypatch.setattr(clean_up, "clients", lambda s: c)
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     with pytest.raises(SystemExit) as e:
         clean_up.main()
     assert e.value.code == 1 and f"FAILED budget {s.budget_name}: refused" in capsys.readouterr().err

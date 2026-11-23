@@ -2,7 +2,12 @@
 
   uv run python ext-maintenance/maintenance.py                     offline: local Iceberg table, DuckDB
   uv run python ext-maintenance/maintenance.py --target aws        OPTIMIZE and VACUUM once in Athena, measured
-  uv run python ext-maintenance/maintenance.py --target aws --schedule   also create the two daily schedules
+  uv run python ext-maintenance/maintenance.py --target aws --schedule [--email you@example.com]
+        the nightly function <PREFIX>-compact-days, its two schedules, two alarms and the alert topic
+  uv run python ext-maintenance/maintenance.py --target aws --register-partitions
+        trip_events_parquet: projection off, every day folder and the next 7 days registered
+  uv run python ext-maintenance/maintenance.py --target aws --measure [--all-days]
+        the 30-day count before and after compacting trip_events_parquet, after a spend estimate
 
 Firehose commits once per buffer interval, so a 60 s buffer can add up to 1,440 commits a day, each with its own
 small data files and its own snapshot. Every query then opens many files, and the metadata keeps growing.
@@ -19,7 +24,10 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Appended, not put first: a folder of this recipe never hides a module of the same name in another one
+# (each extension has its own clean_up.py).
+sys.path += [p for p in [str(Path(__file__).resolve().parent.parent), str(Path(__file__).resolve().parent),
+                str(Path(__file__).resolve().parent.parent / "scripts")] if p not in sys.path]
 
 from main.config import Settings  # noqa: E402
 from main.lake import LocalLake  # noqa: E402
@@ -38,24 +46,21 @@ def vacuum_sql(s: Settings) -> str:
     return f"VACUUM {s.database}.{s.lake_table}"
 
 
-def schedule_definitions(s: Settings, account: str) -> list[dict]:
-    """EventBridge Scheduler calls Athena directly (universal target): no function to write or to pay for."""
-    out = s.athena_output(account)
+def schedule_definitions(prefix: str, function_arn: str, role_arn: str) -> list[dict]:
+    """Two schedules in the tagged group <PREFIX>-maintenance-compaction, both calling the function: at 03:00 the
+    rule per day (compact), at 04:00 VACUUM of each Iceberg table; Vancouver time, so they fall outside class hours;
+    no retries (the next night is the retry)."""
+    def target(mode: str) -> dict:
+        return {"Arn": function_arn, "RoleArn": role_arn, "Input": json.dumps({"mode": mode}),
+                "RetryPolicy": {"MaximumRetryAttempts": 0}}
 
-    def target(query: str) -> dict:
-        return {"Arn": "arn:aws:scheduler:::aws-sdk:athena:startQueryExecution",
-                "RoleArn": s.scheduler_role_arn,  # may run athena:StartQueryExecution, Glue and S3 on the lake
-                "Input": json.dumps({"QueryString": query, "WorkGroup": s.workgroup,
-                                     "ResultConfiguration": {"OutputLocation": out}})}
-
-    # Nightly, compaction first, expiry an hour later; times in Vancouver so they fall outside class hours.
+    common = {"GroupName": f"{prefix}-maintenance-compaction", "ScheduleExpressionTimezone": "America/Vancouver",
+              "FlexibleTimeWindow": {"Mode": "OFF"}, "State": "ENABLED"}
     return [
-        {"Name": f"{s.prefix}-lake-optimize", "ScheduleExpression": "cron(0 3 * * ? *)",
-         "ScheduleExpressionTimezone": "America/Vancouver", "FlexibleTimeWindow": {"Mode": "OFF"},
-         "Target": target(optimize_sql(s)), "State": "ENABLED"},
-        {"Name": f"{s.prefix}-lake-vacuum", "ScheduleExpression": "cron(0 4 * * ? *)",
-         "ScheduleExpressionTimezone": "America/Vancouver", "FlexibleTimeWindow": {"Mode": "OFF"},
-         "Target": target(vacuum_sql(s)), "State": "ENABLED"},
+        {"Name": f"{prefix}-compact-schedule", "ScheduleExpression": "cron(0 3 * * ? *)", "Target": target("compact"),
+         **common},
+        {"Name": f"{prefix}-lake-vacuum", "ScheduleExpression": "cron(0 4 * * ? *)", "Target": target("vacuum"),
+         **common},
     ]
 
 
@@ -121,7 +126,7 @@ def run_local(s: Settings, root: Path, commits: int = 120, rows_each: int = 5) -
 
 # --- AWS ----------------------------------------------------------------------------------------------------
 
-def run_aws(s: Settings, schedule: bool) -> str:
+def run_aws(s: Settings) -> str:
     import boto3
 
     from main import athena as athena_q
@@ -134,40 +139,40 @@ def run_aws(s: Settings, schedule: bool) -> str:
     opt = athena_q.run(athena, optimize_sql(s), s.workgroup, out, s.database)
     vac = athena_q.run(athena, vacuum_sql(s), s.workgroup, out, s.database)
     after = athena_q.run(athena, bench, s.workgroup, out, s.database)
-    lines = [
+    return "\n".join([
         f"{'':<10}{'data scanned':>15}{'run time':>12}",
         f"{'before':<10}{before.data_scanned_bytes:>13} B{before.engine_ms:>9} ms",
         f"{'after':<10}{after.data_scanned_bytes:>13} B{after.engine_ms:>9} ms",
         f"OPTIMIZE: {opt.data_scanned_bytes} B scanned, {opt.engine_ms} ms; VACUUM: {vac.engine_ms} ms",
-    ]
-    if schedule:
-        # The role EventBridge Scheduler assumes: created here unless SCHEDULER_ROLE_ARN names one you have.
-        from main.infra import ensure_roles
-        s = ensure_roles(boto3.client("iam", region_name=s.region), s, account, "", which=("scheduler",))
-        sch = boto3.client("scheduler", region_name=s.region)
-        for d in schedule_definitions(s, account):
-            try:
-                sch.create_schedule(**d)
-            except sch.exceptions.ConflictException:
-                sch.update_schedule(**d)
-            lines.append(f"schedule {d['Name']}: {d['ScheduleExpression']} {d['ScheduleExpressionTimezone']}")
-    return "\n".join(lines)
+    ])
 
 
-def main() -> None:
+def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--target", choices=["local", "aws"], default="local")
-    p.add_argument("--schedule", action="store_true", help="create the nightly schedules (aws only)")
-    args = p.parse_args()
-    s = Settings()
-    if args.target == "aws":
-        print(run_aws(s, args.schedule))
-    else:
+    p.add_argument("--schedule", action="store_true", help="deploy the nightly function, schedules and alarms (aws)")
+    p.add_argument("--email", help="with --schedule: the address the alarms send to (subscribed to the topic)")
+    p.add_argument("--register-partitions", action="store_true",
+                   help="trip_events_parquet: projection off, partitions of every day folder and the next 7 days")
+    p.add_argument("--measure", action="store_true", help="the 30-day count before and after compaction (aws)")
+    p.add_argument("--all-days", action="store_true", help="with --measure: compact every marked day, not 10")
+    args = p.parse_args(argv)
+    if args.target == "local":
         import tempfile
 
         with tempfile.TemporaryDirectory() as d:
-            print(run_local(s, Path(d)))
+            print(run_local(Settings(), Path(d)))
+        return 0
+    import nightly_ops
+    if args.register_partitions:
+        return nightly_ops.register_partitions_cli()
+    if args.measure:
+        return nightly_ops.measure_cli(all_days=args.all_days)
+    if args.schedule:
+        return nightly_ops.deploy_cli(email=args.email)
+    print(run_aws(Settings()))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

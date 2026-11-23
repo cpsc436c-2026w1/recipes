@@ -8,7 +8,10 @@ from botocore.exceptions import ClientError
 from skeleton.config import REGION, TAG
 
 RESULTS_DAYS = 7                   # S3 deletes Athena's result files after a week (ours)
-SCAN_LIMIT_BYTES = 1_000_000_000   # Athena cancels any query in the workgroup that would scan more (ours: 1 GB)
+SCAN_LIMIT_BYTES = 2 ** 30         # Athena cancels any query in the workgroup that would scan more (ours: 1 GB = 2^30)
+ENGINE = "Athena engine version 3"
+# The same settings as scripts/lake.py gives <PREFIX>-wg, so a newer recipe with the same PREFIX borrows this workgroup
+# instead of stopping on a difference (2026-11-23: a 1,000,000,000-byte cutoff here stopped ext-backfill).
 
 
 def ensure_bucket(s3, bucket: str) -> None:
@@ -69,7 +72,8 @@ def ensure_workgroup(athena, workgroup: str, bucket: str) -> None:
     config = {"ResultConfiguration": {"OutputLocation": f"s3://{bucket}/athena-results/"},
               "EnforceWorkGroupConfiguration": True,
               "BytesScannedCutoffPerQuery": SCAN_LIMIT_BYTES,
-              "PublishCloudWatchMetricsEnabled": True}
+              "PublishCloudWatchMetricsEnabled": True,
+              "EngineVersion": {"SelectedEngineVersion": ENGINE}}
     try:
         athena.create_work_group(Name=workgroup, Configuration=config, Tags=[TAG])
     except ClientError as e:

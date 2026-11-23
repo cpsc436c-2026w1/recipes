@@ -1,7 +1,7 @@
 """Remove everything a real run of this recipe created in your AWS account, for this PREFIX.
 
-  PREFIX=recipe-yourname uv run python clean_up.py            delete
-  PREFIX=recipe-yourname uv run python clean_up.py --dry-run  list only
+  PREFIX=recipe-yourname uv run python clean_up.py            list only: nothing is deleted
+  PREFIX=recipe-yourname uv run python clean_up.py --yes      delete
 
 Removes, in this order: the collection {PREFIX}-products (its index and documents go with it), the collection
 group, the data access policy, the network and the encryption policies. A collection bills OCU-hours while it has
@@ -132,8 +132,10 @@ def _wait_group_gone(aoss, name: str, wait_s: int) -> None:
 
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--dry-run", action="store_true", help="list what would be deleted (the default)")
+    p.add_argument("--yes", action="store_true", help="delete; without it, only list what would be deleted")
     args = p.parse_args(argv)
+    args.dry_run = args.dry_run or not args.yes
     s = Settings()
     steps = clean_up(s, args.dry_run)
     code = steps.report()
@@ -141,6 +143,8 @@ def main(argv=None) -> None:
     print(f"{len(steps.removed)} resources {verb}, {len(steps.failed)} failed, for PREFIX={s.prefix} in {s.region}")
     if code:
         print("Something is left: read the FAILED lines, fix the reason, and run clean_up.py again.")
+    if args.dry_run:
+        print("Nothing deleted. Run again with --yes to delete these.")
     sys.exit(code)
 
 

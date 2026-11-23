@@ -1,0 +1,10 @@
+# DuckDB package sizes for <PREFIX>-duckdb-query, measured 2026-11-21 on an aarch64 machine
+# Files: the duckdb 2.0.1 wheel from PyPI and the httpfs and aws extensions for linux_arm64, gzipped as served.
+# bytes   MiB    file
+22209956 21.2 duckdb-2.0.1-cp312-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl (zipped)
+8499047 8.1 httpfs.gz (zipped)
+21837821 20.8 aws.gz (zipped)
+63992397 61.0 duckdb wheel unzipped (du -sb)
+25628302 24.4 httpfs.duckdb_extension unzipped
+69111966 65.9 aws.duckdb_extension unzipped
+# Package without aws: wheel + httpfs = 21.2 + 8.1 = 29.3 MiB zipped; 61.0 + 24.4 = 85.4 MiB unzipped (computed).

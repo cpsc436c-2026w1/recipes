@@ -166,14 +166,14 @@ match.
 
 **Clean-up**
 
-- **R50** (event) When `clean_up.py` runs, the recipe shall delete the collection, the collection group and the
+- **R50** (event) When `clean_up.py --yes` runs, the recipe shall delete the collection, the collection group and the
   data access, network and encryption policies named `$PREFIX-products`, and nothing else.
-- **R51** (event) When `clean_up.py --dry-run` runs, the recipe shall print what it would delete and delete nothing.
-- **R52** (event) When `clean_up.py` runs and a resource is already gone, the recipe shall report it `absent` and
+- **R51** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print what it would delete and delete nothing.
+- **R52** (event) When `clean_up.py --yes` runs and a resource is already gone, the recipe shall report it `absent` and
   exit with code 0.
 - **R53** (unwanted) If a step of `clean_up.py` is refused with an error other than `ResourceNotFoundException`, then
   the recipe shall report that step `FAILED` with the error code, try the remaining steps and exit with code 1.
-- **R54** (complex) While the collection is being deleted by an earlier clean-up, when `clean_up.py` runs, the
+- **R54** (complex) While the collection is being deleted by an earlier clean-up, when `clean_up.py --yes` runs, the
   recipe shall report it `absent` and wait until it is gone before it deletes the group.
 - **R55** (event) When `clean_up.py` deletes the collection group, the recipe shall wait until the group is gone
   before it ends.
@@ -278,7 +278,8 @@ In the same terminal, with `COURSE_GATEWAY_URL` and `KB_MCP_TOKEN` still set.
 aws sts get-caller-identity                     # the account you expect, before anything is created
 export PREFIX=recipe-yourname AWS_REGION=ca-central-1
 uv run python -m main.run --backend opensearch --embedder gateway --answers gateway
-uv run python clean_up.py                       # the same day
+uv run python clean_up.py                       # lists what it would delete; deletes nothing
+uv run python clean_up.py --yes                 # the same day
 ```
 
 What you should see: the run waits while the collection is created (it waits up to 15 minutes); if the new
@@ -298,7 +299,7 @@ two paths split text differently (Decisions, BM25 parameters), and that changes 
 after the relevant ones.
 A NextGen collection group refuses `standbyReplicas="DISABLED"`. The first sandbox run on 2026-11-12 was refused
 for that reason ([`output/main-opensearch-refused.txt`](output/main-opensearch-refused.txt)); the code now sends
-`ENABLED`. If creating the collection or a search fails, run `uv run python clean_up.py` with the same `PREFIX`,
+`ENABLED`. If creating the collection or a search fails, run `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` with the same `PREFIX`,
 and report from the part 2 run until an OpenSearch run succeeds.
 
 Clean-up and cost: `clean_up.py` as in [Cost and clean-up](#cost-and-clean-up); at most about 0.36 USD for a run of
@@ -377,8 +378,8 @@ On your laptop, use the terminal of the run with the same `PREFIX` and sandbox c
 delete. Check the list before you run the second line:
 
 ```bash
-uv run python clean_up.py --dry-run
-uv run python clean_up.py     # collection, group, access policy, network and encryption policies
+uv run python clean_up.py
+uv run python clean_up.py --yes     # collection, group, access policy, network and encryption policies
 ```
 
 If an earlier clean-up is still deleting a collection, the script reports it `absent (already being deleted)` and waits until the collection is gone;

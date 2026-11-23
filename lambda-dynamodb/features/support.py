@@ -95,7 +95,7 @@ def dry(context, script: str, **extra) -> Run:
     """DRY=1; a call to aws or curl exits 99 and writes a line the steps look for."""
     bin_dir = put_tools(context.tmp / "bin", aws=FAILING, curl=FAILING)
     env = script_env(context.tmp) | {"DRY": "1", "PATH": f"{bin_dir}:{os.environ['PATH']}"} | context.env | extra
-    p = subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=TIMEOUT_S)
+    p = subprocess.run(["bash", str(RECIPE / script), *(["--yes"] if script.endswith("clean_up.sh") else [])], env=env, capture_output=True, text=True, timeout=TIMEOUT_S)
     context.run = Run(script, p.returncode, p.stdout, p.stderr)
     return context.run
 
@@ -114,7 +114,7 @@ def fake(context, script: str, unset: tuple = (), **extra) -> Run:
     env |= context.env | extra
     for name in unset:
         env.pop(name, None)
-    p = subprocess.run(["bash", str(RECIPE / script)], env=env, capture_output=True, text=True, timeout=TIMEOUT_S)
+    p = subprocess.run(["bash", str(RECIPE / script), *(["--yes"] if script.endswith("clean_up.sh") else [])], env=env, capture_output=True, text=True, timeout=TIMEOUT_S)
     context.run = Run(script, p.returncode, p.stdout, p.stderr, _lines(log), _lines(Path(str(log) + ".region")),
                       _lines(context.tmp / "tool.log.curl"), _lines(context.tmp / "tool.log.sleep"),
                       _lines(context.tmp / "tool.log.python3"))

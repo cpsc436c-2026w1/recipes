@@ -47,8 +47,8 @@ query and runs it in DuckDB, and every question leaves one trace item in DynamoD
 | Checking the SQL (R20, R22) | Parse with sqlglot (a SQL parser for Python) in app code: one statement, a query, known tables only, no file or environment functions | Rules over the parsed query do not miss a write hidden in odd spelling and do not refuse a column called `updated` | L15; Agentic AI Lens AGENTSEC02-BP02 (validate tool inputs: the SQL is the input of the tool) |
 | Second layer (R21) | DuckDB holds copies of the tables in memory with external access off and settings locked, and runs each query as one statement in a read-only transaction | A check that has a gap still cannot read a file, change a setting or change the tables: DuckDB refuses the write itself | L15 (read-only engine); defence in depth, GENSEC01-BP03 (least privilege on data stores); GENSEC05-BP01 (a boundary the agent cannot widen) |
 | Who may see whose rows (R91) | Main puts the asking customer's id in the system prompt and does not enforce row access. `ext-guardrails-redteam` enforces it: its queries run in an engine that holds only the asking customer's rows | A system prompt guides the LLM; it does not stop a user who asks it to ignore the rule, and a rule over the SQL text misses the query nobody thought of. Do not give main to users who may see only their own rows | L15 (guardrails); GENSEC05-BP01; Agentic AI Lens AGENTREL02-BP02 |
-| Bounded work per question (R13, R15, R16, R30, R31, R33, R34) | At most 4 model calls, 400 output tokens (600 for a model that reasons first, next row) and 250 seconds per call (the gateway itself waits up to 240 s for a thinking model), 50 rows, 200 characters per text value and 5 seconds per query (course default); a result that was cut says what was cut, for the LLM and in the trace | A loop that never ends spends the key's budget. Long tool results add input tokens on every later call. A table with a long text column makes tool results long. A result cut without a mark is read as the whole result. A query that joins every row with every row holds the dashboard until someone stops the app. With these limits a question ends within about 4 × 255 seconds | GENCOST05-BP01 (stopping conditions); GENREL03-BP02 (timeouts on agentic workflows); GENCOST03-BP01 and BP02 (prompt and response length); Agentic AI Lens AGENTSEC02-BP02 (size limits on tool outputs, each truncation logged) |
-| Reasoning tokens and replies stopped at the token limit (R35, R36) | 600 output tokens per call for `qwen3.8-27b`; a reply that stops at `finish_reason` `length` with no text and no tool call, or with a tool call whose arguments are cut, ends the question with status `error` and "the model used its token cap before answering" | `qwen3.8-27b` reasons before it answers, and the reasoning counts against `max_tokens`. With a cap of 150 its replies came back empty; with 600, one answer of two sentences took 330 completion tokens, 277 of them reasoning. 600 is a margin over the most we measured, and it was enough for this recipe's six questions: on the gateway (2026-11-14, `output/main-gateway-qwen3.8-27b.txt`) the model answered the four questions about the tables and declined the other two, in 10 model calls of at most 162 completion tokens each, 847 in all, 0.000729 CAD by the gateway's count (the recipe's estimate printed 0.000719). These calls would also have fit in 400. An empty reply is not the model's answer and not a refusal, so it is neither shown as one nor counted as `no_answer` | [GENCOST03-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gencost03-bp02.html) (control response length); GENREL03-BP01 (retry or fail gracefully) |
+| Bounded work per question (R13, R15, R16, R30, R31, R33, R34) | At most 4 model calls, 16,384 output tokens (the course's cap for gateway calls, next row) and 250 seconds per call (the gateway itself waits up to 240 s for a thinking model), 50 rows, 200 characters per text value and 5 seconds per query (course default); a result that was cut says what was cut, for the LLM and in the trace | A loop that never ends spends the key's budget. Long tool results add input tokens on every later call. A table with a long text column makes tool results long. A result cut without a mark is read as the whole result. A query that joins every row with every row holds the dashboard until someone stops the app. With these limits a question ends within about 4 × 255 seconds | GENCOST05-BP01 (stopping conditions); GENREL03-BP02 (timeouts on agentic workflows); GENCOST03-BP01 and BP02 (prompt and response length); Agentic AI Lens AGENTSEC02-BP02 (size limits on tool outputs, each truncation logged) |
+| Reasoning tokens and replies stopped at the token limit (R35, R36) | 16,384 output tokens per call for `qwen3.8-27b`, as for every model (it was 600); a reply that stops at `finish_reason` `length` with no text and no tool call, or with a tool call whose arguments are cut, ends the question with status `error` and "the model used its token cap before answering" | `qwen3.8-27b` reasons before it answers, and the reasoning counts against `max_tokens`. With a cap of 150 its replies came back empty; with 600, one answer of two sentences took 330 completion tokens, 277 of them reasoning. 600 is a margin over the most we measured, and it was enough for this recipe's six questions: on the gateway (2026-11-14, `output/main-gateway-qwen3.8-27b.txt`) the model answered the four questions about the tables and declined the other two, in 10 model calls of at most 162 completion tokens each, 847 in all, 0.000729 CAD by the gateway's count (the recipe's estimate printed 0.000719). These calls would also have fit in 400. But the rider-comment chat of `ext-guardrails-redteam` (2026-11-23) cut 9 of 16 replies of `qwen3.8-27b` at 600 and none at 16,384 (the largest took 2,042 completion tokens): a cap set from one set of questions is too low for the next, and the course's rule is 16,384 for every gateway call. A reply that stops on its own costs the same under either cap. An empty reply is not the model's answer and not a refusal, so it is neither shown as one nor counted as `no_answer` | [GENCOST03-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gencost03-bp02.html) (control response length); GENREL03-BP01 (retry or fail gracefully) |
 | Model calls (R40, R43, R44) | Through the course LLM gateway with `KB_MCP_TOKEN` from the environment; never a provider key | One key per student with its own budget and rate limit; nothing secret in the repo | Course constraint; L16 (model gateway); GENSEC01-BP01; [AI Engineering ch. 10](https://learning.oreilly.com/library/view/ai-engineering/9781098166298/ch10.html), Step 3. Add Model Router and Gateway (the book's term is model gateway) |
 | Default model (R32) | `qwen3.6-35b-a3b`, the cheaper of the gateway's two chat models (`CHAT_MODEL` changes it) | It answered the recipe's six questions (`output/main-gateway.txt`), and every call is charged to your key's budget. Check it on your own questions before you rely on it, and move to the stronger model when it fails them | GENCOST01-BP01 (right-size the model); [AI Engineering ch. 4](https://learning.oreilly.com/library/view/ai-engineering/9781098166298/ch04.html), Model Selection: judge models on your own criteria, then weigh cost against performance. The book starts prompt work from the strongest model and works back to smaller ones; starting from the cheaper one is a course choice |
 | Temperature (R31) | 0 | The same question gives the same SQL more often, which makes traces and evals comparable | Runs you can compare: an eval reruns the same questions (course default) |
@@ -114,15 +114,15 @@ When you change what the recipe does, change the requirement and its scenario wi
 - **R30** (unwanted) If the LLM asks for the tool in the 4th model call of a question, then the recipe shall end
   the question with status `no_answer`, the reply "I could not answer within the step limit." and empty `sql` and
   `rows`, and leave the SQL of that call unrun.
-- **R31** (ubiquitous) The recipe shall send `temperature` 0 with every request to the gateway, and `max_tokens` 400
-  for every other model (R35 names `qwen3.8-27b`).
+- **R31** (ubiquitous) The recipe shall send `temperature` 0 with every request to the gateway, and `max_tokens` 16384
+  for every model (R35 names `qwen3.8-27b`).
 - **R32** (ubiquitous) The recipe shall ask the gateway for the model `qwen3.6-35b-a3b` unless `CHAT_MODEL` names
   another.
 - **R33** (unwanted) If the gateway does not answer a model call within 250 seconds, then the recipe shall end the
   question with status `error`.
 - **R34** (unwanted) If a query runs longer than 5 seconds, then the recipe shall stop it and give the LLM the time
   limit as the tool result.
-- **R35** (optional) Where `CHAT_MODEL` is `qwen3.8-27b`, the recipe shall send `max_tokens` 600 with every
+- **R35** (optional) Where `CHAT_MODEL` is `qwen3.8-27b`, the recipe shall send `max_tokens` 16384 with every
   request to the gateway.
 - **R36** (unwanted) If a reply of the gateway stops at `finish_reason` `length` with no text and no tool call, or
   with a tool call whose arguments do not parse, then the recipe shall run no query and end the question with status `error`, "the model used its token cap before answering" in `error`,
@@ -164,15 +164,15 @@ When you change what the recipe does, change the requirement and its scenario wi
 
 **Clean-up**
 
-- **R70** (event) When `clean_up.py` runs, the recipe shall delete the three tables, the three alarms and the SNS
+- **R70** (event) When `clean_up.py --yes` runs, the recipe shall delete the three tables, the three alarms and the SNS
   topic with its subscriptions that it created for this `PREFIX`.
-- **R71** (event) When `clean_up.py --dry-run` runs, the recipe shall print the names it would delete without a call
-  to AWS.
+- **R71** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print the names it
+  would delete without a call to AWS.
 - **R72** (state) While a table is in the `DELETING` state, the recipe shall report it as `absent` in a clean-up and
   delete the other resources.
 - **R73** (unwanted) If AWS refuses a step of `clean_up.py`, then the recipe shall exit with code 1 after it has
   tried every other step and printed `FAILED` for the refused one.
-- **R74** (event) When `clean_up.py` runs and a resource is already gone, the recipe shall report it as `absent`,
+- **R74** (event) When `clean_up.py --yes` runs and a resource is already gone, the recipe shall report it as `absent`,
   not as a failure.
 - **R75** (ubiquitous) The recipe shall leave in place every alarm other than its own three, also one whose name
   starts with `$PREFIX-chat-`.
@@ -203,7 +203,7 @@ runs in the course's account, never in yours: you only send it requests.
 | Web page | `ext-shiny-app/app.py`, `client.py`, `source.py` | yes, `APP_MODEL=stub`, on `127.0.0.1:8000` | yes, on `127.0.0.1:8000` with the gateway | yes: `shiny run` on the instance, or the container on Fargate |
 | Stub gateway | `ext-shiny-app/stub_gateway.py` | yes, started by the page | no | no: the file is in the container image, and with `APP_MODEL` not set to `stub` nothing starts it |
 | Fargate scripts | `ext-shiny-app/fargate/*.sh` | `DRY=1` prints their commands | run from the laptop, which needs Docker for the image build; they create things in your sandbox | they are not copied there |
-| Clean-up | `clean_up.py`; `ext-shiny-app/fargate/teardown.sh` | `--dry-run`, `DRY=1` | run from the laptop with your sandbox credentials | never run there |
+| Clean-up | `clean_up.py --yes`; `ext-shiny-app/fargate/teardown.sh` | `clean_up.py` without `--yes`, `DRY=1` | run from the laptop with your sandbox credentials | never run there |
 | Tests and scenarios | `tests/`, `features/` | yes, and in CI | never against AWS or the gateway | no |
 
 This recipe does not have a Lambda function. For a handler behind a function URL, see
@@ -321,7 +321,8 @@ bash ext-shiny-app/fargate/deploy.sh            # secret, role, image, cluster, 
 bash ext-shiny-app/fargate/start.sh             # starts one task and prints its address; billing by the hour starts
 bash ext-shiny-app/fargate/url.sh               # prints the address again
 bash ext-shiny-app/fargate/stop.sh              # stops the task; billing by the hour ends
-bash ext-shiny-app/fargate/teardown.sh          # removes everything deploy.sh made
+bash ext-shiny-app/fargate/teardown.sh          # lists what it would delete; deletes nothing
+bash ext-shiny-app/fargate/teardown.sh --yes    # removes everything deploy.sh made
 ```
 
 What each step does, and what you should see:
@@ -453,10 +454,11 @@ shown by the stub run and the tests.
 | Extension | What it adds | Folder | What changes in the main scenario |
 |---|---|---|---|
 | Answer or retrieval cache | Exact answer cache keyed on the normalized question, the data version, the model and prompt version and who asks; looked up before the model | `ext-answer-cache/` | Step 3 is skipped on a hit; a new table `$PREFIX-chat-cache` |
-| Guardrails with a red-team log | Input check, an engine that holds only the asking customer's rows, output check; a log that counts attacks that got through and normal questions refused | `ext-guardrails-redteam/` | Before step 3, inside step 4 and after step 6 |
+| Guardrails with a red-team log | Input check, an engine that holds only the asking customer's rows, output check; a log that counts attacks that got through and normal questions refused. Also injection through stored text: rider comments only through a tool whose SQL the code writes, as marked data, with a citation check and an eval of attacks in data rows | `ext-guardrails-redteam/` | Before step 3, inside step 4 and after step 6 |
 | User's verdict on an answer | A thumbs up or down stored on the trace item of the question; a report of the answers marked down | `ext-feedback/` | After step 7; nothing new in AWS |
 | Chat as a web page | A Shiny Express app with querychat: the question is typed in a page, the result is a table on it; scripts to run it on Fargate | `ext-shiny-app/` | The page takes the place of `main/run.py`; steps 2, 4 and 5 are reused, step 7 (traces) is not |
 | Trace analysis and alarms | One span (a record of a call) per model call and tool call, linked to its request; metrics; CloudWatch alarms on errors, slow answers and daily cost; DuckDB queries over the spans | `ext-trace-alarms/` | Step 7 also writes spans and metrics; three alarms and an SNS topic |
+| Athena as the chat's engine | The model's SQL runs on Athena over a table in the lake, through a Lambda function whose role reads only two tables in a workgroup with a 100 MB cutoff; at most 3 queries and 18 s a question, a daily cap of 5 GB billed, Data scanned and cost in the trace | `ext-athena-engine/` | Steps 2–5 and 7: the rides prompt, a deadline on every wait, the engine invokes `$PREFIX-chat-query`; new: workgroup, function, role, usage table, Glue tables (nothing in `main/` changes for the DuckDB scenario) |
 
 ## Cost and clean-up
 
@@ -489,9 +491,10 @@ On your laptop, in `dashboard-chat`, with the same `PREFIX` and sandbox credenti
 prints the names it would delete and does not contact AWS; check them, then run the second line:
 
 ```bash
-uv run python clean_up.py --dry-run    # names of the tables, alarms and topic of this PREFIX
-uv run python clean_up.py              # deletes those that exist
-bash ext-shiny-app/fargate/teardown.sh # only if you ran deploy.sh: the Fargate pieces of the web page
+uv run python clean_up.py              # names of the tables, alarms and topic of this PREFIX (also: --dry-run)
+uv run python clean_up.py --yes        # deletes those that exist
+bash ext-shiny-app/fargate/teardown.sh # lists what it would delete; deletes nothing
+bash ext-shiny-app/fargate/teardown.sh --yes # only if you ran deploy.sh: the Fargate pieces of the web page
 ```
 
 ## Adapt it

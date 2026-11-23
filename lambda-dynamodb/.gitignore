@@ -1,0 +1,8 @@
+# What a run writes: the creation ledger (ARNs with the account number), replay evidence, generated data sets and
+# the read-path results. In a team repository, commit state/ledger.jsonl (every member's creates are on it).
+state/
+evidence/
+sim/data/
+ext-dashboard-page/data/
+results.duckdb
+results.duckdb.wal

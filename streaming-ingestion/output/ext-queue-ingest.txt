@@ -1,0 +1,216 @@
+# ext-queue-ingest in AWS, 2026-11-23T05:48Z to 08:11Z, ca-central-1, PREFIX=recipe-queue (30 s window) and recipe-queue-w0
+# (run.py --no-window, for comparison), run at the same time; the account is masked as 111122223333; SIM01 is synthetic
+== request_count.py up (PREFIX=recipe-queue: logs the SQS calls of queues recipe-queue*)
+trail recipe-queue-sqs-requests logs the SQS calls of queues recipe-queue* to s3://recipe-queue-sqs-requests-111122223333/
+== a smoke run at --speed 60 (PREFIX=recipe-queue-smoke) two minutes after the trail: half its sends were logged (1,189 of 2,399),
+   so latency.py now refuses trail counts whose SendMessageBatch differs from the sender's; it was cleaned up (dry run, then --yes)
+== run.py --target aws --speed 1 --keep --wait 1800 (recipe-queue)
+created: queue window 30 s, batches of up to 100, visibility 210 s, sink dynamodb
+sent 2515 deliveries in 2514 calls over 6897.748 s (run id 20261123T055357Z-rush-hour, sent.jsonl under evidence/20261123T055357Z-rush-hour/)
+table recipe-queue-trips-completed: 837 of 837 completions stored
+next: uv run python ext-queue-ingest/latency.py --run-id 20261123T055357Z-rush-hour
+== run.py --target aws --speed 1 --keep --wait 1800 --no-window (recipe-queue-w0)
+created: queue window 0 s, batches of up to 10, visibility 180 s, sink dynamodb (comparison only: README Cost, batching window)
+sent 2515 deliveries in 2514 calls over 6897.754 s (run id 20261123T055346Z-rush-hour, sent.jsonl under evidence/20261123T055346Z-rush-hour/)
+table recipe-queue-w0-trips-completed: 837 of 837 completions stored
+next: uv run python ext-queue-ingest/latency.py --run-id 20261123T055346Z-rush-hour   (printed by run.py before its hint was corrected: latency.py has no --no-window; it reads the mapping)
+== run.py stop (both), then 15 min for CloudWatch and CloudTrail
+== request_count.py count over each run's window
+      1 recipe-queue-trip-completed DeleteMessage
+    427 recipe-queue-trip-completed DeleteMessageBatch
+    129 recipe-queue-trip-completed GetQueueAttributes
+      1 recipe-queue-trip-completed GetQueueUrl
+      1 recipe-queue-trip-completed ListQueueTags
+   9063 recipe-queue-trip-completed ReceiveMessage
+   2514 recipe-queue-trip-completed SendMessageBatch
+      2 recipe-queue-trip-completed-dlq GetQueueAttributes
+      1 recipe-queue-trip-completed-dlq ListQueueTags
+      1 recipe-queue-w0-trip-completed DeleteMessage
+   2514 recipe-queue-w0-trip-completed DeleteMessageBatch
+    109 recipe-queue-w0-trip-completed GetQueueAttributes
+      1 recipe-queue-w0-trip-completed GetQueueUrl
+      1 recipe-queue-w0-trip-completed ListQueueTags
+   6403 recipe-queue-w0-trip-completed ReceiveMessage
+   2514 recipe-queue-w0-trip-completed SendMessageBatch
+== latency.py (recipe-queue, 30 s window)
+837 latencies; p95 34.1 s (nearest rank 796 of 837); target under 60 s at a 30 s window: met
+batches: 2515 messages received in 331 calls, mean batch 7.60, median 6; calls 94 ms mean, 31.7 s billed; 6542 empty receives; 2514 send calls; 12135 SQS requests (counted (CloudTrail data events))
+dead-letter queue: 0 messages
+30 days at this rate: 2.10 USD (3.05 CAD), 7.0% of the 30 USD lease; a year 25.56 USD (37.06 CAD), 85% (the run's measured units x 720 / 1.93 h)
+== latency.py (recipe-queue-w0, run.py --no-window)
+837 latencies; p95 0.1 s (nearest rank 796 of 837); target under 30 s at a 0 s window: met
+batches: 2515 messages received in 2514 calls, mean batch 1.00, median 1; calls 10 ms mean, 27.7 s billed; 3883 empty receives; 2514 send calls; 11543 SQS requests (counted (CloudTrail data events))
+dead-letter queue: 0 messages
+30 days at this rate: 2.37 USD (3.43 CAD), 7.9% of the 30 USD lease; a year 28.79 USD (41.74 CAD), 96% (the run's measured units x 720 / 1.92 h)
+== latency.py --table (output/batching-window.txt)
+batching window, batch size (mapping)          0 s, batch 10    30 s, batch 100
+messages sent (SIM01, one replay)                      2,515              2,515
+run hours (first send to last stored)                   1.92               1.93
+messages in 30 days at this rate                     945,066            939,618
+Lambda calls                                           2,514                331
+messages per call, mean / median                    1.00 / 1           7.60 / 6
+call duration ms, mean / median                       10 / 1            94 / 68
+billed Lambda seconds                                   27.7               31.7
+latency send to stored s, median / p95           0.04 / 0.07        20.1 / 34.1
+completions stored                                837 of 837         837 of 837
+messages in the dead-letter queue                          0                  0
+ReceiveMessage calls (CloudTrail)                      6,403              9,062
+  of them empty (CloudWatch)                           3,883              6,542
+  of them with messages                                2,520              2,520
+DeleteMessage(Batch) calls (CloudTrail)                2,515                428
+SQS requests billed, all actions                      11,543             12,135
+  per message sent                                      4.59               4.83
+log KB ingested                                        1,058                140
+run USD: SQS / Lambda                      0.00462 / 0.00055  0.00485 / 0.00012
+run USD, all parts                                   0.00630            0.00562
+30 days of such traffic, USD                 2.37 (3.43 CAD)    2.10 (3.05 CAD)
+  % of the 30 USD lease                                 7.9%               7.0%
+a year, USD                                28.79 (41.74 CAD)  25.56 (37.06 CAD)
+  % of the lease                                         96%                85%
+
+Measured in AWS (ca-central-1) with ext-queue-ingest/run.py --target aws --speed 1, SIM01 replayed to SQS at the hour's pace;
+the runs: 20261123T055346Z-rush-hour, 20261123T055357Z-rush-hour.
+SQS requests: counted (CloudTrail data events). DynamoDB writes and the trips service's sends are the same in both and are in the totals.
+Cost = the run's measured units at the course price sheet (ca-central-1, 2026-11-18; SQS 0.40 per million requests, Lambda arm64 128 MB),
+times 720 h (8,760 h) / run hours: traffic like this run's, back to back. CAD at 1.45. Free tiers left out.
+== replay_dlq.py --probe (after the measurement)
+StartMessageMoveTask: allowed; 1 message moved to recipe-queue-trip-completed (the consumer reports it failed, and it comes back to recipe-queue-trip-completed-dlq after 5 receives: delete it there with the console or purge-queue)
+== LIVE=1 behave --tags=live features/queue_ingest.feature (recipe-queue)
+
+1 feature passed, 0 failed, 0 skipped
+1 rule passed, 0 failed, 8 skipped
+1 scenario passed, 0 failed, 16 skipped
+5 steps passed, 0 failed, 78 skipped
+Took 0min 0.000s
+== clean_up.py --dry-run (recipe-queue-w0)
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-queue-w0' in ca-central-1
+would remove mapping 5dcbf22f-b61a-4300-bdbf-60dc1aca8a91 of recipe-queue-w0-trip-completed-consumer
+would remove function recipe-queue-w0-trip-completed-consumer
+would remove log group /aws/lambda/recipe-queue-w0-trip-completed-consumer
+would remove policy of role recipe-queue-w0-queue-consumer-role
+would remove role recipe-queue-w0-queue-consumer-role
+would remove queue recipe-queue-w0-trip-completed
+would remove queue recipe-queue-w0-trip-completed-dlq
+would remove table recipe-queue-w0-trips-completed
+== clean_up.py --dry-run (recipe-queue)
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-queue' in ca-central-1
+would remove mapping 2130fa25-2eb5-4217-90cf-1eb723abb12a of recipe-queue-trip-completed-consumer
+would remove function recipe-queue-trip-completed-consumer
+would remove log group /aws/lambda/recipe-queue-trip-completed-consumer
+would remove policy of role recipe-queue-queue-consumer-role
+would remove role recipe-queue-queue-consumer-role
+would remove queue recipe-queue-trip-completed
+would remove queue recipe-queue-trip-completed-dlq
+would remove table recipe-queue-trips-completed
+would remove trail recipe-queue-sqs-requests
+would remove bucket recipe-queue-sqs-requests-111122223333 (26 objects)
+== clean_up.py --yes (recipe-queue-w0)
+removing the streaming-ingestion resources with prefix 'recipe-queue-w0' in ca-central-1
+removed  mapping 5dcbf22f-b61a-4300-bdbf-60dc1aca8a91 of recipe-queue-w0-trip-completed-consumer
+removed  function recipe-queue-w0-trip-completed-consumer
+removed  log group /aws/lambda/recipe-queue-w0-trip-completed-consumer
+removed  policy of role recipe-queue-w0-queue-consumer-role
+removed  role recipe-queue-w0-queue-consumer-role
+removed  queue recipe-queue-w0-trip-completed
+removed  queue recipe-queue-w0-trip-completed-dlq
+removed  table recipe-queue-w0-trips-completed
+exit 0
+== clean_up.py --yes (recipe-queue)
+removing the streaming-ingestion resources with prefix 'recipe-queue' in ca-central-1
+removed  mapping 2130fa25-2eb5-4217-90cf-1eb723abb12a of recipe-queue-trip-completed-consumer
+removed  function recipe-queue-trip-completed-consumer
+removed  log group /aws/lambda/recipe-queue-trip-completed-consumer
+removed  policy of role recipe-queue-queue-consumer-role
+removed  role recipe-queue-queue-consumer-role
+removed  queue recipe-queue-trip-completed
+removed  queue recipe-queue-trip-completed-dlq
+removed  table recipe-queue-trips-completed
+removed  trail recipe-queue-sqs-requests
+removed  bucket recipe-queue-sqs-requests-111122223333 (26 objects)
+exit 0
+== proof, 2026-11-23T08:11Z: nothing named recipe-queue* or recipe-poller* is left
+queues:            0
+mappings:          0
+functions:         0
+tables:            0
+roles:             0
+log groups:        0
+streams:           0
+buckets:           0
+trails:            0
+schedule groups:   0
+schedules:         0
+athena workgroups: 0
+tagged purpose=recipe: 0
+tagged purpose=recipe-streaming-ingestion: 0
+tagged Team=recipe-queue: 0
+tagged Team=recipe-queue-w0: 0
+tagged Team=recipe-queue-smoke: 0
+tagged Team=recipe-poller: 0
+
+# idle floor, 2026-11-23T08:22Z to 09:14Z: request_count.py up, run.py deploy (recipe-queue, 30 s) and deploy --no-window (recipe-queue-w0),
+# nothing sent; counted 08:33Z to 09:03Z (the trail began 08:22Z); run.py stop; dry run; clean-up; proof
+deployed at 2026-11-23T08:23:16Z: mapping 0fc6e0c7-35c5-43d8-9f1e-70212dfad31a enabled, window 30 s, batches of up to 100; nothing sent
+deployed at 2026-11-23T08:23:12Z: mapping 18d40d20-5ca2-4f40-b5ba-a6cc63b483df enabled, window 0 s, batches of up to 10; nothing sent
+== latency.py --idle recipe-queue-w0 recipe-queue --start 2026-11-23T08:33:00Z --end 2026-11-23T09:03:00Z
+recipe-queue-w0 idle 30 min: 192 SQS requests ({'GetQueueAttributes': 12, 'ReceiveMessage': 180}), 180 empty receives, 0 sent, 0 calls; 384 an hour: 30 days 0.11 USD (0.16 CAD), 0.4% of the lease; a year 1.35 USD (1.95 CAD)
+recipe-queue idle 30 min: 192 SQS requests ({'GetQueueAttributes': 12, 'ReceiveMessage': 180}), 180 empty receives, 0 sent, 0 calls; 384 an hour: 30 days 0.11 USD (0.16 CAD), 0.4% of the lease; a year 1.35 USD (1.95 CAD)
+== clean_up.py --dry-run (recipe-queue-w0)
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-queue-w0' in ca-central-1
+would remove mapping 18d40d20-5ca2-4f40-b5ba-a6cc63b483df of recipe-queue-w0-trip-completed-consumer
+would remove function recipe-queue-w0-trip-completed-consumer
+would remove log group /aws/lambda/recipe-queue-w0-trip-completed-consumer
+would remove policy of role recipe-queue-w0-queue-consumer-role
+would remove role recipe-queue-w0-queue-consumer-role
+would remove queue recipe-queue-w0-trip-completed
+would remove queue recipe-queue-w0-trip-completed-dlq
+would remove table recipe-queue-w0-trips-completed
+== clean_up.py --dry-run (recipe-queue)
+would remove (dry run) the streaming-ingestion resources with prefix 'recipe-queue' in ca-central-1
+would remove mapping 0fc6e0c7-35c5-43d8-9f1e-70212dfad31a of recipe-queue-trip-completed-consumer
+would remove function recipe-queue-trip-completed-consumer
+would remove log group /aws/lambda/recipe-queue-trip-completed-consumer
+would remove policy of role recipe-queue-queue-consumer-role
+would remove role recipe-queue-queue-consumer-role
+would remove queue recipe-queue-trip-completed
+would remove queue recipe-queue-trip-completed-dlq
+would remove table recipe-queue-trips-completed
+would remove trail recipe-queue-sqs-requests
+would remove bucket recipe-queue-sqs-requests-111122223333 (11 objects)
+== clean_up.py --yes (recipe-queue-w0)
+removing the streaming-ingestion resources with prefix 'recipe-queue-w0' in ca-central-1
+removed  mapping 18d40d20-5ca2-4f40-b5ba-a6cc63b483df of recipe-queue-w0-trip-completed-consumer
+removed  function recipe-queue-w0-trip-completed-consumer
+removed  log group /aws/lambda/recipe-queue-w0-trip-completed-consumer
+removed  policy of role recipe-queue-w0-queue-consumer-role
+removed  role recipe-queue-w0-queue-consumer-role
+removed  queue recipe-queue-w0-trip-completed
+removed  queue recipe-queue-w0-trip-completed-dlq
+removed  table recipe-queue-w0-trips-completed
+exit 0
+== clean_up.py --yes (recipe-queue)
+removing the streaming-ingestion resources with prefix 'recipe-queue' in ca-central-1
+removed  mapping 0fc6e0c7-35c5-43d8-9f1e-70212dfad31a of recipe-queue-trip-completed-consumer
+removed  function recipe-queue-trip-completed-consumer
+removed  log group /aws/lambda/recipe-queue-trip-completed-consumer
+removed  policy of role recipe-queue-queue-consumer-role
+removed  role recipe-queue-queue-consumer-role
+removed  queue recipe-queue-trip-completed
+removed  queue recipe-queue-trip-completed-dlq
+removed  table recipe-queue-trips-completed
+removed  trail recipe-queue-sqs-requests
+removed  bucket recipe-queue-sqs-requests-111122223333 (11 objects)
+exit 0
+== proof, 2026-11-23T09:14Z: nothing named recipe-queue* or recipe-poller* is left
+queues:            0
+mappings:          0
+functions:         0
+tables:            0 (one was DELETING at the first listing; listed again at 09:14Z: 0)
+roles:             0
+log groups:        0
+buckets:           0
+trails:            0
+schedule groups:   0
+tagged Team=recipe-queue: 0
+tagged Team=recipe-queue-w0: 0
+tagged purpose=recipe: 0

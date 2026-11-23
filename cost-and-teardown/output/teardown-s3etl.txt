@@ -1,0 +1,109 @@
+# The teardown run against what ext-backfill / s3-event-etl left, before their own clean-ups (live, 2026-11-23,
+# account masked). First the dry run, read, then the teardown, then the proof.
+
+$ PREFIX=recipe-s3etl LEDGER=$OTHER_LEDGER scripts/teardown.sh --dry-run --steps scripts/teardown-s3etl.toml
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 19 resources before the teardown
+would run s3-event-etl: cd ../s3-event-etl && uv run python clean_up.py --yes
+would run shared bucket and workgroups: scripts/lake.py down --yes
+would delete     Athena workgroup recipe-s3etl-wg
+would delete     DynamoDB table recipe-s3etl-runs
+would delete     Glue database recipe_s3etl_lake
+would delete     Glue job recipe-s3etl-etl
+would delete     Glue table recipe_s3etl_lake.trip_events_clean
+would delete     Glue table recipe_s3etl_lake.trip_events_stage
+would delete     IAM role recipe-s3etl-etl-check-role
+would delete     IAM role recipe-s3etl-etl-glue-role
+would delete     IAM role recipe-s3etl-etl-scheduler-role
+would delete     IAM role recipe-s3etl-etl-sweep-role
+would delete     Lambda function recipe-s3etl-etl-check
+would delete     Lambda function recipe-s3etl-etl-sweep
+would delete     CloudWatch log group /aws/lambda/recipe-s3etl-etl-check
+would delete     CloudWatch log group /aws/lambda/recipe-s3etl-etl-sweep
+would delete     S3 bucket recipe-s3etl-lake-111122223333
+would delete     S3 notification entry recipe-s3etl-s3-event-etl
+would delete     Scheduler schedule group recipe-s3etl-s3-event-etl
+would delete     SNS topic recipe-s3etl-etl-alerts
+left: found by name only, not in the ledger Scheduler schedule recipe-s3etl-s3-event-etl/recipe-s3etl-etl-hourly
+dry run: nothing was deleted. Run again without --dry-run to delete.
+exit 0
+
+$ PREFIX=recipe-s3etl LEDGER=../s3-event-etl/state/ledger.jsonl scripts/teardown.sh --steps scripts/teardown-s3etl.toml
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 19 resources before the teardown
+removed  notification entry recipe-s3etl-s3-event-etl of recipe-s3etl-lake-111122223333 (the other entries kept)
+removed  schedule group recipe-s3etl-s3-event-etl and its schedule
+removed  function recipe-s3etl-etl-check
+removed  log group /aws/lambda/recipe-s3etl-etl-check
+removed  function recipe-s3etl-etl-sweep
+removed  log group /aws/lambda/recipe-s3etl-etl-sweep
+removed  Glue job recipe-s3etl-etl
+removed  role recipe-s3etl-etl-check-role
+removed  role recipe-s3etl-etl-sweep-role
+removed  role recipe-s3etl-etl-glue-role
+removed  role recipe-s3etl-etl-scheduler-role
+removed  topic recipe-s3etl-etl-alerts
+removed  run log items etl, etl-object, etl-lock of recipe-s3etl-runs
+removed  table recipe-s3etl-runs
+removed  Glue table recipe_s3etl_lake.trip_events_clean
+absent   Glue table recipe_s3etl_lake.trip_events_stage
+removed  s3://recipe-s3etl-lake-111122223333/stage/trip-events/
+removed  s3://recipe-s3etl-lake-111122223333/quarantine/trip-events-rows/
+removed  s3://recipe-s3etl-lake-111122223333/lake/etl-state/
+removed  s3://recipe-s3etl-lake-111122223333/lake/trip_events_clean/
+removed  s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+step     s3-event-etl: exit 0
+removed  Athena workgroup recipe-s3etl-wg
+absent   Athena workgroup recipe-s3etl-ctas-wg
+removed  s3://recipe-s3etl-lake-111122223333 and its 228 object versions
+step     shared bucket and workgroups: exit 0
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+removed  Glue database recipe_s3etl_lake (left after the steps)
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+teardown complete: 0 still there, 0 by hand -> docs/resources.md
+exit 0
+# Resources of team recipe-s3etl (PREFIX recipe-s3etl)
+
+Torn down: every resource the team created was asked for by its own service after the deletes, and answered not found.
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Athena workgroup | `recipe-s3etl-wg` | created | per use | scripts/lake.py down | ledger, tag | deleted 2026-11-23T03:54:28Z |
+| DynamoDB table | `recipe-s3etl-runs` | created | monthly | the clean_up.py of the recipe whose ledger has this row | ledger, tag | deleted 2026-11-23T03:54:28Z |
+| Glue database | `recipe_s3etl_lake` | created | per use | kept: other recipes' tables | ledger, tag, name | deleted 2026-11-23T03:54:28Z |
+| Glue job | `recipe-s3etl-etl` | created | per use | clean_up.py --yes | ledger, tag | deleted 2026-11-23T03:54:28Z |
+| Glue table | `recipe_s3etl_lake.trip_events_clean` | created | per use | clean_up.py --yes | ledger, name | deleted 2026-11-23T03:54:28Z |
+| Glue table | `recipe_s3etl_lake.trip_events_stage` | created | per use | clean_up.py --yes | ledger | deleted 2026-11-23T03:54:28Z |
+| IAM role | `recipe-s3etl-etl-check-role` | created | per use | clean_up.py --yes | ledger, IAM | deleted 2026-11-23T03:54:28Z |
+| IAM role | `recipe-s3etl-etl-glue-role` | created | per use | clean_up.py --yes | ledger, IAM | deleted 2026-11-23T03:54:28Z |
+| IAM role | `recipe-s3etl-etl-scheduler-role` | created | per use | clean_up.py --yes | ledger, IAM | deleted 2026-11-23T03:54:28Z |
+| IAM role | `recipe-s3etl-etl-sweep-role` | created | per use | clean_up.py --yes | ledger, IAM | deleted 2026-11-23T03:54:28Z |
+| Lambda function | `recipe-s3etl-etl-check` | created | per use | clean_up.py --yes | ledger, tag | deleted 2026-11-23T03:54:29Z |
+| Lambda function | `recipe-s3etl-etl-sweep` | created | per use | clean_up.py --yes | ledger, tag | deleted 2026-11-23T03:54:29Z |
+| CloudWatch log group | `/aws/lambda/recipe-s3etl-etl-check` | created | per use | clean_up.py --yes | ledger, tag, name | deleted 2026-11-23T03:54:29Z |
+| CloudWatch log group | `/aws/lambda/recipe-s3etl-etl-sweep` | created | per use | clean_up.py --yes | ledger, tag, name | deleted 2026-11-23T03:54:29Z |
+| S3 bucket | `recipe-s3etl-lake-111122223333` | created | monthly | scripts/lake.py down | ledger, tag | deleted 2026-11-23T03:54:29Z |
+| S3 notification entry | `recipe-s3etl-s3-event-etl` | created | per use | clean_up.py --yes | ledger | deleted 2026-11-23T03:54:29Z |
+| Scheduler schedule group | `recipe-s3etl-s3-event-etl` | created | per use | clean_up.py --yes | ledger, tag, schedule group | deleted 2026-11-23T03:54:29Z |
+| SNS topic | `recipe-s3etl-etl-alerts` | created | per use | clean_up.py --yes | ledger, tag | deleted 2026-11-23T03:54:29Z |
+
+## Not in the ledger
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Scheduler schedule | `recipe-s3etl-s3-event-etl/recipe-s3etl-etl-hourly` | — | per use | — | schedule group | deleted 2026-11-23T03:54:29Z |
+
+$ what is left of recipe-s3etl
+tag Team=recipe-s3etl:        
+schedule groups:    
+buckets:            
+Glue databases:     
+workgroups:         
+IAM roles:          
+functions:          
+tables:             
+Glue jobs:          
+topics:             
+streams:            
+log groups:         

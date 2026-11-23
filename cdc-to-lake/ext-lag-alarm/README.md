@@ -56,7 +56,7 @@ uv run python ext-lag-alarm/lag.py --target aws
 ```
 
 The probe runs when you run it. To keep the alarm meaningful, run it on a schedule of your own (for example every
-15 minutes from a team runner) and say so in your README. Clean-up: `uv run python clean_up.py` in `cdc-to-lake`
+15 minutes from a team runner) and say so in your README. Clean-up: `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` in `cdc-to-lake`
 removes both alarms and the freshness object. Cost: see below.
 
 **What you should see** (`output/lag-local.txt`): a probe through a functioning pipeline at about the buffer interval (62 s: 2 s to the

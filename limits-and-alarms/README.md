@@ -158,15 +158,15 @@ match.
 
 **Clean-up**
 
-- **R50** (event) When `clean_up.py` runs, the recipe shall delete the five alarms, the dashboard, the function,
+- **R50** (event) When `clean_up.py --yes` runs, the recipe shall delete the five alarms, the dashboard, the function,
   its log group, the budget, the topic and the role that this run created for this `PREFIX`.
-- **R51** (event) When `clean_up.py --dry-run` runs, the recipe shall print what it would delete and delete
+- **R51** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print what it would delete and delete
   nothing.
 - **R52** (unwanted) If the function `$PREFIX-app` does not carry the recipe's tag, then the recipe shall keep it
   and its log group, print `FAILED` with the reason and exit with code 1 after the other steps.
 - **R53** (unwanted) If AWS refuses a step of `clean_up.py`, then the recipe shall exit with code 1 after it has
   tried every other step and printed `FAILED` for the refused one.
-- **R54** (event) When `clean_up.py` runs and a resource is already gone, the recipe shall report it as `absent`
+- **R54** (event) When `clean_up.py --yes` runs and a resource is already gone, the recipe shall report it as `absent`
   and exit with code 0.
 - **R55** (unwanted) If the role `$PREFIX-app-role` or the topic `$PREFIX-limits-alarms` does not carry the
   recipe's tag, then the recipe shall keep it and print `FAILED` with the reason.
@@ -313,8 +313,8 @@ The function does not run on a schedule. In the terminal of the AWS run, with th
 would delete, check that every name starts with your prefix, then delete it:
 
 ```bash
-uv run python clean_up.py --dry-run    # lists what it would delete
-uv run python clean_up.py              # alarms, dashboard, function, log group, budget, topic, role
+uv run python clean_up.py    # lists what it would delete
+uv run python clean_up.py --yes              # alarms, dashboard, function, log group, budget, topic, role
 ```
 
 CloudWatch does not offer a call that deletes metric data: the metrics stop when the function is gone, and CloudWatch

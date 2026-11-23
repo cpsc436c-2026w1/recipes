@@ -1,7 +1,7 @@
 """Remove every table a real run of this recipe created, for this PREFIX.
 
-  PREFIX=recipe-<you> uv run python clean_up.py --dry-run   list only
-  PREFIX=recipe-<you> uv run python clean_up.py             delete
+  PREFIX=recipe-<you> uv run python clean_up.py   list only
+  PREFIX=recipe-<you> uv run python clean_up.py --yes             delete
 
 Removes the DynamoDB tables {PREFIX}-chat-conversations, -chat-history, -answer-cache and -llm-traces.
 The recipe creates nothing else. Every table is tried, also after one fails; a failure is printed and the exit
@@ -93,8 +93,10 @@ def clean_up(s: Settings, ddb, dry_run: bool = False) -> Steps:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--dry-run", action="store_true", help="list what would be deleted (the default)")
+    p.add_argument("--yes", action="store_true", help="delete; without it, only list what would be deleted")
     args = p.parse_args(argv)
+    args.dry_run = args.dry_run or not args.yes
     s = Settings()
     steps = clean_up(s, boto3.client("dynamodb", region_name=s.region), args.dry_run)
     verb = "would remove" if args.dry_run else "removed"
@@ -103,6 +105,8 @@ def main(argv: list[str] | None = None) -> None:
     for what in steps.absent:
         print(f"absent {what}")
     print(f"{len(steps.removed)} tables {'to remove' if args.dry_run else 'removed'} for PREFIX={s.prefix} in {s.region}")
+    if args.dry_run:
+        print("Nothing deleted. Run again with --yes to delete these.")
     if steps.failed:
         for line in steps.failed:
             print(f"FAILED {line}", file=sys.stderr)

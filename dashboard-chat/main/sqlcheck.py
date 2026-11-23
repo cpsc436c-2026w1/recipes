@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterable
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.optimizer.scope import Scope, traverse_scope
 
 # Table functions that read files or the environment. The engine blocks them too; the check says why earlier.
 BLOCKED_FUNCTIONS = {
@@ -25,12 +26,16 @@ class SqlRejected(ValueError):
     pass
 
 
-def check_sql(sql: str, allowed_tables: Iterable[str], extra_rules: Iterable[SqlRule] = ()) -> exp.Expression:
-    """Return the parsed query, or raise SqlRejected with a message the model can act on."""
+def check_sql(sql: str, allowed_tables: Iterable[str], extra_rules: Iterable[SqlRule] = (),
+              dialect: str = "duckdb") -> exp.Expression:
+    """Return the parsed query, or raise SqlRejected with a message the model can act on.
+
+    dialect: the SQL dialect the engine runs, "duckdb" here, "athena" in ext-athena-engine.
+    """
     allowed = {t.lower() for t in allowed_tables}
     text = sql.strip().rstrip(";").strip()
     try:
-        statements = [s for s in sqlglot.parse(text, dialect="duckdb") if s is not None]
+        statements = [s for s in sqlglot.parse(text, dialect=dialect) if s is not None]
     except sqlglot.errors.SqlglotError as e:
         raise SqlRejected(f"the SQL does not parse: {str(e).splitlines()[0][:200]}") from None
     if len(statements) != 1:
@@ -45,15 +50,35 @@ def check_sql(sql: str, allowed_tables: Iterable[str], extra_rules: Iterable[Sql
         name = (func.name if isinstance(func, exp.Anonymous) else func.sql_name()).lower()
         if name in BLOCKED_FUNCTIONS or name.startswith("read_"):
             raise SqlRejected(f"the function {name} is not allowed; query the tables {sorted(allowed)}")
-    ctes = {c.alias_or_name.lower() for c in query.find_all(exp.CTE)}
+    ctes = _cte_references(query)
     for table in query.find_all(exp.Table):
         if not isinstance(table.this, exp.Identifier):
             raise SqlRejected("FROM must name a table, not a file or a function")
         if table.args.get("db") or table.args.get("catalog"):
             raise SqlRejected("use the plain table names, with no schema or database in front")
         name = table.name.lower()
-        if name not in allowed and name not in ctes:
+        if name not in allowed and id(table) not in ctes:
             raise SqlRejected(f"unknown table {name}; the tables are {sorted(allowed)}")
     for rule in extra_rules:
         rule(query)
     return query
+
+
+def _cte_references(query: exp.Expression) -> set[int]:
+    """The table nodes that name a CTE visible where they stand.
+
+    A CTE's name counts only inside its own query (sqlglot's scopes): in
+    `SELECT * FROM secret WHERE EXISTS (WITH secret AS (SELECT 1) SELECT * FROM secret)` the outer `secret` is not
+    the CTE, so it must be one of the allowed tables. A name list of every CTE anywhere in the query would let it
+    through (ext-athena-engine, R140).
+    """
+    found: set[int] = set()
+    try:
+        scopes = traverse_scope(query)
+    except Exception:  # a query sqlglot cannot scope: no table counts as a CTE, so only allowed tables pass
+        return found
+    for scope in scopes:
+        for table in scope.tables:
+            if isinstance(scope.sources.get(table.alias_or_name), Scope):
+                found.add(id(table))
+    return found

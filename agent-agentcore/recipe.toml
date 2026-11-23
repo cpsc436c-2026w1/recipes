@@ -7,7 +7,7 @@ shapes = ["genai-first", "operational-first", "lakehouse-first"]
 extensions = ["Agent under controlled autonomy", "MCP server for your system"]
 lectures = ["L17", "L18"]
 core = ["Strands Agents (hooks, interrupts)", "AgentCore Gateway", "AgentCore Runtime", "pydantic", "Inspect AI"]
-secondary = ["Lambda", "DynamoDB", "Parameter Store", "Logfire", "pydantic-settings"]
+secondary = ["Lambda", "DynamoDB", "Parameter Store", "Logfire", "pydantic-settings", "Pydantic AI (ext-sdk-lambda)", "Lambda function URLs (ext-sdk-lambda)", "DuckDB (ext-sdk-lambda)"]
 region = "ca-central-1"
 cost_one_run = "under one cent in AWS charges (assumed from the AgentCore price list, not measured); model calls count against the course LLM gateway budget, at most MAX_MODEL_CALLS per request"
 summary = "A Strands agent with example library tools: hooks keep the caps on model and tool calls, validate tool arguments against pydantic models, ask a person before a write and give the write a request key; the tools are a Lambda function behind an AgentCore Gateway, the agent runs on AgentCore Runtime, Logfire traces are behind a flag, and an Inspect eval scores requests in code, offline on a stub model"
@@ -33,6 +33,14 @@ name = "Settings in one frozen object read from the environment; secrets in Para
 source = "Twelve-Factor App, Config; course settings standard"
 
 [[practices]]
+name = "A value is shown only when the tool log holds it: the answer's SQL and rows come from what ran, not from the model's output (ext-sdk-lambda)"
+source = "L17; Agentic AI Lens AGENTSEC02-BP02 (validate tool inputs and outputs)"
+
+[[practices]]
+name = "One absolute deadline around the whole agent, checked before each call and cancelling the call in flight (ext-sdk-lambda)"
+source = "L17; Agentic AI Lens AGENTCOST07-BP01"
+
+[[practices]]
 name = "Eval first: requests with expected tool use and outcome, scored in code, offline on a stub model"
 source = "Course standard stack (Inspect AI)"
 
@@ -53,6 +61,19 @@ files = [
     "evals/scoring.py",
     "clean_up.py",
     ".env.example",
+    "ext-sdk-lambda/handler.py",
+    "ext-sdk-lambda/agent_strands.py",
+    "ext-sdk-lambda/agent_pydantic.py",
+    "ext-sdk-lambda/caps.py",
+    "ext-sdk-lambda/toollog.py",
+    "ext-sdk-lambda/verdict.py",
+    "ext-sdk-lambda/engine.py",
+    "ext-sdk-lambda/sqlcheck.py",
+    "ext-sdk-lambda/deploy.py",
+    "ext-sdk-lambda/clean_up.py",
+    "ext-sdk-lambda/invoke_url.py",
+    "ext-sdk-lambda/trip_eval.py",
+    "ext-sdk-lambda/.env.example",
 ]
 
 [validates]
@@ -67,7 +88,7 @@ eval = "uv run --env-file .env.example inspect eval evals/task.py"
 run_offline = "uv run --env-file .env.example python -m main.run ask --model stub --yes"
 run = "uv run --env-file .env python -m main.run deploy"
 invoke = "uv run --env-file .env python -m main.invoke"
-clean = "uv run --env-file .env python clean_up.py"
+clean = "uv run --env-file .env python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [resources]                         # what a deploy creates; clean_up.py removes it
 aws = [

@@ -182,6 +182,9 @@ def no_waits(context):
     """The recipe's waits (a new role, a poll of Athena, a retry) are written down in context.sleeps, not waited."""
     import time
 
+    if getattr(context, "live", False):          # an @live example waits for AWS for real
+        yield
+        return
     real = time.sleep
     time.sleep = lambda s: context.sleeps.append(s)
     try:

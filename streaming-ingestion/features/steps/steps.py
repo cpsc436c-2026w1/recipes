@@ -126,8 +126,25 @@ def step_run(context, which, args):
 
 @when("clean_up.py runs")
 def step_clean_up(context):
-    support.run_clean_up(context)
+    support.run_clean_up(context, "--yes")      # a bare run only lists (the clean-up contract)
     context.runs = getattr(context, "runs", []) + [context.printed]
+
+
+@when("clean_up.py --dry-run runs")
+def step_clean_up_dry(context):
+    context.before_dry_run = support.inventory()
+    support.run_clean_up(context, "--dry-run")
+
+
+@then("the account holds what it held before")
+def step_unchanged(context):
+    assert support.inventory() == context.before_dry_run
+
+
+@then('no call was made to delete anything')
+def step_no_delete(context):
+    deletes = [pair for pair in context.calls.pairs() if pair[1].startswith(("Delete", "Unsubscribe"))]
+    assert not deletes, deletes
 
 
 @then("the exit code is {code:d}")

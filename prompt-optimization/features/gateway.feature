@@ -12,7 +12,7 @@ Feature: Model calls go through the course LLM gateway
     And the gateway requests named the models "qwen3.6-35b-a3b, qwen3.8-27b"
     And 8 gateway requests named the model "qwen3.8-27b"
     And 141 gateway requests named the model "qwen3.6-35b-a3b"
-    And every task-model request caps the output at 4000 tokens and every reflection request at 16384
+    And every gateway request caps the output at 16384 tokens
     And the report's heading says "6 questions, 3 runs per prompt, task model qwen3.6-35b-a3b, course LLM gateway"
     And the report's row "after" is "83% | 83% / 83% / 83% | 15/18 | wrong value 3"
     And the course token is in no printed line and in no file of the run folder

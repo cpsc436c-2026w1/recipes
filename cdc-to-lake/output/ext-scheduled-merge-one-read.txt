@@ -1,0 +1,12 @@
+R100 live of ext-scheduled-merge, 2026-11-23 UTC, right after output/ext-scheduled-merge.txt, PREFIX=recipe-lake
+(account masked): the day's manifest deleted, so the next run takes the same objects again; a fingerprint of every
+trips row and the sums of zone_counts, before and after. The MERGE reads the run's objects once.
+
+$ uv run python ext-scheduled-merge/r100_live.py
+before ({'trips': '837', 'fingerprint': '1800939658751'}, {'rows_': '3', 'req': '837', 'comp': '837'})
+manifest lake/merge-state/dt=2026-11-23.txt: 109 lines, deleted
+rerun finished objects 109 quarantined 0
+merge    713308 B Data scanned, 1118 ms
+rebuild  6610 B Data scanned, 1834 ms
+after  ({'trips': '837', 'fingerprint': '1800939658751'}, {'rows_': '3', 'req': '837', 'comp': '837'})
+R100 the same 109 objects merged again leave trips and zone_counts unchanged: True

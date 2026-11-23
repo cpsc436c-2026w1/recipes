@@ -54,7 +54,7 @@ DRY=1 bash ext-redeploy/run.sh     # prints the commands only
 bash ext-redeploy/run.sh           # after each change to main/handler.py
 ```
 
-Clean-up: this extension does not create anything new; `bash clean_up.sh` removes the API as before. Cost: see below.
+Clean-up: this extension does not create anything new; `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` removes the API as before. Cost: see below.
 
 ## What you should see
 

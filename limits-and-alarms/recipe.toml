@@ -51,7 +51,7 @@ run = "uv run python main/run.py --target aws"
 run_offline = "uv run python main/run.py --target local"
 fire = "uv run python main/fire.py --target aws"
 fire_synthetic = "uv run python main/fire.py --target aws --synthetic"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [extension_commands]
 ext-runaway-loop = "uv run python ext-runaway-loop/loop_run.py"

@@ -1,0 +1,476 @@
+# lake-layout-experiment live run, 2026-11-23, ca-central-1, PREFIX=recipe-layout,
+# account masked as 111122223333. DS01 from the course catalog (data source `course`, borrowed, kept).
+# Two runs. The first found the defects below, fixed on the way (lines starting "+ fix:"); its measured cells of the
+# flat layouts at 8 and 32 copies are not valid (their copies took no room: defect 8), so it was cleaned up and
+# everything built and run again. The second run is the result (output/summary-live.md, the experiment's section 7).
+#   1. DS01's CTAS: the course table's timestamp(6) is not written by a Hive CTAS; cast to timestamp(3).
+#   2. Copies of a row written side by side took little more room than one (probe 0.16-0.29 MB from 1 to 64 copies);
+#      each copy as one run of rows, the same rows on the same day still did (1.02 MB at 8, 1.12 MB at 16, also
+#      without compression; mechanism unchecked). Copies now rotate the days of March, and the growth stops when a
+#      doubling does not grow the probe by half (it caught the second case).
+#   3. A build that stopped part-way could not run again; it now keeps the tables it has and clears what a stopped
+#      CTAS left.
+#   4. The DuckDB extension download got 403 with urllib's default User-Agent; it names its client.
+#   5. The package step had no build/ folder on a machine without an offline run; it makes it.
+#   6. The function's S3 GET count was always null (the DuckDB 2.0.1 profile names none); it reads DuckDB's HTTP log.
+#   7. run.sh ran the @live scenario after late, which had added its row: the scenario now runs first.
+#   8. The flat tables, written from DS01 x copies, did not grow with their copies (whole-table scan 4.88, 6.73 and
+#      12.37 MB at 1, 8 and 32 copies). A flat table of more than 1 copy is now written from the Hive by-day table of
+#      its size, and build checks every final table's whole-table scan (second run: 4.88, 38.95 and 155.02 MB).
+
+## First run
++ scripts/lake.py up; scripts/lake.py workgroup recipe-layout-wg (before the build: probes)
+created  s3://recipe-layout-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+created  Athena workgroup recipe-layout-wg
++ probes in recipe-layout-wg: zone boroughs, DS01 count by pickup time
+SUCCEEDED scanned 0.0 MB, engine 412 ms: SELECT borough, count(*) FROM course.course_rides.zones GROUP BY 1 ORDER BY 1
+    ['borough', '_col1']
+    ['Bronx', '43']
+    ['Brooklyn', '61']
+    ['EWR', '1']
+    ['Manhattan', '69']
+    ['N/A', '1']
+    ['Queens', '69']
+    ['Staten Island', '20']
+    ['Unknown', '1']
+SUCCEEDED scanned 24.7 MB, engine 3142 ms: SELECT count(*) FROM course.course_rides.rides r WHERE r.pickup_datetime >= TIMESTAMP '2024-03-01 00:00:00' AN
+    ['_col0']
+    ['6045943']
++ experiment.py build
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+CREATE TABLE recipe_layout_layout.ds01 WITH (format = 'PARQUET', write_compression = 'ZSTD',: NOT_SUPPORTED: Incorrect timestamp precision for timestamp(6); the configured precision is MILLISECONDS; column name: pickup_time. You may need to manually clean the data at location 's3://recipe-layout-lake-111122223333/athena-results/tables/dbfff157-756f-49dc-b499-14fae6e993bc' before retrying. Athena will not delete data in your account.
+exit 1
++ fix: DS01's pickup_time cast to timestamp(3) (layout.ds01_ctas); build skips tables it has; experiment.py build again
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS)
+built trips_ice_day_1 (CTAS)
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS)
+built trips_ice_day_2 (CTAS)
+probe at 2: 0.28 MB
+upper bound of the plan [1, 4, 16]: 0.58 USD
+built trips_hive_day_4 (CTAS)
+built trips_ice_day_4 (CTAS)
+probe at 4: 0.29 MB
+upper bound of the plan [1, 8, 32]: 0.59 USD
+built trips_hive_day_8 (CTAS)
+built trips_ice_day_8 (CTAS)
+probe at 8: 0.18 MB
+upper bound of the plan [1, 16, 64]: 0.39 USD
+built trips_hive_day_16 (CTAS)
+built trips_ice_day_16 (CTAS)
+probe at 16: 0.18 MB
+upper bound of the plan [1, 32, 128]: 0.39 USD
+built trips_hive_day_32 (CTAS)
+built trips_ice_day_32 (CTAS)
+probe at 32: 0.19 MB
+upper bound of the plan [1, 64, 256]: 0.40 USD
+built trips_hive_day_64 (CTAS)
+built trips_ice_day_64 (CTAS)
+probe at 64: 0.20 MB
+upper bound of the plan [1, 64, 256]: 0.22 USD
+growth: 10 MB not reached: probe 0.204493 MB at 64 copies (copies capped at 256); sizes [1, 64, 256]
+built trips_hive_flat_1 (CTAS)
+built trips_ice_flat_1 (CTAS)
+built trips_hive_flat_64 (CTAS)
+built trips_ice_flat_64 (CTAS)
+built trips_hive_flat_256 (CTAS)
++ the build showed a defect: the probe stayed at 0.16-0.29 MB from 1 to 64 copies (the copies of a row were written side by side and stored once); build stopped; one trial CTAS with the copies first: 4 copies probe 0.60 MB
++ clean_up.py (dry run), then --yes, before the build with the fix
+would remove glue tables of recipe_layout_layout and the database
+would remove s3 prefix layout/ in <PREFIX>-lake-<account>
+would remove lambda function recipe-layout-duckdb-query
+would remove log group /aws/lambda/recipe-layout-duckdb-query
+would remove iam role recipe-layout-duckdb-role
+dry run: nothing was contacted or deleted; add --yes
+removed  glue table recipe_layout_layout.ds01
+removed  glue table recipe_layout_layout.probe_contig_4
+removed  glue table recipe_layout_layout.trips_hive_day_1
+removed  glue table recipe_layout_layout.trips_hive_day_16
+removed  glue table recipe_layout_layout.trips_hive_day_2
+removed  glue table recipe_layout_layout.trips_hive_day_32
+removed  glue table recipe_layout_layout.trips_hive_day_4
+removed  glue table recipe_layout_layout.trips_hive_day_64
+removed  glue table recipe_layout_layout.trips_hive_day_8
+removed  glue table recipe_layout_layout.trips_hive_flat_1
+removed  glue table recipe_layout_layout.trips_hive_flat_256
+removed  glue table recipe_layout_layout.trips_hive_flat_64
+removed  glue table recipe_layout_layout.trips_ice_day_1
+removed  glue table recipe_layout_layout.trips_ice_day_16
+removed  glue table recipe_layout_layout.trips_ice_day_2
+removed  glue table recipe_layout_layout.trips_ice_day_32
+removed  glue table recipe_layout_layout.trips_ice_day_4
+removed  glue table recipe_layout_layout.trips_ice_day_64
+removed  glue table recipe_layout_layout.trips_ice_day_8
+removed  glue table recipe_layout_layout.trips_ice_flat_1
+removed  glue table recipe_layout_layout.trips_ice_flat_64
+removed  glue database recipe_layout_layout
+removed  s3://recipe-layout-lake-111122223333/layout/ (509 objects)
+absent   lambda function recipe-layout-duckdb-query
+absent   log group /aws/lambda/recipe-layout-duckdb-query
+absent   iam role recipe-layout-duckdb-role
++ fix: copies written one after the other (layout.build_statements), the growth stops when a doubling does not grow the probe; experiment.py build
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS)
+built trips_ice_day_1 (CTAS)
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS)
+built trips_ice_day_2 (CTAS)
+probe at 2: 0.32 MB
+upper bound of the plan [1, 4, 16]: 0.55 USD
+built trips_hive_day_4 (CTAS)
+built trips_ice_day_4 (CTAS)
+probe at 4: 0.60 MB
+upper bound of the plan [1, 8, 32]: 0.81 USD
+built trips_hive_day_8 (CTAS)
+built trips_ice_day_8 (CTAS)
+probe at 8: 1.02 MB
+upper bound of the plan [1, 16, 64]: 1.09 USD
+built trips_hive_day_16 (CTAS)
+built trips_ice_day_16 (CTAS)
+probe at 16: 1.12 MB
+growth: no plan: the probe did not grow with the copies (1.0247 MB at 8 copies, 1.11997 MB at 16 copies); sizes none
+exit 1
++ the second build stopped on the new guard: the probe went 0.16, 0.32, 0.60, 1.02, then 1.12 MB at 16 copies (the same rows on the same day were still stored once, also with write_compression NONE or SNAPPY: trial tables probe_*); with the days of March rotated per copy, 8 copies 1.2 MB and 16 copies 2.5 MB (506 and 998 MB of table)
++ clean_up.py (dry run), then --yes
+would remove iam role recipe-layout-duckdb-role
+dry run: nothing was contacted or deleted; add --yes
+removed  glue database recipe_layout_layout
+removed  s3://recipe-layout-lake-111122223333/layout/ (523 objects)
+absent   lambda function recipe-layout-duckdb-query
+absent   log group /aws/lambda/recipe-layout-duckdb-query
+absent   iam role recipe-layout-duckdb-role
++ fix: copies rotate the days of March (layout.rotation_days); experiment.py build
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS)
+built trips_ice_day_1 (CTAS)
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS)
+built trips_ice_day_2 (CTAS)
+probe at 2: 0.33 MB
+upper bound of the plan [1, 4, 16]: 0.64 USD
+built trips_hive_day_4 (CTAS)
+built trips_ice_day_4 (CTAS)
+probe at 4: 0.65 MB
+upper bound of the plan [1, 8, 32]: 1.19 USD
+built trips_hive_day_8 (CTAS)
+built trips_ice_day_8 (CTAS)
+probe at 8: 1.23 MB
+upper bound of the plan [1, 16, 64]: 2.29 USD
+upper bound of the plan [1, 8, 32]: 1.16 USD
+growth: 10 MB not reached: probe 1.23186 MB at 8 copies; sizes [1, 8, 32]
+built trips_hive_flat_1 (CTAS)
+built trips_ice_flat_1 (CTAS)
+built trips_hive_flat_8 (CTAS)
+built trips_ice_flat_8 (CTAS)
+built trips_hive_flat_32 (CTAS)
+built trips_hive_day_32 (CTAS)
+built trips_ice_flat_32 (CTAS)
+built trips_ice_day_32 (CTAS)
+Traceback (shortened to its last line):
+  urllib.error.HTTPError: HTTP Error 403: Forbidden
+exit 1
++ fix: the extension download names its client (function.download; urllib's default was refused with 403); experiment.py build again (keeps the tables it has)
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS (kept from an earlier build))
+built trips_ice_day_1 (CTAS (kept from an earlier build))
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS (kept from an earlier build))
+built trips_ice_day_2 (CTAS (kept from an earlier build))
+probe at 2: 0.33 MB
+upper bound of the plan [1, 4, 16]: 0.64 USD
+built trips_hive_day_4 (CTAS (kept from an earlier build))
+built trips_ice_day_4 (CTAS (kept from an earlier build))
+probe at 4: 0.65 MB
+upper bound of the plan [1, 8, 32]: 1.19 USD
+built trips_hive_day_8 (CTAS (kept from an earlier build))
+built trips_ice_day_8 (CTAS (kept from an earlier build))
+probe at 8: 1.23 MB
+upper bound of the plan [1, 16, 64]: 2.29 USD
+upper bound of the plan [1, 8, 32]: 1.16 USD
+growth: 10 MB not reached: probe 1.23186 MB at 8 copies; sizes [1, 8, 32]
+built trips_hive_flat_1 (CTAS (kept from an earlier build))
+built trips_ice_flat_1 (CTAS (kept from an earlier build))
+built trips_hive_flat_8 (CTAS (kept from an earlier build))
+built trips_ice_flat_8 (CTAS (kept from an earlier build))
+built trips_hive_flat_32 (CTAS (kept from an earlier build))
+built trips_hive_day_32 (CTAS (kept from an earlier build))
+built trips_ice_flat_32 (CTAS (kept from an earlier build))
+built trips_ice_day_32 (CTAS (kept from an earlier build))
+Traceback (shortened to its last line):
+  FileNotFoundError: [Errno 2] No such file or directory: './build/duckdb-query.zip'
+exit 1
++ fix: package() makes build/ (it existed only after an offline run); experiment.py build again
+exists   s3://recipe-layout-lake-111122223333 (created by lake.py up)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS (kept from an earlier build))
+built trips_ice_day_1 (CTAS (kept from an earlier build))
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS (kept from an earlier build))
+built trips_ice_day_2 (CTAS (kept from an earlier build))
+probe at 2: 0.33 MB
+upper bound of the plan [1, 4, 16]: 0.64 USD
+built trips_hive_day_4 (CTAS (kept from an earlier build))
+built trips_ice_day_4 (CTAS (kept from an earlier build))
+probe at 4: 0.65 MB
+upper bound of the plan [1, 8, 32]: 1.19 USD
+built trips_hive_day_8 (CTAS (kept from an earlier build))
+built trips_ice_day_8 (CTAS (kept from an earlier build))
+probe at 8: 1.23 MB
+upper bound of the plan [1, 16, 64]: 2.29 USD
+upper bound of the plan [1, 8, 32]: 1.16 USD
+growth: 10 MB not reached: probe 1.23186 MB at 8 copies; sizes [1, 8, 32]
+built trips_hive_flat_1 (CTAS (kept from an earlier build))
+built trips_ice_flat_1 (CTAS (kept from an earlier build))
+built trips_hive_flat_8 (CTAS (kept from an earlier build))
+built trips_ice_flat_8 (CTAS (kept from an earlier build))
+built trips_hive_flat_32 (CTAS (kept from an earlier build))
+built trips_hive_day_32 (CTAS (kept from an earlier build))
+built trips_ice_flat_32 (CTAS (kept from an earlier build))
+built trips_ice_day_32 (CTAS (kept from an earlier build))
+function recipe-layout-duckdb-query: 29.3 MiB zipped
+exit 0
++ smoke before run: the function once (trips_hive_day_1, one-day) against Athena's rows
+{"duration_ms": 743.76, "billed_duration_ms": 1160.0, "init_duration_ms": 416.05, "memory_mb": 2048, "s3_gets": null, "to_last_row_ms": 1495.1111222233332, "error": ""}
+duckdb rows 66 athena rows 66 same True athena scanned MB 0.16
++ fix: the function counts S3 requests from DuckDB's HTTP log (the smoke call's s3_gets was null: the 2.0.1 profile names no request count); package and deploy again, smoke again
+function recipe-layout-duckdb-query: 29.3 MiB zipped
+{"duration_ms": 623.55, "billed_duration_ms": 972.0, "init_duration_ms": 348.34, "memory_mb": 2048, "s3_gets": 3, "to_last_row_ms": 1243.1111222233333, "error": ""}
+duckdb rows 66 athena rows 66 same True athena scanned MB 0.16
++ before run: the largest reads against the 1 GB cutoff of recipe-layout-wg (32 copies)
+hive-flat       one-week     SUCCEEDED     228.4 MB    14862 ms 
+hive-flat       whole-table  SUCCEEDED      12.4 MB     2744 ms 
+iceberg-flat    one-week     SUCCEEDED     726.3 MB     7161 ms 
+iceberg-flat    whole-table  SUCCEEDED      12.5 MB     1803 ms 
+hive-by-day     one-week     SUCCEEDED      34.6 MB     2039 ms 
+hive-by-day     whole-table  SUCCEEDED     153.8 MB     1928 ms 
+iceberg-by-day  one-week     SUCCEEDED      34.9 MB     1330 ms 
+iceberg-by-day  whole-table  SUCCEEDED     154.6 MB     1664 ms 
++ experiment.py run
+50/450 runs
+100/450 runs
+150/450 runs
+200/450 runs
+250/450 runs
+300/450 runs
+350/450 runs
+400/450 runs
+450/450 runs
+450 runs stored in results.duckdb
+exit 0
++ experiment.py summary (summary.md: 45 cells, copied to output/summary-live.md)
++ experiment.py late
+{"before": {"hive-flat": 7645, "hive-by-day": 7645, "iceberg-flat": 7645, "iceberg-by-day": 7645}, "after": {"hive-flat": 7646, "hive-by-day": 7646, "iceberg-flat": 7646, "iceberg-by-day": 7646}, "agree": true}
++ LIVE=1 behave -t @live
+      Given the course catalog is registered as the data source "course" ... passed in 1.475s
+      When experiment.py build runs ... passed in 1.662s
+      Then the table ds01 has 6045943 rows ... passed in 0.000s
+      And each of the four tables of 1 copy has 6045943 rows ... failed in 0.677s
+ASSERT FAILED: 
+0 scenarios passed, 1 failed, 20 skipped
+3 steps passed, 1 failed, 97 skipped
++ fix: run.sh runs the @live scenario before late (late had added its row to the tables of 1 copy: 6,045,944); the four tables of 1 copy dropped and the sequence run again in the fixed order
+dropped trips_hive_flat_1 and 2 files
+dropped trips_hive_day_1 and 32 files
+dropped trips_ice_flat_1 and 8 files
+dropped trips_ice_day_1 and 38 files
++ LIVE=1 behave -t @live
+      Given the course catalog is registered as the data source "course" ... passed in 1.521s
+      When experiment.py build runs ... passed in 36.838s
+      Then the table ds01 has 6045943 rows ... passed in 0.000s
+      And each of the four tables of 1 copy has 6045943 rows ... passed in 5.366s
+1 scenario passed, 0 failed, 20 skipped
+4 steps passed, 0 failed, 97 skipped
++ experiment.py late
+{"before": {"hive-flat": 7645, "hive-by-day": 7645, "iceberg-flat": 7645, "iceberg-by-day": 7645}, "after": {"hive-flat": 7646, "hive-by-day": 7646, "iceberg-flat": 7646, "iceberg-by-day": 7646}, "agree": true}
+
++ measured costs (Athena query history of both workgroups: the three builds, the trial tables, the probes, the run, late; Lambda from the run's REPORT lines)
+recipe-layout-ctas-wg  CTAS       60 queries,   60 billed,     5121 MB, 0.0269 USD
+recipe-layout-ctas-wg  DDL         9 queries,    0 billed,        0 MB, 0.0000 USD
+recipe-layout-ctas-wg  INSERT      8 queries,    8 billed,       80 MB, 0.0004 USD
+recipe-layout-ctas-wg  SELECT     57 queries,   57 billed,      570 MB, 0.0030 USD
+recipe-layout-ctas-wg  SHOW        8 queries,    8 billed,       80 MB, 0.0004 USD
+recipe-layout-wg       SELECT    445 queries,  445 billed,    34673 MB, 0.1819 USD
+Athena total: 40524 MB billed, 0.2126 USD (0.3082 CAD)
+Lambda, the run's 90 calls: 123.5 GB-s billed, 90 requests, 3130 S3 GET and 90 LIST: 0.00354 USD (0.00513 CAD)
++ experiment.py clean (dry run)
+would remove glue tables of recipe_layout_layout and the database
+would remove s3 prefix layout/ in <PREFIX>-lake-<account>
+would remove lambda function recipe-layout-duckdb-query
+would remove log group /aws/lambda/recipe-layout-duckdb-query
+would remove iam role recipe-layout-duckdb-role
++ experiment.py clean --yes
+removed  lambda function recipe-layout-duckdb-query
+removed  log group /aws/lambda/recipe-layout-duckdb-query
+removed  iam role recipe-layout-duckdb-role
+removed  glue database recipe_layout_layout
+removed  s3://recipe-layout-lake-111122223333/layout/ (362 objects)
+  (one "removed  glue table" line per table left out here: ds01 and the 16 tables of sizes 1, 2, 4, 8 and 32)
++ scripts/lake.py down (dry run)
+would remove Athena workgroup recipe-layout-wg
+would remove Athena workgroup recipe-layout-ctas-wg
+would remove s3://recipe-layout-lake-111122223333 and its 1134 object versions
++ scripts/lake.py down --yes
+removed  Athena workgroup recipe-layout-wg
+removed  Athena workgroup recipe-layout-ctas-wg
+removed  s3://recipe-layout-lake-111122223333 and its 1134 object versions
++ proof: nothing left for PREFIX=recipe-layout (the data source course is the course's, borrowed, kept)
+tagged Team=recipe-layout: 0
+lambda recipe-layout*: 0
+iam roles recipe-layout*: 0
+log groups /aws/lambda/recipe-layout*: 0
+athena workgroups recipe-layout*: 0
+glue databases recipe_layout*: 0
+s3 buckets recipe-layout*: 0
+data source course: 1 (kept)
+
+## Second run (the result)
++ fix: a flat table of more than 1 copy is written from the Hive by-day table of its size, and build checks that every final table's whole-table scan grows with its copies (the first run's flat tables scanned 4.88, 6.73 and 12.37 MB at 1, 8 and 32 copies); everything built again
++ experiment.py build
+created  s3://recipe-layout-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+workgroup recipe-layout-ctas-wg: created
+workgroup recipe-layout-wg: created
+ds01: 6,045,943 rows
+built trips_hive_day_1 (CTAS)
+built trips_ice_day_1 (CTAS)
+probe at 1: 0.16 MB
+upper bound of the plan [1, 2, 8]: 0.36 USD
+built trips_hive_day_2 (CTAS)
+built trips_ice_day_2 (CTAS)
+probe at 2: 0.33 MB
+upper bound of the plan [1, 4, 16]: 0.64 USD
+built trips_hive_day_4 (CTAS)
+built trips_ice_day_4 (CTAS)
+probe at 4: 0.65 MB
+upper bound of the plan [1, 8, 32]: 1.19 USD
+built trips_hive_day_8 (CTAS)
+built trips_ice_day_8 (CTAS)
+probe at 8: 1.24 MB
+upper bound of the plan [1, 16, 64]: 2.29 USD
+upper bound of the plan [1, 8, 32]: 1.16 USD
+growth: 10 MB not reached: probe 1.2378 MB at 8 copies; sizes [1, 8, 32]
+built trips_hive_flat_1 (CTAS)
+built trips_ice_flat_1 (CTAS)
+whole-table scan at 1 copy: hive-flat 4.88 MB, hive-by-day 4.89 MB, iceberg-flat 4.87 MB, iceberg-by-day 4.89 MB
+built trips_hive_flat_8 (CTAS)
+built trips_ice_flat_8 (CTAS)
+whole-table scan at 8 copies: hive-flat 38.95 MB, hive-by-day 39.01 MB, iceberg-flat 38.97 MB, iceberg-by-day 38.94 MB
+built trips_hive_day_32 (CTAS)
+built trips_ice_day_32 (CTAS)
+built trips_hive_flat_32 (CTAS)
+built trips_ice_flat_32 (CTAS)
+whole-table scan at 32 copies: hive-flat 155.02 MB, hive-by-day 153.10 MB, iceberg-flat 154.64 MB, iceberg-by-day 152.91 MB
+function recipe-layout-duckdb-query: 29.3 MiB zipped
+exit 0
++ smoke before run (a cold call: the function was just deployed)
+{"duration_ms": 841.54, "billed_duration_ms": 1257.0, "init_duration_ms": 414.46, "memory_mb": 2048, "s3_gets": 3, "to_last_row_ms": 1655.1111222233338, "error": ""}
+duckdb rows 66 athena rows 66 same True athena scanned MB 0.16
++ experiment.py run
+  (function configuration updated after the smoke call, so the run's first call starts a new instance: a cold call)
+50/450 runs
+100/450 runs
+150/450 runs
+200/450 runs
+250/450 runs
+300/450 runs
+350/450 runs
+400/450 runs
+450/450 runs
+450 runs stored in results.duckdb
+exit 0
++ experiment.py summary (summary.md: 45 cells, copied to output/summary-live.md)
++ LIVE=1 behave -t @live
+      Given the course catalog is registered as the data source "course" ... passed in 2.028s
+      When experiment.py build runs ... passed in 1.651s
+      Then the table ds01 has 6045943 rows ... passed in 0.000s
+      And each of the four tables of 1 copy has 6045943 rows ... passed in 4.221s
+1 scenario passed, 0 failed, 20 skipped
+4 steps passed, 0 failed, 97 skipped
++ experiment.py late
+{"before": {"hive-flat": 7645, "hive-by-day": 7645, "iceberg-flat": 7645, "iceberg-by-day": 7645}, "after": {"hive-flat": 7646, "hive-by-day": 7646, "iceberg-flat": 7646, "iceberg-by-day": 7646}, "agree": true}
++ measured costs of this build and run (Athena query history of both workgroups; Lambda from the run's REPORT lines)
+recipe-layout-ctas-wg  CTAS       17 queries,   17 billed,     6112 MB, 0.0321 USD
+recipe-layout-ctas-wg  DDL         2 queries,    0 billed,        0 MB, 0.0000 USD
+recipe-layout-ctas-wg  INSERT      4 queries,    4 billed,       40 MB, 0.0002 USD
+recipe-layout-ctas-wg  SELECT     18 queries,   18 billed,      180 MB, 0.0009 USD
+recipe-layout-ctas-wg  SHOW        2 queries,    2 billed,       20 MB, 0.0001 USD
+recipe-layout-wg       SELECT    389 queries,  389 billed,    57253 MB, 0.3003 USD
+Athena total: 63605 MB billed, 0.3336 USD (0.4838 CAD)
+Lambda, the run's 90 calls: 123.2 GB-s billed, 90 requests, 3130 S3 GET and 90 LIST: 0.00353 USD (0.00512 CAD)
+
++ experiment.py clean (dry run)
+would remove glue tables of recipe_layout_layout and the database
+would remove s3 prefix layout/ in <PREFIX>-lake-<account>
+would remove lambda function recipe-layout-duckdb-query
+would remove log group /aws/lambda/recipe-layout-duckdb-query
+would remove iam role recipe-layout-duckdb-role
++ experiment.py clean --yes
+removed  lambda function recipe-layout-duckdb-query
+removed  log group /aws/lambda/recipe-layout-duckdb-query
+removed  iam role recipe-layout-duckdb-role
+removed  glue table recipe_layout_layout.ds01
+removed  glue table recipe_layout_layout.trips_hive_day_1
+removed  glue table recipe_layout_layout.trips_hive_day_2
+removed  glue table recipe_layout_layout.trips_hive_day_32
+removed  glue table recipe_layout_layout.trips_hive_day_4
+removed  glue table recipe_layout_layout.trips_hive_day_8
+removed  glue table recipe_layout_layout.trips_hive_flat_1
+removed  glue table recipe_layout_layout.trips_hive_flat_32
+removed  glue table recipe_layout_layout.trips_hive_flat_8
+removed  glue table recipe_layout_layout.trips_ice_day_1
+removed  glue table recipe_layout_layout.trips_ice_day_2
+removed  glue table recipe_layout_layout.trips_ice_day_32
+removed  glue table recipe_layout_layout.trips_ice_day_4
+removed  glue table recipe_layout_layout.trips_ice_day_8
+removed  glue table recipe_layout_layout.trips_ice_flat_1
+removed  glue table recipe_layout_layout.trips_ice_flat_32
+removed  glue table recipe_layout_layout.trips_ice_flat_8
+removed  glue database recipe_layout_layout
+removed  s3://recipe-layout-lake-111122223333/layout/ (386 objects)
++ scripts/lake.py down (dry run)
+would remove Athena workgroup recipe-layout-wg
+would remove Athena workgroup recipe-layout-ctas-wg
+would remove s3://recipe-layout-lake-111122223333 and its 852 object versions
++ scripts/lake.py down --yes
+removed  Athena workgroup recipe-layout-wg
+removed  Athena workgroup recipe-layout-ctas-wg
+removed  s3://recipe-layout-lake-111122223333 and its 852 object versions
++ proof: nothing left for PREFIX=recipe-layout (the data source course is the course's, borrowed, kept)
+tagged Team=recipe-layout: 0
+lambda recipe-layout*: 0
+iam roles recipe-layout*: 0
+log groups /aws/lambda/recipe-layout*: 0
+athena workgroups recipe-layout*: 0
+glue databases recipe_layout*: 0
+s3 buckets recipe-layout*: 0
+data source course: 1 (kept)
+recipe-chat* (rechecked): buckets 0, tagged 0
+
+## Cost of both runs (measured; USD, CAD at 1.45)
+Athena: first run 0.2126 USD (40,524 MB billed), second run 0.3336 USD (63,605 MB): 0.546 USD (0.79 CAD).
+Lambda: 0.0035 USD a run, 0.0071 USD (0.010 CAD).
+S3 storage (at most about 12 GB for about three hours a run) under 0.01 USD; S3 requests by Athena (table and result
+  files written, every run's reads) not metered (request metrics off): under 0.10 USD for both at the price sheet's
+  rates, assumed; Glue Data Catalog requests under 0.002 USD.
+Total: under 0.67 USD (0.97 CAD), 2.2% of the 30 USD lease, under the 3 USD cap. No model calls.

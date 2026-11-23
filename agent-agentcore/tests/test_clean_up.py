@@ -111,7 +111,7 @@ def test_the_command_prints_one_line_per_resource_and_a_total(deployed, monkeypa
     monkeypatch.setattr("clean_up.Clients.for_region", lambda region: aws)
     monkeypatch.setattr("clean_up.time.sleep", no_wait)
     with pytest.raises(SystemExit) as stop:
-        clean_up.main([])
+        clean_up.main(["--yes"])
     out = capsys.readouterr().out
     assert stop.value.code == 0 and f"removed  dynamodb table {s.books_table}" in out
     assert "clean-up for PREFIX=test in ca-central-1" in out and "0 failed" in out

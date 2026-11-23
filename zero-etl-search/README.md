@@ -171,17 +171,17 @@ match.
 
 **Clean-up**
 
-- **R50** (event) When `clean_up.py` runs, the recipe shall delete this `PREFIX`'s event source mappings,
+- **R50** (event) When `clean_up.py --yes` runs, the recipe shall delete this `PREFIX`'s event source mappings,
   functions, log groups, queues, collections with their policies, collection groups, table and the roles tagged
   `recipe=zero-etl-search`, and nothing of another `PREFIX`.
-- **R51** (event) When `clean_up.py --dry-run` runs, the recipe shall print what it would delete and delete nothing.
-- **R52** (event) When `clean_up.py` runs and everything is already gone, the recipe shall report each step absent
+- **R51** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print what it would delete and delete nothing.
+- **R52** (event) When `clean_up.py --yes` runs and everything is already gone, the recipe shall report each step absent
   and exit with code 0.
 - **R53** (unwanted) If a step of `clean_up.py` is refused with an error that does not mean "already gone", then the
   recipe shall report that step `FAILED` with the error code, try the remaining steps and exit with code 1.
 - **R54** (unwanted) If a service control policy denies OpenSearch Ingestion, then the recipe shall report the
   pipeline step `not checked` and leave the exit code as the other steps make it.
-- **R55** (event) When `clean_up.py` runs after a function was deleted, the recipe shall still delete that
+- **R55** (event) When `clean_up.py --yes` runs after a function was deleted, the recipe shall still delete that
   function's event source mappings.
 - **R56** (unwanted) If a role of the recipe's name does not carry the tag `recipe=zero-etl-search`, then the recipe
   shall leave it.
@@ -198,7 +198,7 @@ match.
   age, the age of the oldest record it has not finished, stays above 5 minutes for a minute.
 - **R71** (event) When the set-up runs, the recipe shall create an alarm that goes off when the failure queue holds
   a message.
-- **R72** (event) When `clean_up.py` runs, the recipe shall delete both alarms.
+- **R72** (event) When `clean_up.py --yes` runs, the recipe shall delete both alarms.
 - **R73** (event) When the set-up runs, the recipe shall turn on point-in-time recovery for the table, with a
   recovery period of 7 days.
 - **R74** (unwanted) If DynamoDB answers that the new table's backups are not available yet, then the recipe shall
@@ -282,7 +282,8 @@ aws sts get-caller-identity                       # the account you expect, befo
 export PREFIX=recipe-yourname AWS_REGION=ca-central-1
 uv run python -m main.run --target aws            # creates everything, then runs the scenario
 uv run marimo edit demo/search_demo.py -- --target aws
-uv run python clean_up.py                         # the same day
+uv run python clean_up.py                         # lists what it would delete; deletes nothing
+uv run python clean_up.py --yes                   # the same day
 ```
 
 What you should see: about two minutes of set-up (in the run of 2026-11-13 the collection refused your role for
@@ -296,7 +297,7 @@ pull request of 2026-11-13). The sandbox run took no retry, so the captured outp
 ([`output/main-aws-2026-11-14.txt`](output/main-aws-2026-11-14.txt)): set-up took 132 s, including a 62 s wait for
 the collection. Median lag was 3.3 s over 7 timed changes. On 2026-11-13, median lag was 1.7 s.
 
-Clean-up and cost: `uv run python clean_up.py`; at most about 0.24 USD for a run like the captured one
+Clean-up and cost: `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes`; at most about 0.24 USD for a run like the captured one
 ([Cost and clean-up](#cost-and-clean-up)).
 
 ### 3. Laptop, against your team sandbox: a mapping change (index move)
@@ -425,8 +426,8 @@ under 0.01 USD.
 Remove everything:
 
 ```bash
-PREFIX=recipe-yourname uv run python clean_up.py --dry-run
-PREFIX=recipe-yourname uv run python clean_up.py     # mapping, function and log group, queue, collection, policies, group, table, role
+PREFIX=recipe-yourname uv run python clean_up.py
+PREFIX=recipe-yourname uv run python clean_up.py --yes     # mapping, function and log group, queue, collection, policies, group, table, role
 ```
 
 The clean-up script tries every step and prints one line for each: removed, absent, or FAILED with the reason. It exits 1 when a step

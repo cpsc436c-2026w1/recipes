@@ -29,13 +29,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 for folder in (ROOT / "features", ROOT / "tests", ROOT / "ext-fan-out", ROOT / "ext-windowed-aggregates",
+               ROOT / "ext-queue-ingest", ROOT / "ext-source-poller", ROOT / "sim", ROOT / "scripts", ROOT / "src",
                ROOT / "main", ROOT):
     sys.path.insert(0, str(folder))
 
 OFFLINE = {"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing", "AWS_SESSION_TOKEN": "testing",
            "AWS_DEFAULT_REGION": "ca-central-1", "AWS_EC2_METADATA_DISABLED": "true", "PREFIX": "recipe-ana"}
 NOT_SET = ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_REGION", "GATEWAY_URL", "COURSE_MCP_TOKEN", "COURSE_GATEWAY_URL", "KB_MCP_TOKEN", "LAMBDA_ROLE_ARN",
-           "TABLE", "LATE_RULE", "CLOSE_DELAY_S")
+           "TABLE", "LATE_RULE", "CLOSE_DELAY_S", "BATCH_WINDOW_S", "SINK", "BUCKET", "TEAM", "OWNER", "PURPOSE")
 
 
 def before_all(context):
@@ -45,16 +46,32 @@ def before_all(context):
     logging.getLogger("botocore").setLevel(logging.WARNING)
     moto_lambda.LambdaFunction._invoke_lambda = support.run_function_here
     moto_lambda.LambdaBackend.send_kinesis_message = lambda self, *args, **kwargs: None   # support.poll_streams
+    # moto's SQS checks every message's visibility on each receive with a clock helper that builds two datetimes
+    # per call; with the 2,515 messages of a simulated hour that is most of a scenario's time. The same clock, read
+    # once per call (epoch milliseconds, as moto's helper returns):
+    import time as _time
+    from moto.sqs import models as moto_sqs
+
+    moto_sqs.unix_time_millis = lambda: _time.time() * 1000.0
+    moto_sqs.unix_time = lambda: _time.time()
 
 
 def before_scenario(context, scenario):
     import support
     from moto import mock_aws
 
+    if "live" in scenario.effective_tags:
+        if not os.environ.get("LIVE"):
+            scenario.skip("@live: runs in AWS only (LIVE=1 uv run behave --tags=live, after the README's Run it)")
+        context.printed, context.exit_code, context.error = "", None, None
+        return                                               # a live scenario talks to AWS: no moto, no stand-ins
     os.environ.update(OFFLINE)
     for name in NOT_SET:
         os.environ.pop(name, None)
+    if "prefix_recipe" in scenario.effective_tags:      # the two newest extensions' scenarios name recipe-...
+        os.environ["PREFIX"] = "recipe"
     context.tmp = Path(tempfile.mkdtemp(prefix="streaming-ingestion-scenario-"))
+    os.environ["LEDGER"] = str(context.tmp / "ledger.jsonl")       # scripts/tags.py: never the folder's own ledger
     context.moto = mock_aws()
     context.moto.start()
     context.calls = support.Calls()
@@ -67,6 +84,8 @@ def before_scenario(context, scenario):
 
 
 def after_scenario(context, scenario):
+    if "live" in scenario.effective_tags:
+        return
     context.calls.stop()
     context.moto.stop()
     shutil.rmtree(context.tmp, ignore_errors=True)

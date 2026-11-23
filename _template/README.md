@@ -71,7 +71,8 @@ that adds actions. Name the roles the recipe creates in Decisions, not here.>
 One run costs about <amount> (<measured or from the AWS price list>). Remove everything it created:
 
 ```bash
-PREFIX=recipe-<you> uv run python clean_up.py
+PREFIX=recipe-<you> uv run python clean_up.py    # lists what it would delete; deletes nothing
+PREFIX=recipe-<you> uv run python clean_up.py --yes
 ```
 
 ## Adapt it

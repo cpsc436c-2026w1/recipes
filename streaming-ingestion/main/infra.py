@@ -33,6 +33,19 @@ def names(prefix: str) -> dict:
         "topic": f"{p}-updates-topic",
         "dashboard": f"{p}-dashboard",
         "history": f"{p}-history",
+        # ext-queue-ingest
+        "trip_queue": f"{p}-trip-completed",
+        "trip_dlq": f"{p}-trip-completed-dlq",
+        "trip_consumer": f"{p}-trip-completed-consumer",
+        "trip_consumer_role": f"{p}-queue-consumer-role",
+        "trips_table": f"{p}-trips-completed",
+        # ext-source-poller
+        "poller": f"{p}-feed-poller",
+        "poller_role": f"{p}-feed-poller-role",
+        "scheduler_role": f"{p}-feed-scheduler-role",
+        "slots_table": f"{p}-feed-slots",
+        "schedule_group": f"{p}-source-poller",
+        "schedule": f"{p}-feed-schedule",
     }
 
 
@@ -64,17 +77,19 @@ def create_stream(kinesis, name: str, shards: int = 1, poll_s: float = 2.0) -> s
 
 # ---------- DynamoDB
 
-def create_table(ddb, name: str, key: str, poll_s: float = 2.0) -> str:
+def create_table(ddb, name: str, key: str, poll_s: float = 2.0, sort_key: str | None = None,
+                 tags: dict | None = None) -> str:
     """On-demand (pay per request): no capacity to size for a short run, and no charge while idle except storage.
 
     A table with this name that is still being deleted is waited out and then created again.
     """
     for _ in range(2):
         try:
+            keys = [(key, "HASH")] + ([(sort_key, "RANGE")] if sort_key else [])
             ddb.create_table(TableName=name, BillingMode="PAY_PER_REQUEST",
-                             KeySchema=[{"AttributeName": key, "KeyType": "HASH"}],
-                             AttributeDefinitions=[{"AttributeName": key, "AttributeType": "S"}],
-                             Tags=[{"Key": k, "Value": v} for k, v in TAGS.items()])
+                             KeySchema=[{"AttributeName": k, "KeyType": t} for k, t in keys],
+                             AttributeDefinitions=[{"AttributeName": k, "AttributeType": "S"} for k, _ in keys],
+                             Tags=[{"Key": k, "Value": v} for k, v in (tags or TAGS).items()])
             break
         except ddb.exceptions.ResourceInUseException:
             try:
@@ -102,7 +117,8 @@ FAILED_KEEP_DAYS = 14      # a queue of failures keeps its messages 14 days, the
 
 
 def create_queue(sqs, name: str, dead_letter_arn: str | None = None, max_receives: int = 5,
-                 recreate_wait_s: float = 90.0, poll_s: float = 5.0, keep_days: int = 4) -> tuple[str, str]:
+                 recreate_wait_s: float = 90.0, poll_s: float = 5.0, keep_days: int = 4,
+                 visibility_s: int = 180, tags: dict | None = None) -> tuple[str, str]:
     """A consumer's queue keeps a message 4 days (the SQS default). Pass keep_days=FAILED_KEEP_DAYS for a queue that
     holds failures: a message in a dead-letter queue expires by the time it was first sent, so with the same 4 days
     a message that failed on day 3 would be gone a day later, before anyone has looked."""
@@ -110,15 +126,21 @@ def create_queue(sqs, name: str, dead_letter_arn: str | None = None, max_receive
     if dead_letter_arn:
         # a message that fails max_receives times moves to the dead-letter queue instead of blocking the queue
         attrs["RedrivePolicy"] = json.dumps({"deadLetterTargetArn": dead_letter_arn, "maxReceiveCount": max_receives})
-        attrs["VisibilityTimeout"] = "180"                           # 6 x the function timeout (Lambda SQS docs)
+        attrs["VisibilityTimeout"] = str(visibility_s)   # 6 x the function timeout, plus a batching window (Lambda SQS docs)
     end = time.time() + recreate_wait_s
     while True:
         try:
-            url = sqs.create_queue(QueueName=name, Attributes=attrs, tags=TAGS)["QueueUrl"]
+            url = sqs.create_queue(QueueName=name, Attributes=attrs, tags=tags or TAGS)["QueueUrl"]
             break
         except ClientError as err:
+            code = err.response["Error"]["Code"]
+            if code.endswith(("QueueAlreadyExists", "QueueNameExists")):
+                # a second run with other settings (another batching window): the queue is given this run's
+                url = sqs.get_queue_url(QueueName=name)["QueueUrl"]
+                sqs.set_queue_attributes(QueueUrl=url, Attributes=attrs)
+                break
             # SQS refuses a name for 60 s after a queue with it was deleted (a run right after a clean-up)
-            if not err.response["Error"]["Code"].endswith("QueueDeletedRecently") or time.time() >= end:
+            if not code.endswith("QueueDeletedRecently") or time.time() >= end:
                 raise
             time.sleep(poll_s)
     arn = sqs.get_queue_attributes(QueueUrl=url, AttributeNames=["QueueArn"])["Attributes"]["QueueArn"]
@@ -131,7 +153,8 @@ LAMBDA_TRUST = {"Version": "2012-10-17", "Statement": [{
     "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole"}]}
 
 
-def create_role(iam, name: str, statements: list[dict], region: str, account: str, function: str) -> str:
+def create_role(iam, name: str, statements: list[dict], region: str, account: str, function: str,
+                tags: dict | None = None) -> str:
     """A role for one function, allowed only what that function does, plus writing its own logs (SEC03-BP02).
 
     To use a role you already have instead, set LAMBDA_ROLE_ARN: every function then runs with that role and none
@@ -143,7 +166,7 @@ def create_role(iam, name: str, statements: list[dict], region: str, account: st
             "Resource": f"arn:aws:logs:{region}:{account}:log-group:/aws/lambda/{function}:*"}
     try:
         arn = iam.create_role(RoleName=name, AssumeRolePolicyDocument=json.dumps(LAMBDA_TRUST),
-                              Tags=[{"Key": k, "Value": v} for k, v in TAGS.items()])["Role"]["Arn"]
+                              Tags=[{"Key": k, "Value": v} for k, v in (tags or TAGS).items()])["Role"]["Arn"]
     except iam.exceptions.EntityAlreadyExistsException:
         arn = iam.get_role(RoleName=name)["Role"]["Arn"]
     iam.put_role_policy(RoleName=name, PolicyName="least-privilege",
@@ -154,12 +177,12 @@ def create_role(iam, name: str, statements: list[dict], region: str, account: st
 LOG_DAYS = 7               # a function's log lines are kept a week (ours)
 
 
-def create_log_group(logs, function: str) -> None:
+def create_log_group(logs, function: str, tags: dict | None = None) -> None:
     """The function's log group, made before the function, with a retention. Lambda would make the group itself on
     the first call, and that group keeps every line until somebody deletes it."""
     name = f"/aws/lambda/{function}"
     try:
-        logs.create_log_group(logGroupName=name, tags=TAGS)
+        logs.create_log_group(logGroupName=name, tags=tags or TAGS)
     except logs.exceptions.ResourceAlreadyExistsException:
         pass
     logs.put_retention_policy(logGroupName=name, retentionInDays=LOG_DAYS)
@@ -175,13 +198,13 @@ def zip_files(files: dict[str, Path]) -> bytes:
 
 
 def create_function(lam, name: str, role_arn: str, package: bytes, handler: str, env: dict,
-                    timeout: int = 30, memory: int = 128, role_wait_s: float = 3.0) -> str:
+                    timeout: int = 30, memory: int = 128, role_wait_s: float = 3.0, tags: dict | None = None) -> str:
     for attempt in range(10):
         try:
             arn = lam.create_function(
                 FunctionName=name, Runtime=RUNTIME, Architectures=[ARCH], Role=role_arn, Handler=handler,
                 Code={"ZipFile": package}, Timeout=timeout, MemorySize=memory,
-                Environment={"Variables": env}, Tags=TAGS)["FunctionArn"]
+                Environment={"Variables": env}, Tags=tags or TAGS)["FunctionArn"]
             break
         except lam.exceptions.ResourceConflictException:
             lam.update_function_code(FunctionName=name, ZipFile=package)

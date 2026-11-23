@@ -1,0 +1,27 @@
+A night that cannot count a table now fails with an error, 2026-11-23 UTC, PREFIX=recipe-lake, account masked.
+
+$ ICEBERG_TABLES=recipe_lake_lake.trips:requested_time,recipe_lake_cdc.trip_changes:change_time \
+    uv run python ext-maintenance/maintenance.py --target aws --schedule      # recipe_lake_cdc does not exist
+exists   s3://recipe-lake-lake-111122223333 (created by lake.py up)
+created  Athena workgroup recipe-lake-wg
+created  Athena workgroup recipe-lake-ctas-wg
+created  table recipe_lake_lake.trip_events_parquet (registered partitions)
+ready    function recipe-lake-compact-days (900 s, asynchronous retries 0, MERGE_READS_RAW=1)
+created  schedule recipe-lake-maintenance-compaction/recipe-lake-compact-schedule: cron(0 3 * * ? *) America/Vancouver
+created  schedule recipe-lake-maintenance-compaction/recipe-lake-lake-vacuum: cron(0 4 * * ? *) America/Vancouver
+ready    alarm recipe-lake-compact-errors: Errors GreaterThanOrEqualToThreshold 1 over 86400 s
+ready    alarm recipe-lake-compact-missed: Invocations LessThanThreshold 1 over 86400 s
+
+$ aws lambda invoke --function-name recipe-lake-compact-days --payload '{"mode": "compact"}' night.json   # at 2026-11-23T03:01:34Z
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "$LATEST"
+}
+{"errorMessage": "recipe_lake_cdc.trip_changes: counting files: FAILED: SCHEMA_NOT_FOUND: line 1:84: Schema 'recipe_lake_cdc' does not exist", "errorType": "RuntimeError", "requestId": "69b8e5b2-75ff-41ce-91d5-4a2a48c11ec7", "stackTrace": ["  File \"/var/task/compact_days.py\", line 563, in handler\n    item = nightly(now, cfg, s3=boto3.client(\"s3\"), glue=boto3.client(\"glue\"),\n", "  File \"/var/task/compact_days.py\", line 542, in nightly\n    raise RuntimeError(\"; \".join(parts))\n"]}
+
+$ aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors --dimensions Name=FunctionName,Value=recipe-lake-compact-days --period 60 --statistics Sum ...
+2026-11-23T03:01:00Z  Sum 1.0      (Invocations at 03:01: 1.0)
+alarm recipe-lake-compact-errors (Errors >= 1 over 86400 s): INSUFFICIENT_DATA when read, before its first daily evaluation
+
+Before the change the same night returned run_state failed without raising: Errors stayed 0 and the alarm could not send.

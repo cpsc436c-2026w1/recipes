@@ -1,0 +1,511 @@
+ext-read-path: live run, 2026-11-23 (UTC), ca-central-1. Account masked as 111122223333; the function URL is not
+shown (deleted at 01:40 UTC).
+PREFIX=recipe-readpath.
+What ran: the set-up (dynamodb main and ext-riders-and-drivers with KEEP=1, then lambda-dynamodb main with KEEP=1),
+then run.sh --busy-rider --writer 5 --fresh 20, then two of the idle round's 20 calls (gaps 5 and 15 minutes), then
+--summary. The other 18 idle calls (gaps 30 and 60 minutes and four more rounds, about 9 hours) were not run.
+
+### 2026-11-23T01:13:13Z cd dynamodb && KEEP=1 bash main/run.sh
+
+== 1. Create the trips table. Every screen of the app names a trip by its id, so trip_id is the partition key; the index waiting-by-zone answers the dispatcher (step 9)
+
+$ aws dynamodb create-table --table-name recipe-readpath-trips --billing-mode PAY_PER_REQUEST --on-demand-throughput MaxReadRequestUnits=100,MaxWriteRequestUnits=100 --key-schema AttributeName=trip_id,KeyType=HASH --attribute-definitions [{"AttributeName":"trip_id","AttributeType":"S"},{"AttributeName":"pickup_zone","AttributeType":"S"},{"AttributeName":"status","AttributeType":"S"}] --global-secondary-indexes [{"IndexName":"waiting-by-zone","KeySchema":[{"AttributeName":"pickup_zone","KeyType":"HASH"},{"AttributeName":"status","KeyType":"RANGE"}],"Projection":{"ProjectionType":"KEYS_ONLY"},"OnDemandThroughput":{"MaxReadRequestUnits":100,"MaxWriteRequestUnits":100}}] --tags Key=purpose,Value=recipe Key=prefix,Value=recipe-readpath --query TableDescription.TableStatus
+"CREATING"
+
+== 2. Load 50 requested trips, 25 per call (the most batch-write-item takes). One write unit per trip up to 1 KB, and one more for its entry in the index
+
+$ aws dynamodb batch-write-item --request-items {"recipe-readpath-trips": [{"PutRequest": {"Item": {"trip_id": {"S": "t-0000"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "12"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0001"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "13"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0002"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "14"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0003"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "15"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0004"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "16"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0005"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "17"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0006"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "18"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0007"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "19"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0008"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "20"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0009"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "21"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0010"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "22"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0011"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "23"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0012"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "24"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0013"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "25"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0014"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "26"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0015"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "27"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0016"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "28"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0017"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "29"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0018"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "30"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0019"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "31"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0020"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "32"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0021"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "33"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0022"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "34"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0023"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "35"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0024"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "36"}}}}]} --return-consumed-capacity TOTAL --output json
+{
+    "unprocessed": 0,
+    "write_units": 50.0
+}
+
+$ aws dynamodb batch-write-item --request-items {"recipe-readpath-trips": [{"PutRequest": {"Item": {"trip_id": {"S": "t-0025"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "37"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0026"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "38"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0027"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "39"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0028"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "40"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0029"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "41"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0030"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "12"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0031"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "13"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0032"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "14"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0033"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "15"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0034"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "16"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0035"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "17"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0036"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "18"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0037"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "19"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0038"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "20"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0039"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "21"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0040"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "22"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0041"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "23"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0042"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "24"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0043"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "25"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0044"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "26"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0045"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Midtown"}, "fare_quote": {"N": "27"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0046"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Harlem"}, "fare_quote": {"N": "28"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0047"}, "status": {"S": "requested"}, "pickup_zone": {"S": "Astoria"}, "fare_quote": {"N": "29"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0048"}, "status": {"S": "requested"}, "pickup_zone": {"S": "SoHo"}, "fare_quote": {"N": "30"}}}}, {"PutRequest": {"Item": {"trip_id": {"S": "t-0049"}, "status": {"S": "requested"}, "pickup_zone": {"S": "JFK"}, "fare_quote": {"N": "31"}}}}]} --return-consumed-capacity TOTAL --output json
+{
+    "unprocessed": 0,
+    "write_units": 50.0
+}
+
+== 3. The rider's screen shows trip t-0042: one item by its key, eventually consistent (the default)
+
+$ aws dynamodb get-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0042"}} --return-consumed-capacity TOTAL --query {trip: Item.trip_id.S, status: Item.status.S, zone: Item.pickup_zone.S, read_units: ConsumedCapacity.CapacityUnits}
+{
+    "trip": "t-0042",
+    "status": "requested",
+    "zone": "Astoria",
+    "read_units": 0.5
+}
+
+== 4. The same read, strongly consistent: it reflects every write that succeeded before it, for twice the read units
+
+$ aws dynamodb get-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0042"}} --consistent-read --return-consumed-capacity TOTAL --query {status: Item.status.S, read_units: ConsumedCapacity.CapacityUnits}
+{
+    "status": "requested",
+    "read_units": 1.0
+}
+
+== 5. Two drivers tap Accept on t-0042. d-7 is first: a conditional write, only if no driver is set
+
+$ aws dynamodb update-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0042"}} --update-expression SET driver_id = :d, #s = :s --condition-expression attribute_not_exists(driver_id) --return-values-on-condition-check-failure ALL_OLD --cli-error-format json --expression-attribute-names {"#s":"status"} --expression-attribute-values {":d":{"S":"d-7"},":s":{"S":"accepted"}} --return-consumed-capacity TOTAL --query {write_units: ConsumedCapacity.CapacityUnits}
+{
+    "write_units": 3.0
+}
+
+== 6. d-9, a moment later, sends the same conditional write: refused, and the error carries the item that blocked it
+
+$ aws dynamodb update-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0042"}} --update-expression SET driver_id = :d, #s = :s --condition-expression attribute_not_exists(driver_id) --return-values-on-condition-check-failure ALL_OLD --cli-error-format json --expression-attribute-names {"#s":"status"} --expression-attribute-values {":d":{"S":"d-9"},":s":{"S":"accepted"}} --return-consumed-capacity TOTAL --query {write_units: ConsumedCapacity.CapacityUnits}
+{
+    "Message": "The conditional request failed",
+    "Code": "ConditionalCheckFailedException",
+    "message": "The conditional request failed",
+    "Item": {
+        "pickup_zone": {
+            "S": "Astoria"
+        },
+        "driver_id": {
+            "S": "d-7"
+        },
+        "fare_quote": {
+            "N": "24"
+        },
+        "status": {
+            "S": "accepted"
+        },
+        "trip_id": {
+            "S": "t-0042"
+        }
+    }
+}
+(refused: d-7 keeps the trip; the app tells d-9 the trip is taken. A refused write reports no units)
+
+== 7. The rider's screen after the accept: a strong read, so it cannot show the trip as still waiting
+
+$ aws dynamodb get-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0042"}} --consistent-read --query {driver: Item.driver_id.S, status: Item.status.S}
+{
+    "driver": "d-7",
+    "status": "accepted"
+}
+
+== 8. A dispatcher asks for every trip waiting at JFK. On the table no key names them, so Scan reads all 50 items and filters
+
+$ aws dynamodb scan --table-name recipe-readpath-trips --filter-expression pickup_zone = :z AND #s = :s --expression-attribute-names {"#s":"status"} --expression-attribute-values {":z":{"S":"JFK"},":s":{"S":"requested"}} --select COUNT --return-consumed-capacity TOTAL --query {returned: Count, read: ScannedCount, read_units: ConsumedCapacity.CapacityUnits}
+{
+    "returned": 10,
+    "read": 50,
+    "read_units": 2.0
+}
+
+== 9. The same question through the index waiting-by-zone: Query reads the waiting JFK trips and no others
+
+$ aws dynamodb query --table-name recipe-readpath-trips --index-name waiting-by-zone --key-condition-expression pickup_zone = :z AND #s = :s --expression-attribute-names {"#s":"status"} --expression-attribute-values {":z":{"S":"JFK"},":s":{"S":"requested"}} --select COUNT --return-consumed-capacity TOTAL --query {returned: Count, read: ScannedCount, read_units: ConsumedCapacity.CapacityUnits}
+{
+    "returned": 10,
+    "read": 10,
+    "read_units": 0.5
+}
+
+== Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh
+exit 0
+### 2026-11-23T01:13:46Z KEEP=1 bash ext-riders-and-drivers/run.sh
+
+== 1. A table for each rider's trips in time order: partition key rider_id, sort key requested_at
+
+$ aws dynamodb create-table --table-name recipe-readpath-rider-trips --billing-mode PAY_PER_REQUEST --on-demand-throughput MaxReadRequestUnits=100,MaxWriteRequestUnits=100 --key-schema [{"AttributeName":"rider_id","KeyType":"HASH"},{"AttributeName":"requested_at","KeyType":"RANGE"}] --attribute-definitions [{"AttributeName":"rider_id","AttributeType":"S"},{"AttributeName":"requested_at","AttributeType":"S"}] --tags Key=purpose,Value=recipe Key=prefix,Value=recipe-readpath --query TableDescription.TableStatus
+"CREATING"
+
+== 2. A table of drivers and their status
+
+$ aws dynamodb create-table --table-name recipe-readpath-drivers --billing-mode PAY_PER_REQUEST --on-demand-throughput MaxReadRequestUnits=100,MaxWriteRequestUnits=100 --key-schema AttributeName=driver_id,KeyType=HASH --attribute-definitions AttributeName=driver_id,AttributeType=S --tags Key=purpose,Value=recipe Key=prefix,Value=recipe-readpath --query TableDescription.TableStatus
+"CREATING"
+
+== 3. Load history: 50 past trips of 5 riders over 10 days, and 5 available drivers
+
+$ aws dynamodb batch-write-item --request-items {"recipe-readpath-rider-trips": [{"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-01T08:15:00Z"}, "trip_id": {"S": "h-0000"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-01T09:15:00Z"}, "trip_id": {"S": "h-0001"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-01T10:15:00Z"}, "trip_id": {"S": "h-0002"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-01T11:15:00Z"}, "trip_id": {"S": "h-0003"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-01T12:15:00Z"}, "trip_id": {"S": "h-0004"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-02T08:15:00Z"}, "trip_id": {"S": "h-0005"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-02T09:15:00Z"}, "trip_id": {"S": "h-0006"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-02T10:15:00Z"}, "trip_id": {"S": "h-0007"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-02T11:15:00Z"}, "trip_id": {"S": "h-0008"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-02T12:15:00Z"}, "trip_id": {"S": "h-0009"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-03T08:15:00Z"}, "trip_id": {"S": "h-0010"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-03T09:15:00Z"}, "trip_id": {"S": "h-0011"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-03T10:15:00Z"}, "trip_id": {"S": "h-0012"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-03T11:15:00Z"}, "trip_id": {"S": "h-0013"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-03T12:15:00Z"}, "trip_id": {"S": "h-0014"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-04T08:15:00Z"}, "trip_id": {"S": "h-0015"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-04T09:15:00Z"}, "trip_id": {"S": "h-0016"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-04T10:15:00Z"}, "trip_id": {"S": "h-0017"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-04T11:15:00Z"}, "trip_id": {"S": "h-0018"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-04T12:15:00Z"}, "trip_id": {"S": "h-0019"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-05T08:15:00Z"}, "trip_id": {"S": "h-0020"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-05T09:15:00Z"}, "trip_id": {"S": "h-0021"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-05T10:15:00Z"}, "trip_id": {"S": "h-0022"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-05T11:15:00Z"}, "trip_id": {"S": "h-0023"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-05T12:15:00Z"}, "trip_id": {"S": "h-0024"}, "pickup_zone": {"S": "JFK"}}}}]} --return-consumed-capacity TOTAL --output json
+{
+    "unprocessed": 0,
+    "write_units": 25.0
+}
+
+$ aws dynamodb batch-write-item --request-items {"recipe-readpath-rider-trips": [{"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-06T08:15:00Z"}, "trip_id": {"S": "h-0025"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-06T09:15:00Z"}, "trip_id": {"S": "h-0026"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-06T10:15:00Z"}, "trip_id": {"S": "h-0027"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-06T11:15:00Z"}, "trip_id": {"S": "h-0028"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-06T12:15:00Z"}, "trip_id": {"S": "h-0029"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-07T08:15:00Z"}, "trip_id": {"S": "h-0030"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-07T09:15:00Z"}, "trip_id": {"S": "h-0031"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-07T10:15:00Z"}, "trip_id": {"S": "h-0032"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-07T11:15:00Z"}, "trip_id": {"S": "h-0033"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-07T12:15:00Z"}, "trip_id": {"S": "h-0034"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-08T08:15:00Z"}, "trip_id": {"S": "h-0035"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-08T09:15:00Z"}, "trip_id": {"S": "h-0036"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-08T10:15:00Z"}, "trip_id": {"S": "h-0037"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-08T11:15:00Z"}, "trip_id": {"S": "h-0038"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-08T12:15:00Z"}, "trip_id": {"S": "h-0039"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-09T08:15:00Z"}, "trip_id": {"S": "h-0040"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-09T09:15:00Z"}, "trip_id": {"S": "h-0041"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-09T10:15:00Z"}, "trip_id": {"S": "h-0042"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-09T11:15:00Z"}, "trip_id": {"S": "h-0043"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-09T12:15:00Z"}, "trip_id": {"S": "h-0044"}, "pickup_zone": {"S": "JFK"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-00"}, "requested_at": {"S": "2026-10-10T08:15:00Z"}, "trip_id": {"S": "h-0045"}, "pickup_zone": {"S": "Midtown"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-01"}, "requested_at": {"S": "2026-10-10T09:15:00Z"}, "trip_id": {"S": "h-0046"}, "pickup_zone": {"S": "Harlem"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-02"}, "requested_at": {"S": "2026-10-10T10:15:00Z"}, "trip_id": {"S": "h-0047"}, "pickup_zone": {"S": "Astoria"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-03"}, "requested_at": {"S": "2026-10-10T11:15:00Z"}, "trip_id": {"S": "h-0048"}, "pickup_zone": {"S": "SoHo"}}}}, {"PutRequest": {"Item": {"rider_id": {"S": "r-04"}, "requested_at": {"S": "2026-10-10T12:15:00Z"}, "trip_id": {"S": "h-0049"}, "pickup_zone": {"S": "JFK"}}}}]} --return-consumed-capacity TOTAL --output json
+{
+    "unprocessed": 0,
+    "write_units": 25.0
+}
+
+$ aws dynamodb batch-write-item --request-items {"recipe-readpath-drivers": [{"PutRequest": {"Item": {"driver_id": {"S": "d-1"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-2"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-3"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-4"}, "status": {"S": "available"}}}}, {"PutRequest": {"Item": {"driver_id": {"S": "d-5"}, "status": {"S": "available"}}}}]} --return-consumed-capacity TOTAL --output json
+{
+    "unprocessed": 0,
+    "write_units": 5.0
+}
+
+== 3b. Start clean: remove trips t-0100 and t-0101 left by an earlier run, and make d-3 available
+
+$ aws dynamodb delete-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0100"}}
+
+$ aws dynamodb delete-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0101"}}
+
+$ aws dynamodb update-item --table-name recipe-readpath-drivers --key {"driver_id":{"S":"d-3"}} --update-expression REMOVE trip_id SET #s = :s --expression-attribute-names {"#s":"status"} --expression-attribute-values {":s":{"S":"available"}}
+
+== 4. Rider r-03 opens their history for Oct 3 to Oct 6: Query, one partition key and a sort-key range, in time order
+
+$ aws dynamodb query --table-name recipe-readpath-rider-trips --key-condition-expression rider_id = :r AND requested_at BETWEEN :a AND :b --expression-attribute-values {":r":{"S":"r-03"},":a":{"S":"2026-10-03"},":b":{"S":"2026-10-06T23:59:59Z"}} --return-consumed-capacity TOTAL --query {trips: Items[].[requested_at.S, trip_id.S], read: ScannedCount, read_units: ConsumedCapacity.CapacityUnits}
+{
+    "trips": [
+        [
+            "2026-10-03T11:15:00Z",
+            "h-0013"
+        ],
+        [
+            "2026-10-04T11:15:00Z",
+            "h-0018"
+        ],
+        [
+            "2026-10-05T11:15:00Z",
+            "h-0023"
+        ],
+        [
+            "2026-10-06T11:15:00Z",
+            "h-0028"
+        ]
+    ],
+    "read": 4,
+    "read_units": 0.5
+}
+
+== 5. ...and their latest trip only: newest first, one item
+
+$ aws dynamodb query --table-name recipe-readpath-rider-trips --key-condition-expression rider_id = :r --expression-attribute-values {":r":{"S":"r-03"}} --no-scan-index-forward --limit 1 --query Items[0].[requested_at.S, trip_id.S]
+[
+    "2026-10-10T11:15:00Z",
+    "h-0048"
+]
+
+== 6. Rider r-03 requests a new trip. It must appear in BOTH tables or in neither: one transaction, two Puts
+
+$ aws dynamodb transact-write-items --transact-items file:///tmp/recipe-readpath-tx.json --return-consumed-capacity TOTAL --cli-error-format json --query ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}
+[
+    {
+        "table": "recipe-readpath-rider-trips",
+        "write_units": 2.0
+    },
+    {
+        "table": "recipe-readpath-trips",
+        "write_units": 3.0
+    }
+]
+
+== 7. Driver d-3 accepts t-0100: the trip is free and d-3 is available, so both items change (2 write units each)
+
+$ aws dynamodb transact-write-items --transact-items file:///tmp/recipe-readpath-tx.json --return-consumed-capacity TOTAL --cli-error-format json --query ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}
+[
+    {
+        "table": "recipe-readpath-trips",
+        "write_units": 4.0
+    },
+    {
+        "table": "recipe-readpath-drivers",
+        "write_units": 2.0
+    }
+]
+
+== 8. Rider r-01 requests trip t-0101, the same way as step 6
+
+$ aws dynamodb transact-write-items --transact-items file:///tmp/recipe-readpath-tx.json --return-consumed-capacity TOTAL --cli-error-format json --query ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}
+[
+    {
+        "table": "recipe-readpath-rider-trips",
+        "write_units": 2.0
+    },
+    {
+        "table": "recipe-readpath-trips",
+        "write_units": 3.0
+    }
+]
+
+== 9. d-3, still busy with t-0100, accepts t-0101: the driver's condition fails, so NEITHER item changes
+
+$ aws dynamodb transact-write-items --transact-items file:///tmp/recipe-readpath-tx.json --return-consumed-capacity TOTAL --cli-error-format json --query ConsumedCapacity[].{table: TableName, write_units: CapacityUnits}
+{
+    "Message": "Transaction cancelled, please refer cancellation reasons for specific reasons [None, ConditionalCheckFailed]",
+    "Code": "TransactionCanceledException",
+    "CancellationReasons": [
+        {
+            "Code": "None"
+        },
+        {
+            "Code": "ConditionalCheckFailed",
+            "Message": "The conditional request failed"
+        }
+    ]
+}
+(cancelled: one reason per item, in order; the driver's says ConditionalCheckFailed)
+
+$ aws dynamodb get-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0101"}} --consistent-read --query {trip: Item.trip_id.S, status: Item.status.S, driver: Item.driver_id.S}
+{
+    "trip": "t-0101",
+    "status": "requested",
+    "driver": null
+}
+
+== 10. The fare of t-0100 changes on two screens at once. Each sends the version it read; only the first write lands
+
+$ aws dynamodb update-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0100"}} --update-expression SET fare_quote = :f, version = version + :one --condition-expression version = :seen --expression-attribute-values {":f":{"N":"24"},":seen":{"N":"1"},":one":{"N":"1"}} --return-values UPDATED_NEW --query Attributes.{fare: fare_quote.N, version: version.N}
+{
+    "fare": "24",
+    "version": "2"
+}
+
+$ aws dynamodb update-item --table-name recipe-readpath-trips --key {"trip_id":{"S":"t-0100"}} --update-expression SET fare_quote = :f, version = version + :one --condition-expression version = :seen --expression-attribute-values {":f":{"N":"26"},":seen":{"N":"1"},":one":{"N":"1"}} --return-values UPDATED_NEW --query Attributes.{fare: fare_quote.N, version: version.N}
+
+aws: [ERROR]: An error occurred (ConditionalCheckFailedException) when calling the UpdateItem operation: The conditional request failed
+(refused: the version moved on; this screen reads the trip again, then decides)
+
+== Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh
+exit 0
+### 2026-11-23T01:14:50Z cd lambda-dynamodb && KEEP=1 bash main/run.sh
+
+== 1. Run the handler on this machine first, against your tables (needs Python 3 and boto3; CloudShell has both)
+
+$ env PREFIX=recipe-readpath python3 lambda-dynamodb/main/handler.py
+{"action": "get", "trip_id": "t-0042"} -> {"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 0.5}
+{"action": "get", "trip_id": "t-0042", "strong": true} -> {"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 1.0}
+{"action": "rider", "rider_id": "r-03", "since": "2026-10-08"} -> {"items": [{"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0038", "requested_at": "2026-10-08T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0043", "requested_at": "2026-10-09T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0048", "requested_at": "2026-10-10T11:15:00Z"}, {"trip_id": "t-0100", "requested_at": "2026-10-21T18:30:00Z", "pickup_zone": "SoHo", "rider_id": "r-03"}], "read_units": 0.5}
+{"action": "claim", "trip_id": "t-0042", "driver_id": "d-9"} -> {"claimed": false, "held_by": "d-7"}
+{"action": "accept", "trip_id": "t-0101", "driver_id": "d-3"} -> {"accepted": false, "reasons": {"trip": "None", "driver": "ConditionalCheckFailed"}}
+
+== 2. A role for the function. The trust policy says who may use it: the Lambda service
+
+$ aws iam create-role --role-name recipe-readpath-api-role --tags Key=purpose,Value=recipe --assume-role-policy-document {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+    "Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]} --query Role.Arn
+"arn:aws:iam::111122223333:role/recipe-readpath-api-role"
+
+== 3. What the role may do: read and update the three tables, and write its own logs. Nothing else
+
+$ aws iam put-role-policy --role-name recipe-readpath-api-role --policy-name tables-and-logs --policy-document {"Version":"2012-10-17","Statement":[
+  {"Sid":"TripsAndDrivers","Effect":"Allow",
+   "Action":["dynamodb:GetItem","dynamodb:Query","dynamodb:UpdateItem"],
+   "Resource":["arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-readpath-trips","arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-readpath-rider-trips","arn:aws:dynamodb:ca-central-1:111122223333:table/recipe-readpath-drivers"]},
+  {"Sid":"OwnLogs","Effect":"Allow",
+   "Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+   "Resource":"arn:aws:logs:ca-central-1:111122223333:log-group:/aws/lambda/recipe-readpath-api:*"}]}
+
+== 4. The function's log group, kept 7 days; then package and create the function: Python 3.12 on arm64, 128 MB, 10 s timeout (boto3 is in the runtime already)
+
+$ aws logs create-log-group --log-group-name /aws/lambda/recipe-readpath-api --tags purpose=recipe
+
+$ aws logs put-retention-policy --log-group-name /aws/lambda/recipe-readpath-api --retention-in-days 7
+
+$ python3 -c import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w'); z.write(sys.argv[2],'handler.py'); z.close() /tmp/recipe-readpath-api.zip lambda-dynamodb/main/handler.py
+
+$ aws lambda create-function --function-name recipe-readpath-api --runtime python3.12 --architectures arm64 --memory-size 128 --timeout 10 --handler handler.lambda_handler --role arn:aws:iam::111122223333:role/recipe-readpath-api-role --zip-file fileb:///tmp/recipe-readpath-api.zip --environment Variables={PREFIX=recipe-readpath} --tags purpose=recipe --query {name: FunctionName, runtime: Runtime, arch: Architectures[0], memory_mb: MemorySize, state: State}
+{
+    "name": "recipe-readpath-api",
+    "runtime": "python3.12",
+    "arch": "arm64",
+    "memory_mb": 128,
+    "state": "Pending"
+}
+
+$ aws lambda wait function-active-v2 --function-name recipe-readpath-api
+
+== 5. Call it directly once, with an event (the way another AWS service would call it)
+
+$ aws lambda invoke --function-name recipe-readpath-api --cli-binary-format raw-in-base64-out --payload {"action":"get","trip_id":"t-0042","strong":true} /tmp/recipe-readpath-api-out.json --query {status: StatusCode, error: FunctionError}
+{
+    "status": 200,
+    "error": null
+}
+{"statusCode": 200, "body": "{\"item\": {\"driver_id\": \"d-7\", \"fare_quote\": 24, \"pickup_zone\": \"Astoria\", \"status\": \"accepted\", \"trip_id\": \"t-0042\"}, \"read_units\": 1.0}"}
+
+== 6. A public HTTPS address: a function URL with auth type NONE. Anyone who has the URL can call it
+
+$ aws lambda create-function-url-config --function-name recipe-readpath-api --auth-type NONE --query {url: FunctionUrl, auth: AuthType}
+{
+    "url": "<function URL, deleted>",
+    "auth": "NONE"
+}
+
+== 7. A public URL needs two statements in the function's resource policy: invoke through the URL, and invoke at all only via the URL
+
+$ aws lambda add-permission --function-name recipe-readpath-api --statement-id url-public --action lambda:InvokeFunctionUrl --principal * --function-url-auth-type NONE --query Statement --output text
+{"Sid":"url-public","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunctionUrl","Resource":"arn:aws:lambda:ca-central-1:111122223333:function:recipe-readpath-api","Condition":{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}}
+
+$ aws lambda add-permission --function-name recipe-readpath-api --statement-id url-invoke --action lambda:InvokeFunction --principal * --invoked-via-function-url --query Statement --output text
+{"Sid":"url-invoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:ca-central-1:111122223333:function:recipe-readpath-api","Condition":{"Bool":{"lambda:InvokedViaFunctionUrl":"true"}}}
+
+== 8. Call it the way the app would
+
+$ curl -X POST <url> -d '{"action":"get","trip_id":"t-0042"}'
+{"item": {"driver_id": "d-7", "fare_quote": 24, "pickup_zone": "Astoria", "status": "accepted", "trip_id": "t-0042"}, "read_units": 0.5}   [HTTP 200, 0.089454 s]
+
+$ curl -X POST <url> -d '{"action":"rider","rider_id":"r-03","since":"2026-10-08"}'
+{"items": [{"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0038", "requested_at": "2026-10-08T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0043", "requested_at": "2026-10-09T11:15:00Z"}, {"rider_id": "r-03", "pickup_zone": "SoHo", "trip_id": "h-0048", "requested_at": "2026-10-10T11:15:00Z"}, {"trip_id": "t-0100", "requested_at": "2026-10-21T18:30:00Z", "pickup_zone": "SoHo", "rider_id": "r-03"}], "read_units": 0.5}   [HTTP 200, 0.070416 s]
+
+$ curl -X POST <url> -d '{"action":"claim","trip_id":"t-0042","driver_id":"d-9"}'
+{"claimed": false, "held_by": "d-7"}   [HTTP 200, 0.091679 s]
+
+$ curl -X POST <url> -d '{"action":"accept","trip_id":"t-0101","driver_id":"d-3"}'
+{"accepted": false, "reasons": {"trip": "None", "driver": "ConditionalCheckFailed"}}   [HTTP 200, 0.268434 s]
+
+$ curl -X POST <url> -d '{"action":"delete-everything"}'
+{"error": "unknown action 'delete-everything'"}   [HTTP 400, 0.060972 s]
+
+== 9. What each call was billed: the REPORT line Lambda logs after every call (logs can take a few seconds to arrive)
+
+$ aws logs filter-log-events --log-group-name /aws/lambda/recipe-readpath-api --filter-pattern "REPORT RequestId" --query events[].message --output text
+REPORT RequestId: 8dd489fb-824b-4a9a-abd9-e3951f0eb023	Duration: 269.46 ms	Billed Duration: 628 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	Init Duration: 358.13 ms	
+	REPORT RequestId: 853486ab-7249-4b15-9c22-8b1e7a599a26	Duration: 35.88 ms	Billed Duration: 36 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: c4315381-d879-4c54-8796-56f7fb070371	Duration: 39.10 ms	Billed Duration: 40 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 574b6f04-ab94-4c67-b5f8-320cea18401a	Duration: 79.95 ms	Billed Duration: 80 ms	Memory Size: 128 MB	Max Memory Used: 92 MB	
+	REPORT RequestId: 4b8fc6c7-aa82-40a6-a52e-f8c63f125f27	Duration: 190.03 ms	Billed Duration: 191 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+	REPORT RequestId: 28daa223-3195-41e4-b271-e4e811861ae9	Duration: 1.49 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 93 MB	
+
+
+== Done. KEEP=1: the API stays up and public. Remove it with: bash clean_up.sh
+exit 0
+
+### 2026-11-23T01:15:55Z bash ext-read-path/run.sh --busy-rider --writer 5 --fresh 20
+run 20261123T011556Z: 600 planned calls, one at a time, to recipe-readpath-api's URL
+300 trips of r-busy written to recipe-readpath-rider-trips
+writer: 300 updates, 0 throttled, 0 retried, at most 5 in one second
+the 300 trips of r-busy deleted
+1020 of 1020 calls joined with their REPORT line
+Prices: price sheet, ca-central-1, 2026-11-18 (../prices.toml); USD (CAD at 1.45).
+
+| variant | read | class | writer | calls | failed | p50 ms | p95 ms | p99 ms | p50 Lambda ms | p95 Lambda ms | p99 Lambda ms | median read units | 1,000 calls USD (CAD) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| get-eventual | get | all | off | 200 | 0 | 63.3 | 69.3 | 82.7 | 26.4 | 36.6 | 39.6 | 0.5 | 0.000313 (0.000454) |
+| get-eventual | get | warm | off | 200 | 0 | 63.3 | 69.3 | 82.7 | 26.4 | 36.6 | 39.6 | 0.5 | 0.000313 (0.000454) |
+| get-strong | get | all | off | 200 | 0 | 63.3 | 69.5 | 83.3 | 30.1 | 36.4 | 39.9 | 1.0 | 0.000389 (0.000564) |
+| get-strong | get | warm | off | 200 | 0 | 63.3 | 69.5 | 83.3 | 30.1 | 36.4 | 39.9 | 1.0 | 0.000389 (0.000564) |
+| rider | rider | all | off | 200 | 0 | 63.6 | 68.4 | 84.2 | 32.4 | 36.5 | 37.8 | 0.5 | 0.000324 (0.000469) |
+| rider | rider | warm | off | 200 | 0 | 63.6 | 68.4 | 84.2 | 32.4 | 36.5 | 37.8 | 0.5 | 0.000324 (0.000469) |
+| rider | rider r-busy | all | off | 200 | 0 | 73.6 | 162.4 | 332.5 | 127.9 | 138.1 | 353.0 | 3.0 | 0.000827 (0.001199) |
+| rider | rider r-busy | warm | off | 199 | 0 | 73.6 | 161.3 | 189.5 | 127.6 | 137.7 | 156.7 | 3.0 | 0.000826 (0.001197) |
+| rider | rider r-busy | cold | off | 1 | 0 | 898.0 | fewer than 20 calls | fewer than 100 calls | 436.4 | fewer than 20 calls | fewer than 100 calls | 3.0 | 0.002126 (0.003082) |
+| rider | rider r-busy | all | on | 200 | 0 | 73.4 | 167.4 | 222.6 | 131.2 | 155.4 | 174.4 | 3.5 | 0.000900 (0.001306) |
+| rider | rider r-busy | warm | on | 200 | 0 | 73.4 | 167.4 | 222.6 | 131.2 | 155.4 | 174.4 | 3.5 | 0.000900 (0.001306) |
+
+SLO (R220):
+- get-eventual, get, writer off: p99 under 1,000 ms over warm and cold calls: met
+- get-strong, get, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider r-busy, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider r-busy, writer on: p99 under 1,000 ms over warm and cold calls: met
+
+| call | gap or round | class | init ms | caller ms | status |
+|---|---|---|---|---|---|
+| fresh copy | round 1 | cold | 369.9 | 885.4 | 200 |
+| fresh copy | round 2 | cold | 380.5 | 782.2 | 200 |
+| fresh copy | round 3 | cold | 497.1 | 961.1 | 200 |
+| fresh copy | round 4 | cold | 373.6 | 771.7 | 200 |
+| fresh copy | round 5 | cold | 361.5 | 810.6 | 200 |
+| fresh copy | round 6 | cold | 477.1 | 1041.6 | 200 |
+| fresh copy | round 7 | cold | 275.5 | 832.3 | 200 |
+| fresh copy | round 8 | cold | 273.1 | 626.8 | 200 |
+| fresh copy | round 9 | cold | 369.7 | 757.1 | 200 |
+| fresh copy | round 10 | cold | 476.8 | 892.4 | 200 |
+| fresh copy | round 11 | cold | 382.3 | 789.8 | 200 |
+| fresh copy | round 12 | cold | 269.3 | 624.7 | 200 |
+| fresh copy | round 13 | cold | 374.3 | 753.1 | 200 |
+| fresh copy | round 14 | cold | 369.5 | 760.8 | 200 |
+| fresh copy | round 15 | cold | 340.2 | 698.4 | 200 |
+| fresh copy | round 16 | cold | 280.5 | 623.5 | 200 |
+| fresh copy | round 17 | cold | 461.7 | 886.3 | 200 |
+| fresh copy | round 18 | cold | 385.0 | 763.3 | 200 |
+| fresh copy | round 19 | cold | 374.9 | 783.3 | 200 |
+| fresh copy | round 20 | cold | 365.2 | 745.0 | 200 |
+
+| writer run | updates done | throttled | retried | failed | most in one second |
+|---|---|---|---|---|---|
+| 20261123T011556Z | 300 | 0 | 0 | 0 | 5 |
+exit 0
+### 2026-11-23T01:19:12Z end
+
+### 2026-11-23T01:21:55Z bash ext-read-path/run.sh --idle
+next call due at 01:23:53 (UTC; gap 5 min): start run.sh --idle again then
+### 2026-11-23T01:24:12Z bash ext-read-path/run.sh --idle
+after-idle call 1 of 20 sent (gap 5 min); the next gap is 15 minutes
+1 of 1 calls joined with their REPORT line
+### 2026-11-23T01:24:13Z bash ext-read-path/run.sh --idle
+next call due at 01:39:01 (UTC; gap 15 min): start run.sh --idle again then
+### 2026-11-23T01:39:20Z bash ext-read-path/run.sh --idle
+after-idle call 2 of 20 sent (gap 15 min); the next gap is 30 minutes
+1 of 1 calls joined with their REPORT line
+(each --idle start also prints the summary; the last one is below)
+
+### 2026-11-23T01:39:37Z bash ext-read-path/run.sh --summary
+Prices: price sheet, ca-central-1, 2026-11-18 (../prices.toml); USD (CAD at 1.45).
+
+| variant | read | class | writer | calls | failed | p50 ms | p95 ms | p99 ms | p50 Lambda ms | p95 Lambda ms | p99 Lambda ms | median read units | 1,000 calls USD (CAD) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| get-eventual | get | all | off | 200 | 0 | 63.3 | 69.3 | 82.7 | 26.4 | 36.6 | 39.6 | 0.5 | 0.000313 (0.000454) |
+| get-eventual | get | warm | off | 200 | 0 | 63.3 | 69.3 | 82.7 | 26.4 | 36.6 | 39.6 | 0.5 | 0.000313 (0.000454) |
+| get-strong | get | all | off | 200 | 0 | 63.3 | 69.5 | 83.3 | 30.1 | 36.4 | 39.9 | 1.0 | 0.000389 (0.000564) |
+| get-strong | get | warm | off | 200 | 0 | 63.3 | 69.5 | 83.3 | 30.1 | 36.4 | 39.9 | 1.0 | 0.000389 (0.000564) |
+| rider | rider | all | off | 200 | 0 | 63.6 | 68.4 | 84.2 | 32.4 | 36.5 | 37.8 | 0.5 | 0.000324 (0.000469) |
+| rider | rider | warm | off | 200 | 0 | 63.6 | 68.4 | 84.2 | 32.4 | 36.5 | 37.8 | 0.5 | 0.000324 (0.000469) |
+| rider | rider r-busy | all | off | 200 | 0 | 73.6 | 162.4 | 332.5 | 127.9 | 138.1 | 353.0 | 3.0 | 0.000827 (0.001199) |
+| rider | rider r-busy | warm | off | 199 | 0 | 73.6 | 161.3 | 189.5 | 127.6 | 137.7 | 156.7 | 3.0 | 0.000826 (0.001197) |
+| rider | rider r-busy | cold | off | 1 | 0 | 898.0 | fewer than 20 calls | fewer than 100 calls | 436.4 | fewer than 20 calls | fewer than 100 calls | 3.0 | 0.002126 (0.003082) |
+| rider | rider r-busy | all | on | 200 | 0 | 73.4 | 167.4 | 222.6 | 131.2 | 155.4 | 174.4 | 3.5 | 0.000900 (0.001306) |
+| rider | rider r-busy | warm | on | 200 | 0 | 73.4 | 167.4 | 222.6 | 131.2 | 155.4 | 174.4 | 3.5 | 0.000900 (0.001306) |
+
+SLO (R220):
+- get-eventual, get, writer off: p99 under 1,000 ms over warm and cold calls: met
+- get-strong, get, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider r-busy, writer off: p99 under 1,000 ms over warm and cold calls: met
+- rider, rider r-busy, writer on: p99 under 1,000 ms over warm and cold calls: met
+
+| call | gap or round | class | init ms | caller ms | status |
+|---|---|---|---|---|---|
+| after idle | 5 min | cold | 281.4 | 640.9 | 200 |
+| after idle | 15 min | cold | 356.4 | 754.7 | 200 |
+| fresh copy | round 1 | cold | 369.9 | 885.4 | 200 |
+| fresh copy | round 2 | cold | 380.5 | 782.2 | 200 |
+| fresh copy | round 3 | cold | 497.1 | 961.1 | 200 |
+| fresh copy | round 4 | cold | 373.6 | 771.7 | 200 |
+| fresh copy | round 5 | cold | 361.5 | 810.6 | 200 |
+| fresh copy | round 6 | cold | 477.1 | 1041.6 | 200 |
+| fresh copy | round 7 | cold | 275.5 | 832.3 | 200 |
+| fresh copy | round 8 | cold | 273.1 | 626.8 | 200 |
+| fresh copy | round 9 | cold | 369.7 | 757.1 | 200 |
+| fresh copy | round 10 | cold | 476.8 | 892.4 | 200 |
+| fresh copy | round 11 | cold | 382.3 | 789.8 | 200 |
+| fresh copy | round 12 | cold | 269.3 | 624.7 | 200 |
+| fresh copy | round 13 | cold | 374.3 | 753.1 | 200 |
+| fresh copy | round 14 | cold | 369.5 | 760.8 | 200 |
+| fresh copy | round 15 | cold | 340.2 | 698.4 | 200 |
+| fresh copy | round 16 | cold | 280.5 | 623.5 | 200 |
+| fresh copy | round 17 | cold | 461.7 | 886.3 | 200 |
+| fresh copy | round 18 | cold | 385.0 | 763.3 | 200 |
+| fresh copy | round 19 | cold | 374.9 | 783.3 | 200 |
+| fresh copy | round 20 | cold | 365.2 | 745.0 | 200 |
+
+| writer run | updates done | throttled | retried | failed | most in one second |
+|---|---|---|---|---|---|
+| 20261123T011556Z | 300 | 0 | 0 | 0 | 5 |
+
+### Units of the extension's calls (results.duckdb) and CloudWatch, 01:13 to 01:50 UTC
+calls 1022 (600 planned, 400 busy rider, 20 fresh copies, 2 after idle), 1022 joined with their REPORT line by the
+  x-amzn-RequestId header of the reply; 23 cold (1 busy-rider call, 20 fresh copies, 2 after idle)
+Lambda billed 82,999 ms in all at 128 MB (10.37 GB-seconds); median 29.5 ms a warm get, 130 ms a warm busy-rider
+  Query, 646 ms a cold call
+read units 1,672.5 (results.duckdb, from the replies)
+recipe-readpath-rider-trips ConsumedWriteCapacityUnits 900 (300 puts, 300 updates by the writer, 300 deletes)
+/aws/lambda/recipe-readpath-api IncomingBytes 496,400 (the set-up's 6 calls included)
+data transfer out: not metered per call; reply sizes read after the run: 116 bytes a get, about 1,150 a rider's
+  history of 10 trips, about 32,500 for the 300 trips of r-busy (108 bytes a trip), about 300 bytes of headers
+  a reply: 13.6 MB for the run
+the set-up: 138 write units and 16 read units on the three tables, 6 Lambda calls
+
+### Cost of this run, measured units x the course price sheet (ca-central-1, 2026-11-18), free tier left out
+Lambda requests      1,022 x 0.20 per million              0.00020 USD
+Lambda duration      10.37 GB-s x 0.0000133334 (arm64)     0.00014 USD
+DynamoDB reads       1,672.5 units x 0.1375 per million    0.00023 USD
+DynamoDB writes      900 units x 0.6875 per million        0.00062 USD
+CloudWatch Logs      496,400 bytes x 0.55 per GB           0.00025 USD
+Data transfer out    13.6 MB x 0.09 per GB                 0.00114 USD (from reply sizes, not metered)
+Total                                                     0.0026 USD (0.0037 CAD); 0.009% of the 30 USD lease
+The set-up (dynamodb main, riders, lambda main): 0.0001 USD more.

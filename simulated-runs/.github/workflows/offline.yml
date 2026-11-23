@@ -1,0 +1,20 @@
+# Offline tests on every push: no AWS credentials, no role, no model key. Copy this file to .github/workflows/ at
+# the root of your team repository (GitHub reads workflows only there) and set working-directory to the folder that
+# holds pyproject.toml.
+name: offline
+on:
+  push:
+  pull_request:
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: simulated-runs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run pytest -q
+      - run: uv run behave --dry-run --no-snippets   # every step has code
+      - run: uv run behave

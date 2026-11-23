@@ -1,0 +1,86 @@
+Clean-up of the ext-scheduled-merge live run, 2026-11-23 UTC, PREFIX=recipe-lake (account masked): dry run, clean-up,
+lake.py down, then the proof.
+
+$ uv run python ext-scheduled-merge/clean_up.py
+would remove schedule group recipe-lake-scheduled-merge and its schedules
+would remove function recipe-lake-merge-run
+would remove log group /aws/lambda/recipe-lake-merge-run
+would remove role recipe-lake-merge-role
+would remove role recipe-lake-merge-scheduler-role
+would remove 6 items of job merge in recipe-lake-runs
+would remove table recipe-lake-runs
+would remove Glue table recipe_lake_lake.trips
+would remove Glue table recipe_lake_lake.zone_counts
+would remove Glue table recipe_lake_lake.trip_events
+would remove Glue database recipe_lake_lake
+would remove 5 objects under s3://recipe-lake-lake-111122223333/lake/trips/
+would remove 5 objects under s3://recipe-lake-lake-111122223333/lake/zone_counts/
+would remove 1 objects under s3://recipe-lake-lake-111122223333/lake/merge-state/
+would remove 0 objects under s3://recipe-lake-lake-111122223333/quarantine/trip-events/
+
+$ uv run python ext-scheduled-merge/clean_up.py --yes
+removed      schedule group recipe-lake-scheduled-merge and its schedules
+removed      function recipe-lake-merge-run
+removed      log group /aws/lambda/recipe-lake-merge-run
+removed      role recipe-lake-merge-role
+removed      role recipe-lake-merge-scheduler-role
+removed      6 items of job merge in recipe-lake-runs
+removed      table recipe-lake-runs
+removed      Glue table recipe_lake_lake.trips
+removed      Glue table recipe_lake_lake.zone_counts
+removed      Glue table recipe_lake_lake.trip_events
+removed      Glue database recipe_lake_lake
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/trips/
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/zone_counts/
+removed      1 objects under s3://recipe-lake-lake-111122223333/lake/merge-state/
+removed      0 objects under s3://recipe-lake-lake-111122223333/quarantine/trip-events/
+
+$ uv run python scripts/lake.py down
+would remove Athena workgroup recipe-lake-wg
+absent   Athena workgroup recipe-lake-ctas-wg
+would remove s3://recipe-lake-lake-111122223333 and its 129 object versions
+
+$ uv run python scripts/lake.py down --yes
+removed  Athena workgroup recipe-lake-wg
+absent   Athena workgroup recipe-lake-ctas-wg
+removed  s3://recipe-lake-lake-111122223333 and its 129 object versions
+
+$ uv run python ext-scheduled-merge/clean_up.py --check
+LEFT   schedule group recipe-lake-scheduled-merge
+1 kinds of resource left
+
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-lake --region ca-central-1 --query ResourceTagMappingList[].ResourceARN
+[
+    "arn:aws:scheduler:ca-central-1:111122223333:schedule-group/recipe-lake-scheduled-merge"
+]
+
+$ aws scheduler list-schedule-groups --name-prefix recipe-lake --region ca-central-1 --query ScheduleGroups[].Name
+[
+    "recipe-lake-scheduled-merge"
+]
+
+$ aws glue get-database --name recipe_lake_lake --region ca-central-1
+
+aws: [ERROR]: An error occurred (EntityNotFoundException) when calling the GetDatabase operation: Database recipe_lake_lake not found.
+
+$ aws s3api list-buckets --query Buckets[?starts_with(Name,'recipe-lake')].Name
+[]
+
+$ aws lambda list-functions --region ca-central-1 --query Functions[?starts_with(FunctionName,'recipe-lake')].FunctionName
+[]
+
+$ aws dynamodb list-tables --region ca-central-1 --query TableNames[?starts_with(@,'recipe-lake')]
+[]
+
+$ aws athena get-work-group --work-group recipe-lake-wg --region ca-central-1
+
+aws: [ERROR]: An error occurred (InvalidRequestException) when calling the GetWorkGroup operation: WorkGroup is not found.
+
+Additional error details:
+AthenaErrorCode: INVALID_INPUT
+
+08:19:06Z again, after the schedule group finished deleting:
+$ uv run python ext-scheduled-merge/clean_up.py --check
+nothing of ext-scheduled-merge is left
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-lake --region ca-central-1 --query ResourceTagMappingList[].ResourceARN
+[]

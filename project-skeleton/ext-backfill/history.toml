@@ -1,0 +1,31 @@
+# What backfill.py --source files reads: the format of your files, their columns, and which column is which.
+# This one describes sim/SIM04/history.csv (six DS01 trips with a header line). Change it for your own files.
+
+format = "csv"                        # csv (with a header line), jsonl or parquet
+time_column = "request_datetime"      # the time that gives a row its requested_day (UTC)
+time_format = "%Y-%m-%d %H:%M:%S"     # how that time is written, in strftime codes (CSV and JSON Lines)
+id_column = ""                        # a stable id column of your source, if it has one; else a hash is the id
+where = ""                            # an extra filter, in SQL that Athena and DuckDB both read (optional)
+
+# Every column of the files, in file order, with its type: string, bigint, double or timestamp.
+# CSV and JSON Lines columns are declared string in the external table and cast in the copy.
+[columns]
+hvfhs_license_num = "string"
+request_datetime = "timestamp"
+pickup_datetime = "timestamp"
+pulocationid = "bigint"
+dolocationid = "bigint"
+trip_miles = "double"
+trip_time = "bigint"
+base_passenger_fare = "double"
+driver_pay = "double"
+
+# The column of your files that fills each column of trips_history.
+[map]
+pickup_zone_id = "pulocationid"
+dropoff_zone_id = "dolocationid"
+requested_time = "request_datetime"
+trip_miles = "trip_miles"
+trip_time_s = "trip_time"
+fare = "base_passenger_fare"
+driver_pay = "driver_pay"

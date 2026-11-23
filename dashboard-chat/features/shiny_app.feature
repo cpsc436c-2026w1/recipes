@@ -113,14 +113,14 @@ Feature: Extension: the chat as a web page (Shiny Express with querychat)
     Given the app's chat over a gateway stand-in with the fixed replies of ext-shiny-app/stub_replies.json
     When a user of the app asks "How many orders are there?"
     Then every request of the app went to "/v1/chat/completions" with the Authorization header "Bearer tok-123"
-    And every request of the app has "max_tokens" 400, "temperature" 0 and "model" "qwen3.6-35b-a3b"
+    And every request of the app has "max_tokens" 16384, "temperature" 0 and "model" "qwen3.6-35b-a3b"
 
   @R122
   Scenario: The page gives a model that reasons before it answers the cap of the command line
     Given CHAT_MODEL is "qwen3.8-27b"
     And the app's chat over a gateway stand-in with the fixed replies of ext-shiny-app/stub_replies.json
     When a user of the app asks "How many orders are there?"
-    Then every request of the app has "max_tokens" 600, "temperature" 0 and "model" "qwen3.8-27b"
+    Then every request of the app has "max_tokens" 16384, "temperature" 0 and "model" "qwen3.8-27b"
 
   @R123
   Scenario: The app without the gateway's two settings

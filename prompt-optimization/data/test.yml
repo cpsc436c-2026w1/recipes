@@ -1,21 +1,28 @@
 # Held-out test questions. Only main/report.py and ext-eval-matrix/ load this file, after the optimizer has finished.
+# Each case has a `group` (ext-eval-matrix reports the outcomes per group and stops if a case has none).
 # Never pass these to GEPA, never copy them into questions.yml, never put their SQL in a prompt.
 # tests/test_splits.py fails if a test question or its reference SQL also appears in questions.yml.
 - id: q01
+  group: count
   question: How many orders were paid by card?
   sql: SELECT COUNT(*) FROM orders WHERE payment = 'card'
 - id: q02
+  group: percentage
   question: What percentage of orders were for tea?
   sql: SELECT 100.0 * COUNT(*) FILTER (WHERE item = 'tea') / COUNT(*) FROM orders
 - id: q03
+  group: wait
   question: What is the shortest wait, in minutes, for any order?
   sql: SELECT MIN(epoch(ready_at - placed_at)) / 60.0 FROM orders
 - id: q04
+  group: money
   question: What is the average tip, in dollars, on cash orders?
   sql: SELECT AVG(tip_cad) FROM orders WHERE payment = 'cash'
 - id: q05
+  group: percentage
   question: What percentage of all tips came from latte orders?
   sql: SELECT 100.0 * SUM(tip_cad) FILTER (WHERE item = 'latte') / SUM(tip_cad) FROM orders
 - id: q06
+  group: money
   question: What is the average amount paid per card order, in dollars, counting the quantity and leaving out tips?
   sql: SELECT AVG(quantity * price_cad) FROM orders WHERE payment = 'card'

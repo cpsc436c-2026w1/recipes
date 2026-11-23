@@ -35,7 +35,8 @@ def output_copy(context):
 
 @when("clean_up.py runs")
 def clean_up_runs(context):
-    run_captured(context, clean_up.main, [], root=context.copy)
+    # the clean-up contract: a bare run only lists; a run that deletes passes --yes
+    run_captured(context, clean_up.main, ["--yes"], root=context.copy)
 
 
 @when('clean_up.py runs with "{args}"')

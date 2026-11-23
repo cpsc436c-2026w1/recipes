@@ -1,0 +1,66 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "lake-layout-experiment"
+format = "main-scenario"
+task = "Build the same trips table in four layouts (Hive and Iceberg, flat and partitioned by day) at three sizes grown until the smallest query scans more than 10 MB, run three zone-count queries 10 times each in Athena and in DuckDB on Lambda in one seeded order, and summarise times, Data scanned, billed MB and cost from one SQL file"
+shapes = ["lakehouse-first"]
+extensions = ["Layout experiment"]
+lectures = ["L2", "L10", "L11"]
+core = ["Athena", "S3", "Parquet", "Iceberg", "DuckDB", "Lambda"]
+secondary = ["Glue Data Catalog", "boto3"]
+region = "ca-central-1"
+cost_one_run = "measured 2026-11-23 (sizes 1, 8 and 32 copies): Athena 0.33 USD and Lambda 0.0035 USD for the run that is the result, under 0.67 USD (0.97 CAD) for both runs with S3 (output/live.txt); before the run, computed from the course price sheet (ca-central-1, 2026-11-18) at the assumed sizes 1, 4 and 16 copies: about 0.52 USD (0.76 CAD) estimated, at most 2.19 USD (3.18 CAD); MAX_USD (default 2.00) bounds the Athena part before the final tables are built"
+summary = "A layout experiment that is valid on a small table: grow it until Athena's 10 MB minimum stops hiding the difference, keep every run, and read medians with their IQR and cost per 1,000 queries from one SQL file"
+
+[[practices]]
+name = "Grow the table until the smallest query scans more than the billing minimum, within a spend limit on the whole plan"
+source = "L11 (Athena billing, partitions); Athena pricing (10 MB minimum per query)"
+
+[[practices]]
+name = "Report each cell as median (IQR) over 10 runs in one seeded, interleaved order; mark overlapping ranges before reading a gap as a difference"
+source = "L11 (measurement); course experiment template"
+
+[[practices]]
+name = "Keep failed, cancelled and reused runs, out of the times but in the spend"
+source = "Athena pricing (cancelled queries are billed for what they scanned)"
+
+[[practices]]
+name = "Compare engines with the same clock at the caller, service times beside it"
+source = "Athena QueryExecutionStatistics; L2 (Lambda REPORT lines, cold starts)"
+
+[instruments]
+files = ["layout.py", "experiment.py", "backends.py", "store.py", "summary.sql", "duckdb_fn/handler.py", "function.py", "report_lines.py", "experiments/lake-layout.md"]
+
+[validates]
+command = "uv run pytest -q && uv run behave"
+shows = "the growth rule and spend bound pick the sizes, the statements carry the layouts' properties, every run is stored with its billed MB and exclusion, and summary.sql gives medians, IQR overlap marks and costs"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "uv run python experiment.py build && uv run python experiment.py run && uv run python experiment.py summary"
+run_offline = "uv run python experiment.py build --offline && uv run python experiment.py run --offline && uv run python experiment.py summary --offline"
+clean = "uv run python clean_up.py --yes"
+
+[env]
+PREFIX = "first part of every AWS resource name; default recipe"
+MAX_USD = "the spend limit on the Athena part of the whole plan; default 2.00"
+COURSE_CATALOG_ID = "the course catalog's account id (tutorial B3T1); live build only"
+LEDGER = "where the creation ledger is written; default state/ledger.jsonl"
+
+[resources]
+glue = ["database <prefix>_layout and its tables ds01, trips_<layout>_<copies>"]
+s3 = ["prefix layout/ in $PREFIX-lake-<account> (the bucket is scripts/lake.py's)"]
+lambda_functions = ["$PREFIX-duckdb-query"]
+iam_roles = ["$PREFIX-duckdb-role"]
+log_groups = ["/aws/lambda/$PREFIX-duckdb-query"]
+borrowed = ["data source course", "workgroups $PREFIX-wg and $PREFIX-ctas-wg (scripts/lake.py down deletes them)"]
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"
+spend_limit_before_final_tables = true
+runs_kept_with_exclusions = true
+summary_from_sql_only = true
+tests_offline = true

@@ -1,0 +1,171 @@
+ext-dashboard-page: cold starts of the page function, 2026-11-23 (UTC), ca-central-1, the stream variant.
+Account masked as 111122223333; the function URL is not shown (url-off deleted it at 02:04 UTC).
+PREFIX=recipe-dashcold.
+
+Why: the run of 2026-11-23 (output/ext-dashboard-page.txt) met the SLO only warm; its one cold call took 5,354 ms
+after an init of 68 ms. That page.py (commit 29de175) imported boto3 and made its client inside the handler.
+
+The matrix. One function, recipe-dashcold-page (deployed by run.sh, counts of run.sh load rush-hour), whose code and
+MemorySize were changed in place for each cell: memory 128, 512, 1024 MB x where the DynamoDB client is made:
+  first-read  page.py of commit 29de175 (boto3 imported and the client made on the first read), with three timing
+              prints added (import_boto3_ms, make_client_ms, handle_ms) and nothing else changed;
+  init        page.py of this commit (boto3 imported and the client made at module scope, in the Init phase).
+Each sample: a new value of one environment variable (UpdateFunctionConfiguration, the others kept), wait for
+LastUpdateStatus Successful, then one Invoke of GET /api/zone-counts (a function URL event, LogType=Tail) and 3 warm
+Invokes. Every cold sample had an Init Duration (none redone). wall_ms is the Invoke call timed on the caller, without
+a function URL. 5 cold samples a cell.
+The driver, the first-read page.py, the raw rows and the summary query: experiments/dashboard-cold-start/
+(matrix.py, page_lazy.py, matrix.jsonl, summary.sql).
+
+Summary (DuckDB median and max over the 5 cold samples; warm: median over 15):
+
+memory | client | init med | init max | dur med | dur max | init+dur med | init+dur max | wall med | wall max | billed cold | billed warm | import boto3 | make client
+128 | init | 362 | 464 | 375 | 395 | 741 | 859 | 872 | 995 | 742 | 100 | - | -
+128 | first-read | 70 | 91 | 5407 | 5913 | 5478 | 6004 | 5602 | 6110 | 5478 | 99 | 3427 | 1600
+512 | init | 344 | 346 | 66 | 77 | 412 | 415 | 532 | 618 | 412 | 16 | - | -
+512 | first-read | 67 | 84 | 1146 | 1400 | 1214 | 1467 | 1315 | 1598 | 1215 | 19 | 662 | 378
+1024 | init | 366 | 460 | 43 | 48 | 405 | 508 | 531 | 644 | 406 | 13 | - | -
+1024 | first-read | 71 | 73 | 575 | 600 | 648 | 671 | 770 | 784 | 648 | 13 | 328 | 194
+
+Every cold sample (REPORT line from the Invoke's log tail):
+128 MB init       #1 wall 872.0 ms | Duration: 379.58 ms | Billed Duration: 742 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 361.74 ms
+128 MB init       #2 wall 994.6 ms | Duration: 394.86 ms | Billed Duration: 860 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 464.38 ms
+128 MB init       #3 wall 799.0 ms | Duration: 345.14 ms | Billed Duration: 702 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 356.02 ms
+128 MB init       #4 wall 815.5 ms | Duration: 345.99 ms | Billed Duration: 695 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 348.21 ms
+128 MB init       #5 wall 971.9 ms | Duration: 374.95 ms | Billed Duration: 822 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 446.25 ms
+128 MB first-read #1 wall 4609.8 ms | Duration: 4441.22 ms | Billed Duration: 4495 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 53.65 ms | import_boto3_ms 2780.6 make_client_ms 1319.9 handle_ms 4420.9
+128 MB first-read #2 wall 5371.8 ms | Duration: 5176.10 ms | Billed Duration: 5247 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 70.31 ms | import_boto3_ms 3235.3 make_client_ms 1580.1 handle_ms 5155.6
+128 MB first-read #3 wall 6110.3 ms | Duration: 5912.95 ms | Billed Duration: 6004 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 90.93 ms | import_boto3_ms 3631.8 make_client_ms 1860.2 handle_ms 5872.4
+128 MB first-read #4 wall 5601.9 ms | Duration: 5407.25 ms | Billed Duration: 5478 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 70.55 ms | import_boto3_ms 3426.5 make_client_ms 1599.9 handle_ms 5386.7
+128 MB first-read #5 wall 5678.2 ms | Duration: 5490.43 ms | Billed Duration: 5558 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 66.70 ms | import_boto3_ms 3469.6 make_client_ms 1619.9 handle_ms 5469.9
+512 MB init       #1 wall 442.9 ms | Duration: 58.62 ms | Billed Duration: 327 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 267.51 ms
+512 MB init       #2 wall 539.5 ms | Duration: 69.70 ms | Billed Duration: 415 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 344.31 ms
+512 MB init       #3 wall 532.3 ms | Duration: 76.55 ms | Billed Duration: 415 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 338.25 ms
+512 MB init       #4 wall 532.3 ms | Duration: 65.94 ms | Billed Duration: 412 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 345.63 ms
+512 MB init       #5 wall 617.8 ms | Duration: 51.33 ms | Billed Duration: 396 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 343.86 ms
+512 MB first-read #1 wall 1598.3 ms | Duration: 1399.64 ms | Billed Duration: 1467 ms | Memory Size: 512 MB | Max Memory Used: 93 MB | Init Duration: 67.12 ms | import_boto3_ms 661.6 make_client_ms 637.5 handle_ms 1382.4
+512 MB first-read #2 wall 1072.3 ms | Duration: 906.04 ms | Billed Duration: 960 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 53.00 ms | import_boto3_ms 526.7 make_client_ms 298.6 handle_ms 894.5
+512 MB first-read #3 wall 1504.3 ms | Duration: 1281.02 ms | Billed Duration: 1365 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 83.75 ms | import_boto3_ms 741.5 make_client_ms 438.7 handle_ms 1269.6
+512 MB first-read #4 wall 1314.6 ms | Duration: 1145.59 ms | Billed Duration: 1215 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 68.79 ms | import_boto3_ms 680.5 make_client_ms 377.5 handle_ms 1143.6
+512 MB first-read #5 wall 1037.8 ms | Duration: 889.69 ms | Billed Duration: 942 ms | Memory Size: 512 MB | Max Memory Used: 91 MB | Init Duration: 51.68 ms | import_boto3_ms 521.0 make_client_ms 298.5 handle_ms 887.9
+1024 MB init       #1 wall 531.4 ms | Duration: 38.97 ms | Billed Duration: 406 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 366.39 ms
+1024 MB init       #2 wall 517.3 ms | Duration: 43.11 ms | Billed Duration: 394 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 350.84 ms
+1024 MB init       #3 wall 643.8 ms | Duration: 47.86 ms | Billed Duration: 509 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 460.17 ms
+1024 MB init       #4 wall 634.9 ms | Duration: 48.18 ms | Billed Duration: 503 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 454.19 ms
+1024 MB init       #5 wall 520.8 ms | Duration: 39.49 ms | Billed Duration: 394 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 353.86 ms
+1024 MB first-read #1 wall 783.7 ms | Duration: 575.13 ms | Billed Duration: 648 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 72.58 ms | import_boto3_ms 328.1 make_client_ms 194.3 handle_ms 573.2
+1024 MB first-read #2 wall 752.0 ms | Duration: 560.86 ms | Billed Duration: 629 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 67.81 ms | import_boto3_ms 315.0 make_client_ms 198.6 handle_ms 559.0
+1024 MB first-read #3 wall 721.9 ms | Duration: 557.18 ms | Billed Duration: 626 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 67.96 ms | import_boto3_ms 315.8 make_client_ms 192.2 handle_ms 555.2
+1024 MB first-read #4 wall 777.1 ms | Duration: 583.30 ms | Billed Duration: 654 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 70.53 ms | import_boto3_ms 337.1 make_client_ms 196.1 handle_ms 581.2
+1024 MB first-read #5 wall 769.5 ms | Duration: 599.82 ms | Billed Duration: 671 ms | Memory Size: 1024 MB | Max Memory Used: 91 MB | Init Duration: 71.14 ms | import_boto3_ms 354.1 make_client_ms 180.6 handle_ms 597.9
+
+Then the committed deploy.py at its default MEMORY_MB, a short public URL, and the new bench.py:
+
+### 2026-11-23T02:02:23Z bash ext-dashboard-page/run.sh   (the committed deploy.py, default MEMORY_MB)
+== 1. The counts table (created if missing; one your counting function writes is used as it is)
+table recipe-dashcold-zone-counts: there already, used as it is
+== 2. The page's role: Query on the counts table (and the slot table), its own log group
+$ aws iam create-role recipe-dashcold-page-role
+  (there already: kept)
+$ aws iam put-role-policy recipe-dashcold-page-role policy
+== 3. The page's log group, then the function
+$ aws logs create-log-group /aws/lambda/recipe-dashcold-page
+  (there already: kept)
+$ aws logs put-retention-policy /aws/lambda/recipe-dashcold-page 7 days
+$ aws lambda get-function recipe-dashcold-page
+$ aws lambda update-function-code recipe-dashcold-page
+$ aws lambda update-function-configuration recipe-dashcold-page environment, 512 MB
+== 4. The schedule group (tagged) and the role the URL's one-time schedule runs as
+$ aws scheduler create-schedule-group recipe-dashcold-dashboard-page
+  (there already: kept)
+$ aws iam create-role recipe-dashcold-dash-url-role
+  (there already: kept)
+$ aws iam put-role-policy recipe-dashcold-dash-url-role policy
+== Done: the page is deployed without a public URL. Show it locally with serve_local.py, or publicly with: bash ext-dashboard-page/run.sh url-on 3
+exit 0
+{
+    "memory_mb": 512,
+    "arch": "arm64",
+    "env": {
+        "COUNTS_TABLE": "recipe-dashcold-zone-counts",
+        "PREFIX": "recipe-dashcold"
+    }
+}
+### 2026-11-23T02:02:28Z bash ext-dashboard-page/run.sh url-on 0.1
+== 1. First the one-time schedule that deletes the URL at 2026-11-23T02:08:28 UTC
+$ aws scheduler create-schedule recipe-dashcold-url-off at(2026-11-23T02:08:28) in recipe-dashcold-dashboard-page
+== 2. Then the URL (auth type NONE) and the two statements a public URL needs
+$ aws lambda create-function-url-config recipe-dashcold-page NONE
+$ aws lambda add-permission recipe-dashcold-page url-public
+$ aws lambda add-permission recipe-dashcold-page url-invoke
+The page is public until 2026-11-23T02:08:28 UTC: <the URL>
+End it earlier with: bash ext-dashboard-page/run.sh url-off
+exit 0
+### 2026-11-23T02:02:36Z uv run python ext-dashboard-page/bench.py "<the URL>"
+forcing a cold start of recipe-dashcold-page (BENCH_COLD_START changed), then one read
+cold read: 548.6 ms (HTTP 200): PASS (under 1,000 ms)
+100 reads, 0 failed; p50 30.5 ms, p95 40.4 ms: PASS (p95 under 1,000 ms)
+exit 0
+### 2026-11-23T02:04:26Z REPORT lines with an Init Duration in /aws/lambda/recipe-dashcold-page since the bench started
+REPORT RequestId: 52a33e40-5729-4962-8085-431d0d92e980	Duration: 66.61 ms	Billed Duration: 414 ms	Memory Size: 512 MB	Max Memory Used: 91 MB	Init Duration: 346.93 ms	
+
+### 2026-11-23T02:04:27Z bash ext-dashboard-page/run.sh url-off
+$ aws lambda delete-function-url-config recipe-dashcold-page
+$ aws scheduler delete-schedule recipe-dashcold-url-off recipe-dashcold-dashboard-page
+$ aws lambda remove-permission recipe-dashcold-page url-public
+$ aws lambda remove-permission recipe-dashcold-page url-invoke
+exit 0
+### 2026-11-23T02:04:42Z uv run python clean_up.py --yes
+
+== Remove the URL, the function, its log group and its role
+
+$ aws lambda delete-function-url-config --function-name recipe-dashcold-api
+(no URL: already gone)
+
+$ aws lambda delete-function --function-name recipe-dashcold-api
+(no function: already gone)
+
+$ aws logs delete-log-group --log-group-name /aws/lambda/recipe-dashcold-api
+(no log group: already gone)
+
+$ aws iam delete-role-policy --role-name recipe-dashcold-api-role --policy-name tables-and-logs
+(no policy: already gone)
+
+$ aws iam delete-role --role-name recipe-dashcold-api-role
+(no role: already gone)
+
+== Check: no function, log group or role of this recipe left (each check prints "(no ... left)")
+
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-dashcold-api --output text --query logGroups[?logGroupName=='/aws/lambda/recipe-dashcold-api'].logGroupName
+(no log group left)
+
+$ aws iam list-roles --output text --query Roles[?RoleName=='recipe-dashcold-api-role'].RoleName
+(no role left)
+
+$ aws lambda list-functions --output text --query Functions[?FunctionName=='recipe-dashcold-api'].FunctionName
+(no function left)
+removed  schedule group recipe-dashcold-dashboard-page and its schedules
+removed  Lambda function recipe-dashcold-page
+removed  log group /aws/lambda/recipe-dashcold-page
+removed  IAM role recipe-dashcold-page-role
+removed  IAM role recipe-dashcold-dash-url-role
+removed  DynamoDB table recipe-dashcold-zone-counts
+removed  the API recipe-dashcold-api (bash clean_up.sh: see its lines above)
+absent   function URL of recipe-dashcold-page
+absent   Lambda function recipe-dashcold-dash-refresh
+absent   log group /aws/lambda/recipe-dashcold-dash-refresh
+absent   IAM role recipe-dashcold-dash-refresh-role
+absent   IAM role recipe-dashcold-dash-scheduler-role
+absent   DynamoDB table recipe-dashcold-runs
+exit 0
+### 2026-11-23T02:04:53Z uv run python clean_up.py --check
+tagged   arn:aws:scheduler:ca-central-1:111122223333:schedule-group/recipe-dashcold-dashboard-page
+LEFT     schedule group recipe-dashcold-dashboard-page
+check: 1 left of this recipe's names for recipe-dashcold
+exit 1
+### 2026-11-23T02:05:05Z uv run python clean_up.py --check   (again: a schedule group is deleted asynchronously)
+check: 0 left of this recipe's names for recipe-dashcold (empty)
+exit 0
+### 2026-11-23T02:05:06Z aws resourcegroupstaggingapi get-resources --tag-filters Key=Team,Values=recipe-dashcold
+### aws scheduler list-schedule-groups --name-prefix recipe-dashcold
+### aws lambda list-functions / dynamodb list-tables / iam list-roles / logs describe-log-groups, names starting recipe-dashcold

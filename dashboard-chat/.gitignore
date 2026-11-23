@@ -4,3 +4,7 @@ __pycache__/
 data/*.parquet
 output/traces.jsonl
 output/spans.jsonl
+ext-guardrails-redteam/data/
+state/
+build/
+.local/

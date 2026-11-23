@@ -545,10 +545,13 @@ def token_nowhere(context):
 # ---- the eval matrix ----
 
 def _matrix_rows(context) -> dict[str, list[str]]:
-    rows = {}
+    rows, inside = {}, False
     for line in _report(context).splitlines():
+        if line.startswith("## "):   # only the matrix table: the comparison tables also have 8 columns
+            inside = line.startswith("## Eval matrix (")
+            continue
         cells = [c.strip() for c in line.strip("|").split("|")]
-        if line.startswith("| ") and len(cells) == 8 and cells[0] not in ("model", "---"):
+        if inside and line.startswith("| ") and len(cells) == 8 and cells[0] not in ("model", "---"):
             rows[f"{cells[0]} | {cells[1]}"] = cells[2:]
     return rows
 
@@ -593,7 +596,7 @@ def copy_without_runs(context):
 
 @when("clean_up.py runs")
 def clean_up_runs(context):
-    run_captured(context, clean_up.main, context.copy)
+    run_captured(context, clean_up.main, ["--yes"], root=context.copy)      # a bare run only lists (the contract)
 
 
 @then("the copy has no runs folder")

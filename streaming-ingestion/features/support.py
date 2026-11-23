@@ -322,12 +322,17 @@ def run_script(context, which: str, args: str):
         return run(context, module.main, args.split())
 
 
-def run_clean_up(context):
+def run_clean_up(context, *args: str):
+    """clean_up.py as the command line runs it, with these arguments (not behave's own)."""
     import runpy
 
     sys.modules.pop("clean_up", None)
-    with no_waits(context):
-        return run(context, runpy.run_path, str(ROOT / "clean_up.py"), run_name="__main__")
+    argv, sys.argv = sys.argv, [str(ROOT / "clean_up.py"), *args]
+    try:
+        with no_waits(context):
+            return run(context, runpy.run_path, str(ROOT / "clean_up.py"), run_name="__main__")
+    finally:
+        sys.argv = argv
 
 
 def client(name: str):

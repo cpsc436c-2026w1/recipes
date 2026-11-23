@@ -5,6 +5,10 @@ Every scenario runs offline, with made-up credentials and in temporary folders:
   calls it;
 - a script runs dry (DRY=1, with an `aws` and a `curl` that fail the scenario when called) or for real against a
   stand-in `aws` that logs each call and answers what the scenario tells it to (tests/harness.py);
+- ext-dashboard-page and ext-read-path scenarios start moto inside this process; their ledger is a file of the
+  scenario's own (LEDGER), so no scenario writes the folder's state/;
+- an example tagged @browser opens the page in headless Chromium (playwright); it is skipped when Chromium is not
+  installed (`uv run playwright install chromium` installs it); @live examples are left out (behave.ini);
 - a feature tagged @moto_server runs the dynamodb recipe's scripts and this recipe's handler against a moto server
   on localhost, with the real AWS CLI; it is skipped when the AWS CLI is not installed.
 """
@@ -24,7 +28,8 @@ for folder in (ROOT / "features", ROOT / "tests"):
 OFFLINE = {"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing", "AWS_SESSION_TOKEN": "testing",
            "AWS_DEFAULT_REGION": "ca-central-1", "AWS_REGION": "ca-central-1", "AWS_EC2_METADATA_DISABLED": "true"}
 NOT_SET = ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_ENDPOINT_URL", "GATEWAY_URL", "COURSE_MCP_TOKEN", "COURSE_GATEWAY_URL", "KB_MCP_TOKEN", "KEEP", "DRY",
-           "ROLE_ARN", "PREFIX")
+           "ROLE_ARN", "PREFIX", "SLOTS_TABLE", "PERIOD", "STALE_MINUTES", "ZONES", "COUNTS_TABLE", "RESULTS",
+           "PURPOSE", "TEAM", "OWNER", "LEDGER")
 
 
 def _offline():
@@ -35,6 +40,21 @@ def _offline():
 
 def before_all(context):
     _offline()
+    context.chromium = None
+
+
+def _chromium_ok(context) -> bool:
+    """Whether playwright can start headless Chromium here (checked once per run)."""
+    if context.chromium is None:
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                p.chromium.launch().close()
+            context.chromium = True
+        except Exception as err:          # not installed, or no browser binary for this playwright
+            context.chromium = False
+            print(f"@browser examples skipped: {type(err).__name__}: {str(err).splitlines()[0][:120]}")
+    return context.chromium
 
 
 def before_feature(context, feature):
@@ -63,6 +83,11 @@ def before_scenario(context, scenario):
     context.run = None           # the last script run: support.Run
     context.moto = None          # moto inside this process, for the handler scenarios
     context.handler = None
+    context.dash = None          # ext-dashboard-page: moto session, page module
+    os.environ["LEDGER"] = str(context.tmp / "ledger.jsonl")
+    os.environ["OWNER"] = "tester"
+    if "browser" in scenario.effective_tags and not _chromium_ok(context):
+        scenario.skip("Chromium is not installed for playwright")
 
 
 def after_scenario(context, scenario):

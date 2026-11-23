@@ -1,5 +1,5 @@
 Feature: Clean-up removes what the recipe and both extensions created, and nothing else
-  clean_up.py, run as the command line runs it, inside moto. README, "Requirements": R60 to R64.
+  clean_up.py, run as the command line runs it, inside moto. README, "Requirements": R60 to R65.
 
   Background:
     Given everything the main scenario and both extensions create exists for PREFIX "recipe-ana"
@@ -47,4 +47,13 @@ Feature: Clean-up removes what the recipe and both extensions created, and nothi
     When clean_up.py runs
     Then the exit code is 0
     And no call was made to delete the stream, a table or a mapping again
-    And 9 printed lines hold "(already being deleted)"
+    And 11 printed lines hold "(already being deleted)"
+
+  @R65
+  Scenario: A dry run lists what would go and deletes nothing
+    When clean_up.py --dry-run runs
+    Then the exit code is 0
+    And the account holds what it held before
+    And no call was made to delete anything
+    And the output holds "would remove function recipe-ana-consumer"
+    And the output holds "absent   function recipe-ana-feed-poller"

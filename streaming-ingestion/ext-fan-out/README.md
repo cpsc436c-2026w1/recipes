@@ -76,7 +76,7 @@ uv run python ext-fan-out/run.py --target aws --stopped-for 60
 
 `fanout_consumer.py` runs in Lambda, once as `$PREFIX-dashboard` and once as `$PREFIX-history`. `run.py` runs in
 your terminal. The run removes what it created unless you pass `--keep`. In `streaming-ingestion`, run
-`uv run python clean_up.py` to remove what is left. Cost: under 0.01 USD (from the price list, not measured): the first
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` to remove what is left. Cost: under 0.01 USD (from the price list, not measured): the first
 million SNS requests a month are free, SQS requests are 0.40 USD a million.
 
 ## What you should see

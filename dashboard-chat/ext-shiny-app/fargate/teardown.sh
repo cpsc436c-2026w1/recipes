@@ -5,6 +5,8 @@
 # gone is passed over. If a step fails, or a look-up is refused (so that nobody knows whether the thing is there),
 # the script says which and exits with code 1: something may be left that bills or blocks a later deploy, so do
 # not read the run as done.
+# A bare run lists what it would delete (the commands, as DRY=1 prints them) and deletes nothing; --yes deletes.
+if [ "${1:-}" = "--yes" ]; then shift; else export DRY=1; fi
 source "$(dirname "$0")/common.sh"
 guard
 FAILED=0
@@ -67,4 +69,4 @@ if [ "$FAILED" = 1 ]; then
   echo "NOT DONE: one or more steps or look-ups failed (the lines that start with FAILED). Fix the cause and run teardown.sh again." >&2
   exit 1
 fi
-echo "done: everything deploy.sh made for $NAME is removed"
+if [ -n "${DRY:-}" ]; then echo "Nothing deleted. Run again with --yes to delete these."; else echo "done: everything deploy.sh made for $NAME is removed"; fi

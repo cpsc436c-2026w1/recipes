@@ -74,7 +74,8 @@ Each requirement has one or more scenarios in [`features/`](features/), tagged w
 runs them offline. The requirements of an extension are in its own README, and their numbers go on from here:
 [lag alarm](ext-lag-alarm/README.md#requirements) from 60,
 [rollback or schema change](ext-rollback-or-schema/README.md#requirements) from 70,
-[maintenance](ext-maintenance/README.md#requirements) from 80. When you change what the recipe does, change the
+[scheduled merge](ext-scheduled-merge/README.md#requirements) from 80,
+[maintenance](ext-maintenance/README.md#requirements) from 110. When you change what the recipe does, change the
 requirement and its scenario with it: `python3 tools/check_requirements.py` (repo root) fails when they do not
 match.
 
@@ -143,13 +144,15 @@ match.
 
 **Clean-up**
 
-- **R50** (event) When `clean_up.py` runs, the recipe shall delete everything a run and the three extensions
-  created for this `PREFIX`: schedules, alarms, the event source mapping, the function and its log group, the
-  failures queue, the Firehose stream, the Glue tables and database, its objects and its bucket, the table, and its roles.
-- **R51** (event) When `clean_up.py --dry-run` runs, the recipe shall print what it would remove and delete nothing.
+- **R50** (event) When `clean_up.py --yes` runs, the recipe shall delete everything a run and its extensions
+  created for this `PREFIX`: schedules and schedule groups, alarms and the alert topic, the event source mapping,
+  the functions and their log groups, the failures queue, the Firehose stream, the Glue tables and database, its
+  objects and its bucket, the table, and its roles; the shared lake bucket, its run log and `trip_events_parquet`
+  stay for `scripts/lake.py down`.
+- **R51** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print what it would remove and delete nothing.
 - **R52** (unwanted) If AWS refuses a step of `clean_up.py`, then the recipe shall exit with code 1 after it has
   tried every other step and printed `FAILED` for the refused one.
-- **R53** (event) When `clean_up.py` runs and a resource is already gone, the recipe shall pass over it without a
+- **R53** (event) When `clean_up.py --yes` runs and a resource is already gone, the recipe shall pass over it without a
   failure.
 - **R54** (ubiquitous) The recipe shall leave in place what it did not create: every alarm other than its two,
   every role without its tag, and in a bucket named by `BUCKET` every object outside its four prefixes and the
@@ -184,8 +187,8 @@ the scripts in your terminal create them and ask them questions.
 | Lag probe and alarms | `ext-lag-alarm/lag.py` | a simulated clock | `--target aws`, each time you run it | no; CloudWatch evaluates the alarms |
 | Rollback, schema change | `ext-rollback-or-schema/*.py` | a local Iceberg table | `--target aws`: PyIceberg in your terminal against Glue and S3 | no |
 | Maintenance | `ext-maintenance/maintenance.py` | a local Iceberg table | `--target aws`; `--schedule` creates two schedules | the two schedules: EventBridge Scheduler starts the Athena queries every night; no code of yours |
-| Clean-up | `clean_up.py` | no: it always calls AWS (`--dry-run` only looks) | yes, with the `PREFIX` of the run | no |
-| Tests and scenarios | `tests/`, `features/` | yes, and in CI | never against AWS | no |
+| Clean-up | `clean_up.py` | no: it always calls AWS (without `--yes` it only looks) | yes, with the `PREFIX` of the run | no |
+| Tests and scenarios | `tests/`, `features/` | yes, and in CI | only the examples tagged `@live` (`uv run behave --tags=@live`, `features/live.py`) | no |
 
 This recipe does not have a container or an instance.
 
@@ -200,7 +203,8 @@ Your sign-in needs these IAM actions to run the scripts and the clean-up. The ro
 |---|---|
 | Main scenario and clean-up | `athena:GetQueryExecution`, `athena:GetQueryResults`, `athena:StartQueryExecution`, `cloudwatch:DeleteAlarms`, `cloudwatch:DescribeAlarms`, `dynamodb:CreateTable`, `dynamodb:DeleteItem`, `dynamodb:DeleteTable`, `dynamodb:DescribeTable`, `dynamodb:PutItem`, `dynamodb:UpdateItem`, `firehose:CreateDeliveryStream`, `firehose:DeleteDeliveryStream`, `firehose:DescribeDeliveryStream`, `glue:CreateDatabase`, `glue:CreateTable`, `glue:DeleteDatabase`, `glue:DeleteTable`, `glue:GetDatabase`, `glue:GetTables`, `iam:CreateRole`, `iam:DeleteRole`, `iam:DeleteRolePolicy`, `iam:GetRole`, `iam:ListRolePolicies`, `iam:ListRoleTags`, `iam:PassRole`, `iam:PutRolePolicy`, `lambda:CreateEventSourceMapping`, `lambda:CreateFunction`, `lambda:DeleteEventSourceMapping`, `lambda:DeleteFunction`, `lambda:GetEventSourceMapping`, `lambda:GetFunction`, `lambda:ListEventSourceMappings`, `lambda:UpdateEventSourceMapping`, `lambda:UpdateFunctionCode`, `logs:DeleteLogGroup`, `logs:DescribeLogGroups`, `s3:CreateBucket`, `s3:DeleteBucket`, `s3:DeleteObject`, `s3:ListBucket`, `s3:PutBucketPublicAccessBlock`, `s3:PutLifecycleConfiguration`, `scheduler:DeleteSchedule`, `scheduler:GetSchedule`, `sqs:CreateQueue`, `sqs:DeleteQueue`, `sqs:GetQueueAttributes`, `sqs:GetQueueUrl` |
 | `ext-lag-alarm/` adds | `cloudwatch:PutMetricAlarm`, `cloudwatch:PutMetricData`, `s3:PutObject` |
-| `ext-maintenance/` adds | `scheduler:CreateSchedule`, `scheduler:UpdateSchedule` |
+| `ext-maintenance/` adds | `athena:CreateWorkGroup`, `athena:GetWorkGroup`, `athena:ListWorkGroups`, `cloudwatch:PutMetricAlarm`, `dynamodb:Query`, `glue:BatchCreatePartition`, `glue:GetPartition`, `glue:GetPartitions`, `glue:GetTable`, `glue:UpdatePartition`, `glue:UpdateTable`, `lambda:GetFunctionEventInvokeConfig`, `lambda:PutFunctionEventInvokeConfig`, `lambda:UpdateFunctionConfiguration`, `logs:CreateLogGroup`, `logs:PutRetentionPolicy`, `s3:CopyObject` (`s3:GetObject` and `s3:PutObject`), `scheduler:CreateSchedule`, `scheduler:CreateScheduleGroup`, `scheduler:DeleteScheduleGroup`, `scheduler:GetScheduleGroup`, `scheduler:ListScheduleGroups`, `scheduler:TagResource`, `scheduler:UpdateSchedule`, `sns:CreateTopic`, `sns:DeleteTopic`, `sns:ListTopics`, `sns:Subscribe` |
+| `ext-scheduled-merge/` adds | the `ext-maintenance` rows for Athena workgroups, Lambda, logs, Scheduler and DynamoDB, and `lambda:InvokeFunction`, `dynamodb:BatchWriteItem`, `dynamodb:Scan`, `glue:DeleteDatabase`, `scheduler:GetSchedule`, `scheduler:UpdateSchedule` (pause and resume); by step: `ext-scheduled-merge/README.md`, Run it live |
 | `ext-rollback-or-schema/` adds | `glue:GetTable`, `glue:UpdateTable`, `s3:GetObject`, `s3:PutObject` |
 
 ### 1. Laptop, offline
@@ -253,15 +257,16 @@ uv run python -m main.run --target aws
 
 Clean-up and cost: the run keeps everything, so that the extensions can use it, and the function, the Firehose
 stream and the bucket stay until you remove them. Clean up the same day, in the same terminal with the same
-`PREFIX`: `uv run python clean_up.py --dry-run`, then `uv run python clean_up.py`. One run is under 0.01 USD
+`PREFIX`: `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes`. One run is under 0.01 USD
 ([Cost and clean-up](#cost-and-clean-up)).
 
 ### 3. Sandbox terminal: the extensions
 
 Each extension's README has its own part, with the sign-in, the commands, what you should see, the clean-up and the
 cost: [lag alarm](ext-lag-alarm/README.md#run-it), [rollback or schema change](ext-rollback-or-schema/README.md#run-it),
-[maintenance](ext-maintenance/README.md#run-it). All three were run by us on 2026-11-13 (UTC), after the main
-scenario.
+[maintenance](ext-maintenance/README.md#run-it), [scheduled merge](ext-scheduled-merge/README.md#run-it). The
+first three were run by us on 2026-11-13 (UTC), after the main scenario; the scheduled merge and the nightly
+compaction rule on 2026-11-23 (UTC), with the `@live` examples (`uv run behave --tags=@live`).
 
 ## What you should see
 
@@ -289,7 +294,8 @@ folder.
 |---|---|---|---|
 | Lag monitoring with an alarm | A probe item measures change to queryable; a CloudWatch alarm when it passes `LAG_LIMIT_SECONDS`; one on Lambda's `IteratorAge`; a `freshness.json` with "data last updated" for the dashboard | `ext-lag-alarm/` | After step 6: a probe trip, two alarms, one S3 object |
 | Rollback or schema evolution | Undo a bad load with Iceberg snapshots (time travel, roll back, keep later good commits); add a column that old queries survive | `ext-rollback-or-schema/` | Step 5's table gains snapshots to return to; step 3's `ITEM_FIELDS` gains a column |
-| Table maintenance on a schedule | Compaction (`OPTIMIZE`) and snapshot expiry (`VACUUM`), with Data scanned and run time before and after; two nightly schedules | `ext-maintenance/` | Step 5's many small commits are rewritten; two schedules run every night until clean-up |
+| Table maintenance on a schedule | Compaction by a rule per day (`OPTIMIZE ... WHERE` for Iceberg, a CTAS and a partition switch for plain Parquet), snapshot expiry (`VACUUM`), a nightly function with two alarms, and the 30-day count measured before and after | `ext-maintenance/` | Step 5's many small commits are rewritten; a function runs every night until `ext-maintenance/clean_up.py --yes` |
+| Scheduled merge with late data | An hourly Athena `MERGE INTO` of raw JSON Lines into one row per trip, with counts per day, week or month rebuilt for late, repeated or corrected events; a run log, a lease and a quarantine | `ext-scheduled-merge/` | None of steps 1 to 6: it reads the lake bucket and replayer of `simulated-runs` |
 
 ## Cost and clean-up
 
@@ -308,9 +314,18 @@ One run: under 0.01 USD. Nothing runs on a schedule in the main scenario; the st
 consumer runs only when there are changes.
 
 ```bash
-PREFIX=recipe-yourname uv run python clean_up.py --dry-run
-PREFIX=recipe-yourname uv run python clean_up.py     # schedules, alarms, function, log group, Firehose, Glue, S3 objects, table, roles
+PREFIX=recipe-yourname uv run python clean_up.py
+PREFIX=recipe-yourname uv run python clean_up.py --yes     # schedules, alarms, function, log group, Firehose, Glue, S3 objects, table, roles
+PREFIX=recipe-yourname uv run python scripts/lake.py down --yes   # last, if an extension made the shared lake bucket
 ```
+
+`clean_up.py` first runs the clean-ups of `ext-maintenance` (the nightly compaction function, its schedule group,
+alarms and topic) and `ext-scheduled-merge` (the hourly merge), which can also be run alone
+(`uv run python ext-maintenance/clean_up.py --yes`, `uv run python ext-scheduled-merge/clean_up.py --yes`). The
+shared lake bucket `$PREFIX-lake-<account>`, its workgroups and the run log come from `scripts/lake.py` and
+`scripts/run_log.py`, copies in this folder. `scripts/lake.py down` lists, and `down --yes` deletes, the files under
+`raw/trip-events/` that this folder's ledger records as its runs' own, then the workgroups and the bucket when the
+ledger says it created them; it refuses while another recipe's files are left in a bucket it created.
 
 ## Adapt it
 

@@ -1,0 +1,36 @@
+# The simulated data sets the generator writes (README, "Data"). Change a number here and in the README together.
+# Every data set is simulated from DS01 (sim/source/ds01_sample.csv: 837 Uber trips picked up in zones 48, 161 and
+# 230 of Manhattan, 2024-03-14 08:00 to 09:00 New York time), moved to 09:00 to 10:00 UTC on 2026-11-23.
+
+source = "sim/source/ds01_sample.csv"
+source_start = "2024-03-14T08:00:00"     # the sample's hour, New York local time as in DS01
+sim_start = "2026-11-23T09:00:00Z"       # where that hour is moved to
+seed = 436
+
+[SIM01]
+name = "rush-hour"
+twice = 4                  # requests delivered a second time, 2 to 30 s after the first copy
+late = 2                   # requests received 6 to 10 minutes after their event_time
+late_minutes = [6, 10]
+
+[SIM02]
+name = "bad-lines"
+first = 10                 # the first 10 events of SIM01, with 3 lines broken on purpose
+broken = { 4 = "tip", 7 = "event_time", 9 = "trip_id" }
+
+[SIM03]
+name = "probe"
+zone = 161                 # the first 20 trips of zone 161, each event delivered once
+trips = 20
+
+[SIM04]
+name = "all-faults"
+twice = 4                  # SIM01's picks, the same requests
+late = 2
+late_minutes = [6, 10]
+never_zone = 161           # the 3 events of each of 3 trips are not delivered
+never_trips = 3
+changed_zone = 230         # 2 trips get a second trip_completed: new event_id, 5 minutes later, fare 5.00 higher
+changed_trips = 2
+changed_after_s = 300
+changed_fare_by = 5.00

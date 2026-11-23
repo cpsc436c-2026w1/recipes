@@ -24,7 +24,7 @@ Feature: Lakehouse first: stream, Firehose, Parquet in S3, Athena
   @R42
   Scenario: The workgroup's scan limit
     When rep-lakehouse-first/run.py runs with "--target aws"
-    Then the workgroup "recipe-ana-wg" cancels a query that would scan more than 1000000000 bytes
+    Then the workgroup "recipe-ana-wg" cancels a query that would scan more than 1073741824 bytes
     And it writes results under "s3://recipe-ana-lake-123456789012/athena-results/" whatever the query asks for
     And every query went to the workgroup "recipe-ana-wg"
 

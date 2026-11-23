@@ -26,7 +26,7 @@ for folder in (ROOT / "features", ROOT):
 OFFLINE = {"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing", "AWS_SESSION_TOKEN": "testing",
            "AWS_DEFAULT_REGION": "ca-central-1", "AWS_EC2_METADATA_DISABLED": "true", "PREFIX": "recipe-ana"}
 NOT_SET = ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_REGION", "GATEWAY_URL", "COURSE_MCP_TOKEN", "COURSE_GATEWAY_URL", "KB_MCP_TOKEN", "MODEL",
-           "FIREHOSE_ROLE_ARN", "API_ROLE_ARN", "TABLE")
+           "FIREHOSE_ROLE_ARN", "API_ROLE_ARN", "TABLE", "BACKFILL_SAMPLE")
 
 
 def before_all(context):
@@ -45,13 +45,17 @@ def before_scenario(context, scenario):
     from moto import mock_aws
 
     context.saved_env = dict(os.environ)
-    os.environ.update(OFFLINE)
-    for name in NOT_SET:
-        os.environ.pop(name, None)
+    live = "live" in scenario.effective_tags     # @live: your sandbox, run with `uv run behave --tags=@live`
+    if not live:
+        os.environ.update(OFFLINE)
+        for name in NOT_SET:
+            os.environ.pop(name, None)
     context.tmp = Path(tempfile.mkdtemp(prefix="project-skeleton-scenario-"))
     os.chdir(context.tmp)                       # .local/ is written under the folder a run starts in
+    os.environ["LEDGER"] = str(context.tmp / "state" / "ledger.jsonl")   # scripts/tags.py: the scenario's ledger
     context.moto = mock_aws()
-    context.moto.start()
+    if not live:
+        context.moto.start()
     context.calls = support.Calls()
     context.calls.start()
     support.reset()
@@ -61,7 +65,8 @@ def before_scenario(context, scenario):
 
 def after_scenario(context, scenario):
     context.calls.stop()
-    context.moto.stop()
+    if "live" not in scenario.effective_tags:
+        context.moto.stop()
     os.chdir(context.start_folder)
     shutil.rmtree(context.tmp, ignore_errors=True)
     os.environ.clear()

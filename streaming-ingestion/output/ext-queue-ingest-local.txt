@@ -1,0 +1,7 @@
+# ext-queue-ingest, offline: uv run python ext-queue-ingest/run.py --target local (moto; synthetic stand-in data, sim/stand_in.py)
+# captured 2026-11-23; not a run in AWS
+sent 2515 deliveries to recipe-trip-completed in 252 calls
+consumer: 836 stored, 0 repeats, 1678 other, 5 failed receives, 26 batches; table 836 of 837 completions; dead-letter queue 1 message
+fault cleared; replaying the dead-letter queue
+moved 1 messages by copy from recipe-trip-completed-dlq to recipe-trip-completed
+table 837 of 837 completions; dead-letter queue 0 messages

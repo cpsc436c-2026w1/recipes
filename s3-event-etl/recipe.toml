@@ -1,0 +1,47 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "s3-event-etl"
+format = "main-scenario"
+task = "Check each file as it lands in S3 (an event calls a function), set bad rows aside with their reason, and load the good rows once into an Iceberg table with a Glue job or one Athena MERGE, under limits on the runs"
+shapes = ["lakehouse-first"]
+extensions = []
+lectures = ["L7", "L8", "L10", "L11"]
+core = ["S3 event notifications", "Lambda", "AWS Glue jobs", "Apache Iceberg", "Athena MERGE INTO", "DynamoDB",
+        "EventBridge Scheduler", "SNS"]
+secondary = ["moto as the offline stand-in for AWS", "DuckDB as the offline stand-in for the Glue job's load",
+             "simulated-runs' replayer and SIM01"]
+region = "ca-central-1"
+cost_one_run = "about 0.025 USD (0.036 CAD) for an hour of files checked and one Glue load (191 DPU-seconds, measured 2026-11-23); 3.47 USD for 30 days at 4 Glue runs a day, 1.06 with Athena"
+summary = "Each landed file checked line by line, its bad rows kept with the reason, its good rows loaded exactly once by a bounded Glue job or Athena MERGE"
+
+[[practices]]
+name = "validate at the boundary, one row at a time, and keep what fails with its reason"
+source = "data quality at ingestion; L10"
+
+[[practices]]
+name = "make every step safe to repeat: conditional writes, an insert-only MERGE on the event id, the manifest after the commit"
+source = "idempotent writes; L11 (MERGE INTO)"
+
+[[practices]]
+name = "bound a batch job's cost: timeout, no automatic retries, one run at a time, runs per day, hold after failures"
+source = "Glue Job API defaults (Timeout, MaxRetries, ExecutionProperty)"
+
+[instruments]
+files = ["pipeline/check.py", "pipeline/control.py", "pipeline/sweep.py", "pipeline/etl_job.py",
+         "pipeline/athena_load.py", "pipeline/local_load.py", "scripts/etl.py", "clean_up.py", "scripts/tags.py",
+         "scripts/lake.py", "scripts/run_log.py"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "bad lines are quarantined with reasons, repeats leave the table unchanged, a failed run is retried, the start limits hold, and the clean-up keeps other notification entries"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "bash scripts/live_run.sh"
+clean = "uv run python clean_up.py --yes"
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"

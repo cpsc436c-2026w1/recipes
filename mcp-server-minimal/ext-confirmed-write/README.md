@@ -108,7 +108,7 @@ EARS has six forms. The forms and the form of these sentences are explained in t
    ```
 
 Clean-up and cost: stop the server with Ctrl-C. The run cost nothing. It wrote `output/refunds.duckdb`;
-`uv run python clean_up.py` deletes it, with the sample Parquet files.
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` deletes it, with the sample Parquet files.
 
 ## What you should see
 

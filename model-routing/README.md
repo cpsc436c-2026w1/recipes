@@ -136,11 +136,11 @@ match.
 
 **Clean-up**
 
-- **R40** (event) When `clean_up.py` runs, the recipe shall delete the `.jsonl` logs in `output/` and leave the
+- **R40** (event) When `clean_up.py --yes` runs, the recipe shall delete the `.jsonl` logs in `output/` and leave the
   captured runs there.
-- **R41** (event) When `clean_up.py --dry-run` runs, the recipe shall print the names it would delete and delete
+- **R41** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print the names it would delete and delete
   nothing.
-- **R42** (event) When `clean_up.py` runs and no log is left, the recipe shall exit with code 0.
+- **R42** (event) When `clean_up.py --yes` runs and no log is left, the recipe shall exit with code 0.
 
 **Requirements of the extension**, in the README of its folder:
 
@@ -188,7 +188,7 @@ What you should see, line by line:
    `output/eval-stub.md` (`--out FILE` writes it elsewhere). With `--model gateway` it writes over
    `output/eval-gateway.md`, the captured real run: give `--out` if you want to keep that one.
 
-Clean-up and cost: nothing was spent. `uv run python clean_up.py` deletes the logs.
+Clean-up and cost: nothing was spent. `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` deletes the logs.
 
 ### 2. Laptop, with the course LLM gateway
 
@@ -221,7 +221,7 @@ model replies to a short request with [`llm-probes`](../llm-probes/README.md) fi
 answers can use the whole cap and return an empty reply.
 
 Clean-up and cost: the three commands spent about 0.004 CAD of the key's budget in our run
-([Cost and clean-up](#cost-and-clean-up)); `uv run python clean_up.py` deletes the logs.
+([Cost and clean-up](#cost-and-clean-up)); `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` deletes the logs.
 
 ## What you should see
 
@@ -274,8 +274,8 @@ input tokens and 0.10 per million output; `qwen3.8-27b` 0.10 and 0.20
 `model-routing`, run these commands to list the local logs, check the list, then delete them:
 
 ```bash
-uv run python clean_up.py --dry-run    # what would go
-uv run python clean_up.py              # deletes the .jsonl logs in output/: misroutes, routes, eval-misroutes
+uv run python clean_up.py    # what would go
+uv run python clean_up.py --yes              # deletes the .jsonl logs in output/: misroutes, routes, eval-misroutes
 ```
 
 ## Adapt it

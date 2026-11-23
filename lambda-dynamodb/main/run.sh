@@ -95,7 +95,7 @@ run aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --filter-patte
   --query 'events[].message' --output text
 
 if [ -n "${KEEP:-}" ]; then
-  say "Done. KEEP=1: the API stays up and public. Remove it with: bash clean_up.sh"
+  say "Done. KEEP=1: the API stays up and public. Remove it with: bash clean_up.sh (it lists), then bash clean_up.sh --yes"
 else
   say "10. Remove the URL first (so nobody can call it), then the function, its logs and its role. The tables stay"
   clean_api

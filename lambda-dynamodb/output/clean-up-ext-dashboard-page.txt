@@ -1,0 +1,80 @@
+ext-dashboard-page clean-up, 2026-11-23 (UTC), PREFIX=recipe-dash, from lambda-dynamodb/. Dry run first (read before --yes), then
+--yes, then the proof by tag, by schedule group and by name. Account masked as 111122223333.
+
+### 2026-11-23T01:12:27Z uv run python clean_up.py   (dry run)
+would remove schedule group recipe-dash-dashboard-page and its schedules
+would remove Lambda function recipe-dash-page
+would remove log group /aws/lambda/recipe-dash-page
+would remove IAM role recipe-dash-page-role
+would remove IAM role recipe-dash-dash-url-role
+would remove DynamoDB table recipe-dash-zone-counts
+would remove the API recipe-dash-api (URL, function, log group, role) with: bash clean_up.sh
+absent   function URL of recipe-dash-page
+absent   Lambda function recipe-dash-dash-refresh
+absent   log group /aws/lambda/recipe-dash-dash-refresh
+absent   IAM role recipe-dash-dash-refresh-role
+absent   IAM role recipe-dash-dash-scheduler-role
+absent   DynamoDB table recipe-dash-runs
+nothing was deleted: run again with --yes
+exit 0
+
+### 2026-11-23T01:12:35Z uv run python clean_up.py --yes
+
+== Remove the URL, the function, its log group and its role
+
+$ aws lambda delete-function-url-config --function-name recipe-dash-api
+(no URL: already gone)
+
+$ aws lambda delete-function --function-name recipe-dash-api
+(no function: already gone)
+
+$ aws logs delete-log-group --log-group-name /aws/lambda/recipe-dash-api
+(no log group: already gone)
+
+$ aws iam delete-role-policy --role-name recipe-dash-api-role --policy-name tables-and-logs
+(no policy: already gone)
+
+$ aws iam delete-role --role-name recipe-dash-api-role
+(no role: already gone)
+
+== Check: no function, log group or role of this recipe left (each check prints "(no ... left)")
+
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-dash-api --output text --query logGroups[?logGroupName=='/aws/lambda/recipe-dash-api'].logGroupName
+(no log group left)
+
+$ aws iam list-roles --output text --query Roles[?RoleName=='recipe-dash-api-role'].RoleName
+(no role left)
+
+$ aws lambda list-functions --output text --query Functions[?FunctionName=='recipe-dash-api'].FunctionName
+(no function left)
+removed  schedule group recipe-dash-dashboard-page and its schedules
+removed  Lambda function recipe-dash-page
+removed  log group /aws/lambda/recipe-dash-page
+removed  IAM role recipe-dash-page-role
+removed  IAM role recipe-dash-dash-url-role
+removed  DynamoDB table recipe-dash-zone-counts
+removed  the API recipe-dash-api (bash clean_up.sh: see its lines above)
+absent   function URL of recipe-dash-page
+absent   Lambda function recipe-dash-dash-refresh
+absent   log group /aws/lambda/recipe-dash-dash-refresh
+absent   IAM role recipe-dash-dash-refresh-role
+absent   IAM role recipe-dash-dash-scheduler-role
+absent   DynamoDB table recipe-dash-runs
+exit 0
+
+### 2026-11-23T01:12:56Z proof for PREFIX=recipe-dash
+$ aws resourcegroupstaggingapi get-resources --tag-filters Key=purpose,Values=recipe
+(end of list)
+$ aws scheduler list-schedule-groups --name-prefix recipe-dash
+(end of list)
+$ aws lambda list-functions (names starting recipe-dash)
+(end of list)
+$ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/recipe-dash
+(end of list)
+$ aws iam list-roles (names starting recipe-dash)
+(end of list)
+$ aws dynamodb list-tables (names starting recipe-dash)
+(end of list)
+$ uv run python clean_up.py --check
+check: 0 left of this recipe's names for recipe-dash (empty)
+exit 0

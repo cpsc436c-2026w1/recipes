@@ -1,10 +1,13 @@
 #!/bin/bash
 # dynamodb: delete everything main/ and the extensions created. Deleting a table also ends its PITR charges, and
 # deletes its indexes with it: the vector index of ext-vector-search goes with $PREFIX-trips.
-#   BUCKET=<your bucket> bash clean_up.sh
+#   BUCKET=<your bucket> bash clean_up.sh          # lists what it would delete; deletes nothing
+#   BUCKET=<your bucket> bash clean_up.sh --yes    # deletes
 # Only names built from $PREFIX are deleted, so a teammate's tables with another prefix stay (README, Decisions: names).
 # Every step is attempted, also after one fails. A step that AWS refused is printed as FAILED and the script then
 # ends with exit code 1; "not found" means already gone and is not a failure.
+# A bare run lists what it would delete (the commands, as DRY=1 prints them) and deletes nothing; --yes deletes.
+if [ "${1:-}" = "--yes" ]; then shift; else export DRY=1; fi
 source "$(dirname "$0")/lib.sh"
 DB=${PREFIX//-/_}_lake
 FAILED=0
@@ -48,6 +51,14 @@ left() {
   fi
 }
 
+# ext-nearby keeps a ledger of the tables it created; when there is one, its own clean-up runs first: it deletes
+# $PREFIX-drivers-by-cell and $PREFIX-points-by-cell and removes its attributes from $DRIVERS (ext-nearby/README.md).
+NEARBY_LEDGER=${LEDGER:-$HERE/ext-nearby/state/ledger.jsonl}
+if [ -s "$NEARBY_LEDGER" ]; then
+  say "0. ext-nearby: its two tables, from its ledger"
+  run "${PYTHON:-python3}" "$HERE/ext-nearby/clean_up.py" --yes || FAILED=1
+fi
+
 say "1. Delete the three tables, and wait until each is gone (a run right after this can then create them again)"
 for t in "$TRIPS" "$RIDER_TRIPS" "$DRIVERS"; do
   if [ -z "${DRY:-}" ] && [ "$(aws dynamodb describe-table --table-name "$t" --query Table.TableStatus --output text 2>/dev/null)" = DELETING ]; then
@@ -80,3 +91,4 @@ if [ "$FAILED" != 0 ]; then
   echo "The clean-up is NOT complete: see the FAILED lines above, fix what they say, and run clean_up.sh again." >&2
   exit 1
 fi
+[ -z "${DRY:-}" ] || echo "Nothing deleted. Run again with --yes to delete these."

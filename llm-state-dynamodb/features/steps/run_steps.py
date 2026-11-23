@@ -95,13 +95,14 @@ def script_runs_again(context, script, args):
 
 @when('clean_up.py runs')
 def clean_up_runs(context):
-    run_main(context, "clean_up.py", [])
+    # the clean-up contract: a bare run only lists; a run that deletes passes --yes
+    run_main(context, "clean_up.py", ["--yes"])
 
 
 @when('clean_up.py runs again')
 def clean_up_again(context):
     context.printed = context.printed_err = ""
-    run_main(context, "clean_up.py", [])
+    run_main(context, "clean_up.py", ["--yes"])
 
 
 @then('the exit code is {code:d}')

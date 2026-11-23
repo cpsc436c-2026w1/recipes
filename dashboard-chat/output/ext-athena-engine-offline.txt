@@ -1,0 +1,28 @@
+# ext-athena-engine offline run, 2026-11-23: stand-in for Athena, SIM01 synthetic, scripted model. The live run: output/ext-athena-engine-live.txt.
+$ uv run python ext-athena-engine/run_athena.py --target local
+{"question": "How many trips were requested in zone 161 on 2024-03-14?", "status": "answered", "reason": "", "reply": "The answer is 7661.", "sql": "SELECT COUNT(*) AS trips FROM trips WHERE pickup_zone_id = 161 AND requested_day = DATE '2024-03-14'", "rows": [[7661]], "queries": 1, "data_scanned_bytes": 856975, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 3.055e-05, "latency_ms": 500.0}
+{"question": "How many trips were requested in zones 48, 161 and 230 on 2024-03-14, each?", "status": "answered", "reason": "", "reply": "The answer is 4345.", "sql": "SELECT pickup_zone_id, COUNT(*) AS trips FROM trips WHERE pickup_zone_id IN (48, 161, 230) AND requested_day = DATE '2024-03-14' GROUP BY pickup_zone_id", "rows": [[48, 4345], [161, 7661], [230, 7068]], "queries": 1, "data_scanned_bytes": 856975, "billed_mb": 10, "athena_usd": 5.2452e-05, "model_cad": 3.295e-05, "latency_ms": 500.0}
+engine: stand-in (SIM01, synthetic); model: stub
+$ uv run python ext-athena-engine/run_athena.py --target local --eval
+trip-counts: runs correct 30/30, cases passed 10/10; PASS (needs 24 runs and 8 cases)
+$ uv run python ext-athena-engine/run_athena.py --target local --measure
+response time over 30 questions (stand-in (SIM01, synthetic)): p95 (the 29th of 30) 0.50 s, median 0.50 s; R130 holds (under 20 s); billed 300 MB, Athena 0.001574 USD, model calls 0.000931 CAD
+$ uv run python ext-athena-engine/deploy.py --dry-run
+1. scripts/lake.py up (bucket <PREFIX>-lake-<account>, created if missing, else borrowed)
+2. ensure_workgroup(recipe-chat-wg) (100 MB cutoff, enforced, results athena-results/chat-wg/)
+3. load.py --data sim01, upload to s3://<bucket>/chat/
+4. Athena DDL in recipe-chat-wg: database recipe_chat, tables trips and zones, MSCK REPAIR TABLE
+5. SHOW PARTITIONS trips lists 1
+6. DynamoDB table recipe-chat-usage (on demand, key usage_date, TTL expires_at)
+7. IAM role recipe-chat-reader (trusted by lambda.amazonaws.com) with policy reader
+8. log group /aws/lambda/recipe-chat-query (7 days)
+9. Lambda function recipe-chat-query (arm64, python3.12, 256 MB, 15 s, asynchronous retries 0)
+$ uv run python ext-athena-engine/clean_up.py
+would remove lambda function recipe-chat-query
+would remove log group /aws/lambda/recipe-chat-query
+would remove iam role recipe-chat-reader
+would remove dynamodb table recipe-chat-usage
+would remove athena workgroup recipe-chat-wg (only if the ledger records it created)
+would remove glue tables recipe_chat.trips and .zones, database recipe_chat
+would remove s3 prefixes chat/ and athena-results/chat-wg/ in <PREFIX>-lake-<account>
+dry run for PREFIX=recipe in ca-central-1: nothing was contacted or deleted; add --yes

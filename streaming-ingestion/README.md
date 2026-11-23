@@ -22,6 +22,10 @@ the median and 95th percentile (p95) of their lag.
   store and you need to say how fresh the data is (lakehouse first, operational first).
 - Add `ext-windowed-aggregates/` for the **Windowed aggregates over the stream** extension. Use `ext-fan-out/` for
   **Fan-out to several consumers**: it replaces the stream with an Amazon Simple Notification Service (SNS) topic and one Amazon Simple Queue Service (SQS) queue per consumer.
+- Use `ext-source-poller/` when your source publishes a file per period on a site outside your account (nothing
+  sends you an event): a scheduled function loads each file onto the stream once and the page shows missing ones.
+  Use `ext-queue-ingest/` when another service sends you its events through an SQS queue: each completed trip is
+  stored once, and a broken message waits in a dead-letter queue until it is replayed.
 - Use another design when updates arrive once a day or less (a batch load into the lake fits better), or when you need
   windows that overlap or join two streams (a stream processor such as Spark Structured Streaming or Flink;
   DDIA 2e ch. 12).
@@ -147,15 +151,17 @@ match.
 
 **Clean-up** (`clean_up.py`)
 
-- **R60** (event) When `clean_up.py` runs, the recipe shall remove every mapping, function, log group, role, topic,
+- **R60** (event) When `clean_up.py --yes` runs, the recipe shall remove every mapping, function, log group, role, topic,
   queue, table and stream that the main scenario and both extensions create for `$PREFIX`.
-- **R61** (complex) While nothing of the recipe is left, when `clean_up.py` runs, the recipe shall report every
+- **R61** (complex) While nothing of the recipe is left, when `clean_up.py --yes` runs, the recipe shall report every
   resource as absent and exit with code 0.
 - **R62** (unwanted) If AWS refuses a step of the clean-up, then the recipe shall print that step as `FAILED`,
   attempt every other step, and exit with code 1.
 - **R63** (ubiquitous) The recipe shall remove only resources with the exact names it builds from `$PREFIX`.
-- **R64** (complex) While the stream, a table or a mapping is still being deleted, when `clean_up.py` runs, the
-  recipe shall report it as already being deleted and not ask for its deletion again.
+- **R64** (complex) While the stream, a table, a mapping or the schedule group is still being deleted, when
+  `clean_up.py --yes` runs, the recipe shall report it as already being deleted and not ask for its deletion again.
+- **R65** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall look up each
+  resource it would remove, print `would remove` or `absent` for it, and delete nothing.
 
 ## Run it
 
@@ -244,13 +250,14 @@ uv run python main/run.py --target aws
 
 Clean-up and cost: the run removes what it created unless you pass `--keep`. After `--keep`, or after a run that
 was interrupted, clean up the same day in the same terminal with the same `PREFIX`:
-`uv run python clean_up.py`. One run is under 0.01 USD ([Cost and clean-up](#cost-and-clean-up)).
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes`. One run is under 0.01 USD ([Cost and clean-up](#cost-and-clean-up)).
 
 ### 3. Sandbox terminal: the extensions
 
 Each extension's README has its own part, with the sign-in, the commands, what you should see and the clean-up:
 [windowed aggregates](ext-windowed-aggregates/README.md#run-it), [fan-out](ext-fan-out/README.md#run-it). Both
-were run by us on 2026-11-12.
+were run by us on 2026-11-12; [source poller](ext-source-poller/README.md#run-it) and
+[queue ingest](ext-queue-ingest/README.md#run-it) on 2026-11-23, in the course's account (not a lease).
 
 ## What you should see
 
@@ -284,6 +291,8 @@ is in the number (our reading, not measured apart). Offline (moto) the same part
 |---|---|---|---|
 | Windowed aggregates over the stream | counts per zone in 5-minute tumbling windows by event time, a close delay, and a stated rule for late records (drop and count, or correct) | [`ext-windowed-aggregates/`](ext-windowed-aggregates/) | a second consumer (`windows.py`) reads the same stream into the table `$PREFIX-windows`; the producer sends a simulated half hour with fixed event times |
 | Fan-out to several consumers | each update goes to an SNS topic; the dashboard and history consumers each read their own SQS queue, and a stopped consumer does not hold up the other | [`ext-fan-out/`](ext-fan-out/) | the producer publishes to a topic instead of the stream; each consumer is a Lambda function on its own queue, writing its own table |
+| Source poller | a schedule every 15 minutes calls a function that loads each slot file of a partner's feed once (a conditional claim per slot), loads late files, and gives the page every slot's state (`loaded`, `late`, `loading`, `failed`, `missing`, `not due`) | [`ext-source-poller/`](ext-source-poller/) | the poller sends to the main stream in place of the producer; the main consumer and table are borrowed; a slot table `$PREFIX-feed-slots` |
+| Queue ingest | trip events through an SQS queue into DynamoDB (or S3) once each, a 30 to 60 s batching window, a dead-letter queue after 5 receives and `replay_dlq.py` to send messages back | [`ext-queue-ingest/`](ext-queue-ingest/) | a queue in place of the stream, a Lambda consumer on it (`queue_consumer.py`) writing `$PREFIX-trips-completed` |
 
 ## Cost and clean-up
 
@@ -294,13 +303,15 @@ One `aws` run of the main scenario costs well under 0.01 USD (from the price lis
 - a few hundred Lambda calls of 128 MB (assumed: inside the free tier on most accounts).
 
 The stream is priced per hour for as long as it exists, whether or not anything is sent, so do not leave it after `--keep`.
-Remove everything the recipe and both extensions create:
+Remove everything the recipe and its extensions create:
 
 ```bash
-PREFIX=recipe-yourname uv run python clean_up.py
+PREFIX=recipe-yourname uv run python clean_up.py               # read the list first: would remove, absent; deletes nothing
+PREFIX=recipe-yourname uv run python clean_up.py --yes
 ```
 
-It removes the mappings, functions, log groups, roles, topic, queues, tables and stream with your prefix. It does not touch
+It removes the schedule group, mappings, functions, log groups, roles, topic, queues, tables, stream and the
+poller's `feed/` objects with your prefix (the lake bucket and its `raw/trip-events/` stay: the lake owns them). It does not touch
 resources with another prefix. It is safe to run twice. Every step is attempted: one that is refused is printed as
 `FAILED`, the others still run, and the exit code is then 1 (R60 to R64).
 

@@ -4,10 +4,10 @@ name = "cdc-to-lake"
 format = "main-scenario"
 task = "Every change to a DynamoDB table goes through DynamoDB Streams, a Lambda function and Firehose into an Iceberg change-log table in S3 (Glue Data Catalog) that Athena queries, with change time and arrival time on every row"
 shapes = ["lakehouse-first", "operational-first"]
-extensions = ["change data capture", "lag monitoring", "table maintenance", "rollback"]
+extensions = ["change data capture", "lag monitoring", "table maintenance", "rollback", "scheduled merge", "late data correction", "compaction rule"]
 lectures = ["L11", "L13"]
 core = ["DynamoDB Streams", "AWS Lambda", "Amazon Data Firehose", "Apache Iceberg", "AWS Glue Data Catalog", "Amazon Athena", "Amazon CloudWatch"]
-secondary = ["PyIceberg", "DuckDB", "EventBridge Scheduler"]
+secondary = ["PyIceberg", "DuckDB", "EventBridge Scheduler", "Amazon SNS", "Pydantic"]
 region = "ca-central-1"
 cost_one_run = "under 0.01 USD (assumed from the AWS bulk price lists, ca-central-1, read 2026-11-13: Firehose Direct PUT to Iceberg 0.083 USD per GB, Athena 5.50 USD per TB of Data scanned with a 10 MB minimum per query); not measured"
 summary = "Feed the lake from the operational store's change stream: DynamoDB Streams to Lambda to Firehose to an Iceberg table that Athena queries, with freshness measured and alarmed"
@@ -32,6 +32,18 @@ source = "L11; Data Analytics Lens BP 2.4"
 name = "Compact small files and expire old snapshots on a schedule"
 source = "L11; Athena docs (OPTIMIZE, VACUUM); Data Analytics Lens BP 13.1"
 
+[[practices]]
+name = "Compact by a rule from the files a query reads, only closed days, and never lose a late file"
+source = "Athena docs (OPTIMIZE, partition projection, CTAS); Firehose docs (S3 prefixes, delivery retries)"
+
+[[practices]]
+name = "Merge late, repeated and corrected events into one row per item, and rebuild the periods they change"
+source = "L13; Athena docs (MERGE INTO); S3 docs (consistency model)"
+
+[[practices]]
+name = "Scheduled jobs: a lease, recorded query ids, no automatic retries, and a manifest of what is done"
+source = "Lambda docs (asynchronous error handling); DynamoDB docs (condition expressions)"
+
 [instruments]
 files = [
   "main/handler.py",
@@ -43,6 +55,19 @@ files = [
   "ext-rollback-or-schema/rollback.py",
   "ext-rollback-or-schema/schema_change.py",
   "ext-maintenance/maintenance.py",
+  "ext-maintenance/compact_days.py",
+  "ext-maintenance/nightly_ops.py",
+  "ext-maintenance/land_parquet.py",
+  "ext-maintenance/clean_up.py",
+  "ext-scheduled-merge/merge_run.py",
+  "ext-scheduled-merge/merge.py",
+  "ext-scheduled-merge/sql/trips_source.sql",
+  "ext-scheduled-merge/sql/merge_trips.sql",
+  "ext-scheduled-merge/sql/rebuild_counts.sql",
+  "ext-scheduled-merge/sql/athena_tables.sql",
+  "ext-scheduled-merge/live_run.py",
+  "ext-scheduled-merge/clean_up.py",
+  "main/jobs.py",
   "clean_up.py",
 ]
 
@@ -56,20 +81,30 @@ test = "uv run pytest -q"
 scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
 run = "uv run python -m main.run --target aws"
 run_offline = "uv run python -m main.run"
-clean = "uv run python clean_up.py"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [extension_commands]
 ext-lag-alarm = "uv run python ext-lag-alarm/lag.py --target aws"
 ext-rollback-or-schema = "uv run python ext-rollback-or-schema/rollback.py --target aws"
 ext-rollback-or-schema-schema = "uv run python ext-rollback-or-schema/schema_change.py --target aws"
 ext-maintenance = "uv run python ext-maintenance/maintenance.py --target aws --schedule"
+ext-maintenance-register = "uv run python ext-maintenance/maintenance.py --target aws --register-partitions"
+ext-maintenance-measure = "uv run python ext-maintenance/maintenance.py --target aws --measure --all-days"
+ext-maintenance-clean = "uv run python ext-maintenance/clean_up.py --yes"
+ext-scheduled-merge-offline = "uv run python ext-scheduled-merge/merge.py"
+ext-scheduled-merge = "uv run python ext-scheduled-merge/merge.py --target aws up"
+ext-scheduled-merge-live = "uv run python ext-scheduled-merge/live_run.py"
+ext-scheduled-merge-clean = "uv run python ext-scheduled-merge/clean_up.py --yes"
 
 [env]
 PREFIX = "first part of every AWS resource name; default recipe"
 AWS_REGION = "ca-central-1"
 LAMBDA_ROLE_ARN = "optional: existing role for the Lambda function (stream read, Firehose write, failures queue, logs); created otherwise"
 FIREHOSE_ROLE_ARN = "optional: existing role Firehose assumes (Glue table, S3 bucket); created otherwise"
-SCHEDULER_ROLE_ARN = "optional: existing role EventBridge Scheduler assumes (ext-maintenance --schedule only); created otherwise"
+SCHEDULER_ROLE_ARN = "optional: the role of the schedules ext-maintenance made before its revision (clean_up.py removes them); --schedule now creates $PREFIX-compact-scheduler-role"
+MERGE_READS_RAW = "ext-maintenance: 1 when ext-scheduled-merge reads the same raw files (set by --schedule when the merge is deployed)"
+K_DAYS = "ext-scheduled-merge: days of lateness the rebuild covers; default 3"
+PERIOD = "ext-scheduled-merge: day, week or month; default day"
 BUCKET = "optional; default {PREFIX}-cdc-lake-{account id}"
 BUFFER_SECONDS = "Firehose buffer interval; default 60"
 LAG_LIMIT_SECONDS = "alarm limit for change to queryable; default 300"
@@ -81,8 +116,12 @@ firehose = ["stream $PREFIX-trip-changes"]
 sqs = ["queue $PREFIX-cdc-failures (the batches Lambda gave up on)"]
 glue = ["database ${PREFIX}_cdc (hyphens become underscores)", "table trip_changes", "view trips_current"]
 s3 = ["bucket $PREFIX-cdc-lake-<account> (unless BUCKET is set)", "prefixes lake/, athena-results/, firehose-errors/, freshness/"]
-cloudwatch = ["alarm $PREFIX-cdc-lag", "alarm $PREFIX-cdc-iterator-age"]
-scheduler = ["schedule $PREFIX-lake-optimize", "schedule $PREFIX-lake-vacuum"]
+cloudwatch = ["alarm $PREFIX-cdc-lag", "alarm $PREFIX-cdc-iterator-age", "alarms $PREFIX-compact-errors, $PREFIX-compact-missed (ext-maintenance)"]
+scheduler = ["schedule $PREFIX-lake-optimize, schedule $PREFIX-lake-vacuum (ext-maintenance before its revision; clean_up.py)", "group $PREFIX-maintenance-compaction with $PREFIX-compact-schedule and $PREFIX-lake-vacuum (ext-maintenance/clean_up.py)", "group $PREFIX-scheduled-merge with $PREFIX-merge-hourly (ext-scheduled-merge/clean_up.py)"]
+lambda_jobs = ["function $PREFIX-compact-days (ext-maintenance)", "function $PREFIX-merge-run (ext-scheduled-merge)"]
+lake_shared = ["bucket $PREFIX-lake-<account>, workgroups $PREFIX-wg and $PREFIX-ctas-wg, run log $PREFIX-runs: simulated-runs' helpers (scripts/lake.py down)"]
+glue_lake = ["database ${PREFIX}_lake: trip_events, trips, zone_counts (ext-scheduled-merge); trip_events_parquet (ext-maintenance, kept)"]
+sns = ["topic $PREFIX-maintenance-alerts (ext-maintenance)"]
 iam = ["roles $PREFIX-cdc-lambda-role, $PREFIX-cdc-firehose-role, $PREFIX-cdc-scheduler-role, tagged recipe=cdc-to-lake (unless passed in)"]
 
 [constraints]

@@ -59,18 +59,18 @@ def test_money_cap_stops_the_search_and_leaves_room_for_the_test(tmp_path):
 
 
 def test_calls_in_flight_are_held_against_the_money_cap():
-    # One task call on qwen3.6-35b-a3b can cost at most 1,000 bytes x 0.05 + 4,000 tokens x 0.10 per million
-    # = 0.00045 CAD. A cap of 0.001 has room for two such calls in flight, not three.
-    b = Budget(max_cad=0.001)
+    # One task call on qwen3.6-35b-a3b can cost at most 1,000 bytes x 0.05 + 16,384 tokens x 0.10 per million
+    # = 0.0016884 CAD. A cap of 0.004 has room for two such calls in flight, not three.
+    b = Budget(max_cad=0.004)
     first = b.reserve("test-a", "qwen3.6-35b-a3b", 1_000)
     b.reserve("test-a", "qwen3.6-35b-a3b", 1_000)
-    assert first == pytest.approx(0.00045) and b.held == pytest.approx(0.0009)
+    assert first == pytest.approx(0.0016884) and b.held == pytest.approx(0.0033768)
     with pytest.raises(BudgetExceeded, match="held for calls in flight"):
         b.reserve("test-a", "qwen3.6-35b-a3b", 1_000)
     # A settled call gives its hold back and is charged what it used: there is room again.
     b.settle("test-a", "qwen3.6-35b-a3b", 250, 10, first)
-    assert b.held == pytest.approx(0.00045) and b.total_cad() == pytest.approx(0.0000135)
+    assert b.held == pytest.approx(0.0016884) and b.total_cad() == pytest.approx(0.0000135)
     third = b.reserve("test-a", "qwen3.6-35b-a3b", 1_000)
     # A failed call gives its hold back too.
     b.fail("test-a", OSError("429"), third)
-    assert b.held == pytest.approx(0.00045)
+    assert b.held == pytest.approx(0.0016884)

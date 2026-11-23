@@ -324,7 +324,7 @@ def step_dynamodb_recipe(context, prefix):
         "KEEP": "1", "PREFIX": prefix}
     context.local_env = env
     for script in ("main/run.sh", "ext-riders-and-drivers/run.sh"):
-        p = subprocess.run(["bash", str(RECIPE.parent / "dynamodb" / script)], env=env, capture_output=True, text=True,
+        p = subprocess.run(["bash", str(RECIPE.parent / "dynamodb" / script), *(["--yes"] if script.endswith("clean_up.sh") else [])], env=env, capture_output=True, text=True,
                            timeout=240)
         assert p.returncode == 0, p.stdout[-1500:] + p.stderr[-1500:]
 

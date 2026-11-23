@@ -48,7 +48,7 @@ The scenarios are in `features/shiny_app.feature`.
   page as it was.
 - **R122** (optional) Where `ext-shiny-app` is used, the recipe shall send every model call of the page to
   `$COURSE_GATEWAY_URL/chat/completions` with `KB_MCP_TOKEN` as the bearer key, `temperature` 0 (none for an OpenAI GPT or o-series model) and the `max_tokens` of
-  the command line (R31, R35: 400, or 600 for `qwen3.8-27b`).
+  the command line (R31, R35: 16384).
 - **R123** (complex) Where `ext-shiny-app` is used, if `COURSE_GATEWAY_URL` or `KB_MCP_TOKEN` is not set and
   `APP_MODEL` is not `stub`, then the recipe shall exit with a message that names both, before the page is served.
 - **R124** (optional) Where `ext-shiny-app` is used with `APP_MODEL=stub`, the recipe shall answer from a stand-in
@@ -61,7 +61,7 @@ The scenarios are in `features/shiny_app.feature`.
   recipe shall put the course token in it only as a reference to the secret (`secrets[].valueFrom`).
 - **R128** (complex) Where `ext-shiny-app` is used, when `fargate/deploy.sh` makes the security group, the recipe
   shall give it one rule: port 8000, from one address (`/32`).
-- **R129** (complex) Where `ext-shiny-app` is used, when `fargate/teardown.sh` runs, the recipe shall remove every
+- **R129** (complex) Where `ext-shiny-app` is used, when `fargate/teardown.sh --yes` runs, the recipe shall remove every
   resource that `fargate/deploy.sh` made, and count a look-up that AWS refuses as a failed step, not as a resource
   that is gone.
 

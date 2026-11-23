@@ -1,0 +1,86 @@
+Clean-up of the live runs of 2026-11-23 (ext-scheduled-merge, ext-maintenance, probes, @live examples). Every list
+below was read first as a dry run (clean_up.py --dry-run, features/live.py down) and every entry was in this
+run's ledger as created.
+
+$ PREFIX=recipe-lake uv run python clean_up.py --yes
+removed      alarm recipe-lake-compact-errors
+removed      alarm recipe-lake-compact-missed
+removed      schedule group recipe-lake-maintenance-compaction and its schedules
+removed      function recipe-lake-compact-days
+removed      log group /aws/lambda/recipe-lake-compact-days
+removed      role recipe-lake-compact-role
+removed      role recipe-lake-compact-scheduler-role
+removed      topic recipe-lake-maintenance-alerts and its subscriptions
+restored     partition dt=2026-11-20 at its raw folder (0 files copied back, 2515 rows)
+restored     partition dt=2026-11-21 at its raw folder (0 files copied back, 2515 rows)
+restored     partition dt=2026-11-22 at its raw folder (0 files copied back, 2515 rows)
+removed      3 objects under s3://recipe-lake-lake-111122223333/compacted/trip-events/
+removed      3 objects under s3://recipe-lake-lake-111122223333/maintenance/inputs/
+removed      schedule group recipe-lake-scheduled-merge and its schedules
+removed      function recipe-lake-merge-run
+removed      log group /aws/lambda/recipe-lake-merge-run
+removed      role recipe-lake-merge-role
+removed      role recipe-lake-merge-scheduler-role
+removed      6 items of job merge in recipe-lake-runs
+removed      Glue table recipe_lake_lake.trips
+removed      Glue table recipe_lake_lake.zone_counts
+removed      Glue table recipe_lake_lake.trip_events
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/trips/
+removed      5 objects under s3://recipe-lake-lake-111122223333/lake/zone_counts/
+removed      1 objects under s3://recipe-lake-lake-111122223333/lake/merge-state/
+absent   schedule recipe-lake-lake-optimize
+absent   schedule recipe-lake-lake-vacuum
+absent   Lambda function recipe-lake-cdc-to-firehose
+absent   log group /aws/lambda/recipe-lake-cdc-to-firehose
+absent   queue recipe-lake-cdc-failures
+absent   Firehose stream recipe-lake-trip-changes
+absent   Glue database recipe_lake_cdc
+absent   bucket recipe-lake-cdc-lake-111122223333
+absent   DynamoDB table recipe-lake-trips
+absent   IAM role recipe-lake-cdc-lambda-role
+absent   IAM role recipe-lake-cdc-firehose-role
+absent   IAM role recipe-lake-cdc-scheduler-role
+0 resources removed for PREFIX=recipe-lake in ca-central-1
+
+$ PREFIX=recipe-lake uv run python features/live.py down --yes        # the @live examples: recipe-lake-live
+wrote    output/behave-live-cost.txt
+removed  Glue table recipe_lake_live_lake.trip_changes_probe
+removed  Glue table recipe_lake_live_lake.trip_events_parquet
+removed  Glue database recipe_lake_live_lake
+removed  45099 objects of s3://recipe-lake-live-lake-111122223333 (raw/, compacted/, lake/, maintenance/, live-fixtures/, athena-results/)
+removed  run log recipe-lake-live-runs
+removed  Athena workgroup recipe-lake-live-wg
+removed  Athena workgroup recipe-lake-live-ctas-wg
+removed  s3://recipe-lake-live-lake-111122223333 and its 0 object versions
+
+Left by design by the extension clean-ups (trip_events_parquet, the run log), and the probes' database: removed
+by hand, then the shared bucket and workgroups:
+removed  Glue table recipe_lake_probe.ev (the probes)
+removed  Glue table recipe_lake_probe.probe (the probes)
+removed  Glue database recipe_lake_probe
+removed  27 objects under s3://recipe-lake-lake-111122223333/probe/
+removed  Glue table recipe_lake_lake.trip_events_parquet (kept by ext-maintenance/clean_up.py by design)
+removed  Glue database recipe_lake_lake
+removed  run log recipe-lake-runs (1 item of job compact-days left; kept by both extension clean-ups by design)
+removed  Athena workgroup recipe-lake-wg
+removed  Athena workgroup recipe-lake-ctas-wg
+removed  s3://recipe-lake-lake-111122223333 and its 4413 object versions
+$ PREFIX=recipe-lake uv run python scripts/lake.py down --yes   (the last three lines above)
+
+Proof that nothing of PREFIX=recipe-lake (and recipe-lake-live) is left, ca-central-1, 2026-11-23T02:34:31Z. Each line: what was listed, then the answer.
+tagged purpose=recipe (resourcegroupstaggingapi): []
+tagged Team=recipe-lake* : []
+schedule groups recipe-lake*: []
+schedules recipe-lake* (default group): []
+Glue databases recipe_lake*/recipe-lake*: []
+Athena workgroups recipe-lake*: []
+S3 buckets recipe-lake*: []
+Lambda functions recipe-lake*: []
+log groups /aws/lambda/recipe-lake*: []
+IAM roles recipe-lake*: []
+DynamoDB tables recipe-lake*: []
+CloudWatch alarms recipe-lake*: []
+SNS topics recipe-lake*: []
+SQS queues recipe-lake*: null
+Firehose streams recipe-lake*: []
+describe calls: NoSuchEntity recipe-lake-merge-role; NoSuchEntity recipe-lake-compact-role; ResourceNotFoundException recipe-lake-runs; Not Found recipe-lake-lake-<account>

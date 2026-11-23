@@ -139,7 +139,7 @@ def test_clean_up_reports_a_refused_delete_and_still_tries_the_rest(s, ddb, monk
     assert len(steps.removed) == 3 and len(steps.failed) == 1 and "AccessDeniedException" in steps.failed[0]
     assert c.list_tables()["TableNames"] == [s.conversations_table]
     monkeypatch.setattr(cu.boto3, "client", lambda *a, **k: c)
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     with pytest.raises(SystemExit) as e:
         cu.main()
     assert e.value.code == 1 and "FAILED" in capsys.readouterr().err

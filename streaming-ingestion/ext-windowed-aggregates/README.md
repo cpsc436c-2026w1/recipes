@@ -82,7 +82,7 @@ uv run python ext-windowed-aggregates/run.py --target aws
 ```
 
 `windows.py` runs in Lambda, as the function `$PREFIX-windows`. `run.py` and `timeline.py` run in your terminal.
-Clean-up: the run removes what it created unless you pass `--keep`; `uv run python clean_up.py` in
+Clean-up: the run removes what it created unless you pass `--keep`; `uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` in
 `streaming-ingestion` removes what is left. Cost: a shard-hour and about 2,400 write units, under 0.01 USD (from
 the price list, not measured).
 

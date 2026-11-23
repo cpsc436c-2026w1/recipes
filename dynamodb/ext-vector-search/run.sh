@@ -67,7 +67,7 @@ if [ -z "${DRY:-}" ]; then
     last=$state looks=$((looks + 1))
     case "$state" in ACTIVE|"ACTIVE None"|"ACTIVE False") break;; esac
     if [ "$looks" -ge $((4 * ${WAIT_MINUTES:-30})) ]; then
-      echo "FAILED: index $INDEX is not ACTIVE after ${WAIT_MINUTES:-30} minutes. Run again later with KEEP=1 (the index is kept), or clean up: bash clean_up.sh" >&2
+      echo "FAILED: index $INDEX is not ACTIVE after ${WAIT_MINUTES:-30} minutes. Run again later with KEEP=1 (the index is kept), or clean up: bash clean_up.sh --yes" >&2
       exit 1
     fi
     sleep 15
@@ -112,7 +112,7 @@ search() {
       sleep 15; try=$((try + 1))
     else
       cat "$err" >&2; rm -f "$err"
-      echo "FAILED: the search was refused; the error above says why. Clean up with: bash clean_up.sh" >&2
+      echo "FAILED: the search was refused; the error above says why. Clean up with: bash clean_up.sh --yes" >&2
       exit 1
     fi
   done

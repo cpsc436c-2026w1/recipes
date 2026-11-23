@@ -1,0 +1,11 @@
+point_id,where,lat,lon
+e-out-1,outside,40.699,-73.99
+e-out-2,outside,40.881,-73.94
+e-out-3,outside,40.75,-74.031
+e-out-4,outside,40.8,-73.899
+e-out-5,outside,40.698,-74.032
+e-in-1,inside,40.86,-73.93
+e-in-2,inside,40.705,-74.015
+e-in-3,inside,40.83,-73.945
+e-in-4,inside,40.73,-73.995
+e-in-5,inside,40.79,-73.95

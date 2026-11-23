@@ -138,10 +138,10 @@ Traces:
 
 Clean-up:
 
-- **R90** (event) When `clean_up.py` runs, the recipe shall delete every resource the deploy created and print one line for each.
+- **R90** (event) When `clean_up.py --yes` runs, the recipe shall delete every resource the deploy created and print one line for each.
 - **R91** (unwanted) If a delete is refused, then the recipe shall try the remaining deletes and exit with code 1.
 - **R92** (state) While a role setting names a role, the recipe shall use that role without changing or deleting it.
-- **R93** (event) When `clean_up.py --dry-run` runs, the recipe shall list what it would delete without deleting anything.
+- **R93** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall list what it would delete without deleting anything.
 
 Eval:
 
@@ -197,7 +197,8 @@ uv run --env-file .env inspect eval evals/task.py -T backend=gateway     # 6 req
 uv run --env-file .env python -m main.run deploy
 uv run --env-file .env python -m main.invoke                      # a request, your approval, the result
 uv run --env-file .env python -m main.run ask --model gateway --tools gateway    # laptop agent, tools behind the Gateway
-uv run --env-file .env python clean_up.py
+uv run --env-file .env python clean_up.py    # lists what it would delete; deletes nothing
+uv run --env-file .env python clean_up.py --yes
 ```
 
 To see traces, set `LOGFIRE_ENABLED=true` and `LOGFIRE_TOKEN` in `.env` before the run or the deploy.
@@ -253,8 +254,12 @@ that checks every call against the service model in botocore); a capture from a 
 
 ## Extensions
 
-None yet. Two that fit: a Cedar policy on the Gateway (Policy in AgentCore), and AgentCore Memory for a
-conversation that lasts longer than one Runtime session.
+| Extension | What it adds | Folder | What changes in the main scenario |
+|---|---|---|---|
+| An agent on Lambda that answers with a number it can show | the same bounded agent with Strands or Pydantic AI (`AGENT_SDK`), one read-only SQL tool over one day of trips in DuckDB, on Lambda behind a function URL with auth type `AWS_IAM`; the value is shown only when the tool log holds it | `ext-sdk-lambda/` | nothing in `main/`: the extension copies the cap and argument hooks and changes them (README of the folder, "What changes in main/") |
+
+Two more that fit: a Cedar policy on the Gateway (Policy in AgentCore), and AgentCore Memory for a conversation
+that lasts longer than one Runtime session.
 
 ## Cost and clean-up
 
@@ -272,8 +277,8 @@ What is billed:
 Nothing bills while idle except the stored zip, the parameters and the logs. Remove everything:
 
 ```bash
-uv run --env-file .env python clean_up.py --dry-run
 uv run --env-file .env python clean_up.py
+uv run --env-file .env python clean_up.py --yes
 ```
 
 ## Adapt it

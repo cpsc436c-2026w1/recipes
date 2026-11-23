@@ -1,0 +1,36 @@
+Live run of ext-scheduled-merge, 2026-11-23 UTC, PREFIX=recipe-lake, ca-central-1 (account masked).
+
+$ uv run python scripts/lake.py up
+created  s3://recipe-lake-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+
+$ uv run python ext-scheduled-merge/merge.py --target aws up
+exists   s3://recipe-lake-lake-111122223333 (created by lake.py up)
+created  Athena workgroup recipe-lake-wg
+ready    run log recipe-lake-runs
+ready    Glue database recipe_lake_lake: trip_events (projection), trips and zone_counts (Iceberg)
+ready    function recipe-lake-merge-run (600 s, 256 MB, asynchronous retries 0)
+created  schedule recipe-lake-scheduled-merge/recipe-lake-merge-hourly: rate(1 hour), retries 0
+
+$ uv run python ext-scheduled-merge/merge.py --target aws run-now      # before the replay: the function works
+"objects":0 "run_state":"finished"
+
+$ uv run python ext-scheduled-merge/live_run.py
+replayed SIM01 as live0810: 2515 deliveries in 109 objects, 0 failed, 3.2 s
+waiting 360 s for the objects to settle
+function run: finished in 11.0 s, objects 109, quarantined 0, old_events 0
+merge    8dd8bc4e-8066-43b7-8e51-35d6cdb9829b: 695906 B Data scanned, 2092 ms
+rebuild  e7fe4198-cd52-4984-b3bd-cb8ff3be4e4b: 6206 B Data scanned, 1301 ms
+trips of live0810 per zone: {"161": 191, "230": 342, "48": 304}; truth: {"161": 191, "230": 342, "48": 304}
+zone_counts 2026-11-23: 48 304 304, 161 191 191, 230 342 342
+zone_counts 2026-11-23 requested per zone {"161": 191, "230": 342, "48": 304}, completed 837; truth: {"161": 191, "230": 342, "48": 304}, completed 837
+objects in the day folder: 109, 695906 B; taken by the run: 109, 695906 B (the MERGE's Data scanned is these bytes and trips' when "$path" limits the read)
+result: trips and zone_counts match truth
+
+$ uv run python ext-scheduled-merge/merge.py --target aws run-now      # the next run: nothing new
+"objects":0 "run_state":"finished"
+
+$ uv run python ext-scheduled-merge/merge.py --target aws status
+2026-11-23T08:16:49.000Z  finished  objects=0 quarantined=0 old_events=0 
+2026-11-23T08:16:34.000Z  finished  objects=109 quarantined=0 old_events=0 
+2026-11-23T08:10:26.000Z  finished  objects=0 quarantined=0 old_events=0 
+2026-11-23T08:10:25.000Z  finished  objects=0 quarantined=0 old_events=0 

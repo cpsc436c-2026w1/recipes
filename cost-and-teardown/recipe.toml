@@ -1,0 +1,46 @@
+# Machine-readable summary of a recipe, for tools and coding assistants.
+# Schema: _template/recipe.toml.
+name = "cost-and-teardown"
+format = "main-scenario"
+task = "Tag and record every create, find every resource by four routes, price a run, 30 days and a year from its measured units, and tear everything down with proof"
+shapes = ["lakehouse-first", "operational-first", "genai-first"]
+extensions = []
+lectures = ["L1", "L2", "L11", "L12", "L16", "L18"]   # what a run bills and when (L1, L2), billing units (L11, L12), the cost of a request (L16), what bills while it waits (L18)
+core = ["Resource Groups Tagging API", "IAM", "Kinesis Data Streams", "Lambda", "DynamoDB", "Athena", "S3",
+        "AWS Glue Data Catalog", "CloudWatch Logs", "EventBridge Scheduler"]
+secondary = ["moto as the offline stand-in for AWS", "the course price sheet (prices.toml)",
+             "simulated-runs' replayer and SIM01"]
+region = "ca-central-1"
+cost_one_run = "0.019 USD (0.027 CAD) for one demonstration run, measured 2026-11-23 (the shard-hour 0.0165 of it); the stream bills 0.0165 USD an hour until the teardown"
+summary = "One list of everything your scripts created, what a run, 30 days and a year cost in USD and CAD, and a teardown that calls every clean-up and proves nothing is left"
+
+[[practices]]
+name = "tag every resource at creation and keep a ledger of every create, borrowed resources included"
+source = "COST03-BP02 (add organization information to cost and usage); course tags Project, Team, Owner"
+
+[[practices]]
+name = "price from measured units and the price sheet, always on against on demand, over a stated horizon"
+source = "course price sheet; COST06-BP01 (perform cost modeling)"
+
+[[practices]]
+name = "decommission the hourly parts first and prove each delete by the service's own not found"
+source = "course rule: every recipe has a clean-up step; each delete proved by the service"
+
+[instruments]
+files = ["scripts/tags.py", "scripts/lake.py", "scripts/kinds.py", "scripts/inventory.py", "scripts/units.py",
+         "scripts/cost.py", "scripts/teardown.py", "scripts/teardown.sh", "scripts/teardown.toml", "prices.toml"]
+
+[validates]
+command = "uv run pytest -q"
+shows = "the cost arithmetic matches the price sheet; the inventory finds what the ledger, the tags and the names hold; the teardown deletes hourly parts first and fails while anything is left"
+
+[commands]
+setup = "uv sync"
+test = "uv run pytest -q"
+scenarios = "uv run behave"
+run = "bash scripts/live_run.sh"
+clean = "bash scripts/teardown.sh --yes"   # run it first without --yes: it lists what it would delete
+
+[constraints]
+no_keys_in_code = true
+name_prefix_env = "PREFIX"

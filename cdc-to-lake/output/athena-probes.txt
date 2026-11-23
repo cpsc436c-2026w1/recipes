@@ -1,0 +1,80 @@
+Athena probes of the behaviours the first build left unverified, 2026-11-23 UTC, workgroup recipe-lake-wg
+(engine 3), database recipe_lake_probe: a two-day Iceberg table probe (id string, ts timestamp, v int)
+PARTITIONED BY (day(ts)), and a JSON Lines table ev with partition projection like trip_events. Account masked.
+Each line: label, query id, state, Data scanned (GetQueryExecution), then the statement and the answer.
+
+db                         fdad7bad-18cd-4b6a-aeff-c6f30fc1b127  SUCCEEDED 0 B
+    CREATE DATABASE IF NOT EXISTS recipe_lake_probe
+table                      27272cd4-e5da-4e94-8bf0-def84e066737  SUCCEEDED 0 B
+    CREATE TABLE IF NOT EXISTS recipe_lake_probe.probe (id string, ts timestamp, v int) PARTITIONED BY (day(ts)) LOCATION 's3://recipe-lake-lake-111122223333/probe/iceberg/' TBLPROPERTIES ('table_type'='ICEBERG','format'='parquet')
+cast-insert-1              3b142012-2969-4277-804b-341e57036ac3  SUCCEEDED 0 B
+    INSERT INTO recipe_lake_probe.probe SELECT 'a', CAST(from_iso8601_timestamp('2026-11-21T10:00:00.000Z') AS timestamp), 1
+cast-insert-2              87eb14ba-4fbf-4f3b-a809-992f5559a74b  SUCCEEDED 0 B
+    INSERT INTO recipe_lake_probe.probe SELECT 'b', CAST(from_iso8601_timestamp('2026-11-22T10:00:00.000Z') AS timestamp), 2
+cast-readback              8d5358e6-82c9-4713-9826-b9dedf92c0d1  SUCCEEDED 250 B
+    SELECT id, CAST(ts AS varchar) AS ts, typeof(ts) AS t, v FROM recipe_lake_probe.probe ORDER BY id
+    | id | ts | t | v
+    | a | 2026-11-21 10:00:00.000000 | timestamp(6) | 1
+    | b | 2026-11-22 10:00:00.000000 | timestamp(6) | 2
+with-in-using              3d6e24bd-ec3d-4e2d-b7fe-999e86c7c68e  SUCCEEDED 125 B
+    MERGE INTO recipe_lake_probe.probe t USING (WITH x AS (SELECT 'a' AS id, CAST(from_iso8601_timestamp('2026-11-21T10:00:00.000Z') AS timestamp) AS ts, 5 AS v), y AS (SELECT * FROM x) SELECT * FROM y) s ON t.id = s.id WHEN MATCHED AND s.v > t.v THEN UPDATE SET v = s.v WHEN NOT MATCHED THEN INSERT (id, ts, v) VALUES (s.id, s.ts, s.v)
+with-readback              080b9556-e566-4cde-b9db-71199c39e0c1  SUCCEEDED 243 B
+    SELECT id, v FROM recipe_lake_probe.probe ORDER BY id
+    | id | v
+    | a | 5
+    | b | 2
+files-columns              c294e204-8e62-4a65-81eb-76205e90fe14  SUCCEEDED 1860 B
+    SELECT * FROM "recipe_lake_probe"."probe$files" LIMIT 5
+    | content | file_path | file_format | record_count | file_size_in_bytes | column_sizes | value_counts | null_value_counts | nan_value_counts | lower_bounds | upper_bounds | key_metadata | split_offsets | equality_ids
+    | 0 | s3://recipe-lake-lake-111122223333/probe/iceberg/data/qJw9tQ/ts_day=2026-11-21/20261123_015715_00331_ckq5v-626 | PARQUET | 1 | 471 | {1=41, 2=44, 3=40} | {1=1, 2=1, 3=1} | {1=0, 2=0, 3=0} | {} | {1=a, 2=2026-11-21T10:00, 3=1} | {1=a, 2=2026-11-21T10:00, 3=1} | None | None | None
+    | 0 | s3://recipe-lake-lake-111122223333/probe/iceberg/data/uQ_GzQ/ts_day=2026-11-22/20261123_015717_01357_m288y-ad4 | PARQUET | 1 | 471 | {1=41, 2=44, 3=40} | {1=1, 2=1, 3=1} | {1=0, 2=0, 3=0} | {} | {1=b, 2=2026-11-22T10:00, 3=2} | {1=b, 2=2026-11-22T10:00, 3=2} | None | None | None
+    | 0 | s3://recipe-lake-lake-111122223333/probe/iceberg/data/w4vj5A/ts_day=2026-11-21/20261123_015721_00520_xw4mu-db6 | PARQUET | 1 | 471 | {1=41, 2=44, 3=40} | {1=1, 2=1, 3=1} | {1=0, 2=0, 3=0} | {} | {1=a, 2=2026-11-21T10:00, 3=5} | {1=a, 2=2026-11-21T10:00, 3=5} | None | None | None
+files-partition            6055abcb-f53a-4d3c-a8d8-227cf71fc08f  FAILED    0 B
+    SELECT CAST(partition.ts_day AS varchar) AS day, typeof(partition.ts_day) AS t, content, count(*) AS files FROM "recipe_lake_probe"."probe$files" GROUP BY 1, 2, 3 ORDER BY 1, 3
+    reason: COLUMN_NOT_FOUND: line 1:13: Column 'partition.ts_day' cannot be resolved or requester is not authorized to access requested resources
+third-row                  457e51dc-02a1-4cb7-b569-64c95d83d944  SUCCEEDED 0 B
+    INSERT INTO recipe_lake_probe.probe SELECT 'c', CAST(from_iso8601_timestamp('2026-11-22T12:00:00.000Z') AS timestamp), 3
+files-before               3bcd63e5-8f02-47d9-aafd-ec32df3402d3  SUCCEEDED 252 B
+    SELECT CAST(partition.ts_day AS varchar) AS day, file_count FROM "recipe_lake_probe"."probe$partitions" ORDER BY 1
+    | day | file_count
+    | 2026-11-21 | 2
+    | 2026-11-22 | 2
+optimize-where             9d70750a-e13d-4be8-96b7-2ae898c6020e  SUCCEEDED 250 B
+    OPTIMIZE recipe_lake_probe.probe REWRITE DATA USING BIN_PACK WHERE ts >= TIMESTAMP '2026-11-22 00:00:00' AND ts < TIMESTAMP '2026-11-23 00:00:00'
+files-after                6cb222d5-bcce-479b-a681-055605a14247  SUCCEEDED 252 B
+    SELECT CAST(partition.ts_day AS varchar) AS day, file_count FROM "recipe_lake_probe"."probe$partitions" ORDER BY 1
+    | day | file_count
+    | 2026-11-21 | 2
+    | 2026-11-22 | 1
+optimize-where-other-col   ced306a3-04c1-48d9-8738-5c76d16b4713  FAILED    0 B
+    OPTIMIZE recipe_lake_probe.probe REWRITE DATA USING BIN_PACK WHERE v > 0
+    reason: GENERIC_INTERNAL_ERROR: Unexpected FilterNode found in plan; probably connector was not able to handle provided WHERE expression. You may need to manually clean the data at location 's3://recipe-lake-lake-111122223333/athena-results/tables/ced306a3-04c1-48d9-8738-5c76d16b4713' before retrying. Athen
+json-table                 4e34622e-310f-41b8-b7b3-c592fb2066a0  SUCCEEDED 0 B
+    CREATE EXTERNAL TABLE IF NOT EXISTS recipe_lake_probe.ev (event_type string, event_id string, trip_id string, pickup_zone_id int, driver_id string, event_time string) PARTITIONED BY (dt string) ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe' LOCATION 's3://recipe-lake-lake-111122223333/probe/raw/' TBLPROPERTIES ('projection.enabled'='true','projection.dt.type'='date','projection.dt.format'='
+select-day                 ad057482-3dbd-47ef-b506-16230286a26e  SUCCEEDED 7138042 B
+    SELECT count(*) AS n FROM recipe_lake_probe.ev WHERE dt = '2026-11-22'
+    | n
+    | 20002
+select-path                e6afa6d9-9540-461c-aed1-ca8d2fbb865a  SUCCEEDED 263 B
+    SELECT count(*) AS n FROM recipe_lake_probe.ev WHERE dt = '2026-11-22' AND "$path" IN ('s3://recipe-lake-lake-111122223333/probe/raw/dt=2026-11-22/small.jsonl')
+    | n
+    | 2
+merge-day                  f6c46e12-88bc-4f5b-98a4-7bb26f966725  SUCCEEDED 7138310 B
+    MERGE INTO recipe_lake_probe.probe t USING (SELECT trip_id AS id, CAST(from_iso8601_timestamp(event_time) AS timestamp) AS ts, 9 AS v FROM recipe_lake_probe.ev WHERE dt = '2026-11-22') s ON t.id = s.id WHEN NOT MATCHED AND s.id = 'none' THEN INSERT (id, ts, v) VALUES (s.id, s.ts, s.v)
+merge-path                 ff1c9449-3b17-457f-8751-fb53d0760d53  SUCCEEDED 263 B
+    MERGE INTO recipe_lake_probe.probe t USING (SELECT trip_id AS id, CAST(from_iso8601_timestamp(event_time) AS timestamp) AS ts, 9 AS v FROM recipe_lake_probe.ev WHERE dt = '2026-11-22' AND "$path" IN ('s3://recipe-lake-lake-111122223333/probe/raw/dt=2026-11-22/small.jsonl')) s ON t.id = s.id WHEN NOT MATCHED AND s.id = 'none' THEN INSERT (id, ts, v) VALUES (s.id, s.ts, s.v)
+
+sizes of the two objects of the $path probe: small.jsonl 263 B, big.jsonl 7137779 B (one folder dt=2026-11-22)
+
+Answers:
+1. WITH inside MERGE ... USING (...): accepted (with-in-using).
+2. CAST(from_iso8601_timestamp('...Z') AS timestamp) into an Iceberg timestamp column: accepted, stored as
+   timestamp(6) at the UTC wall time (cast-insert-1, cast-readback).
+3. "<table>$files" has no partition column (files-partition: COLUMN_NOT_FOUND) and lists data files only (after a
+   MERGE wrote a position delete file, files-content shows content 0 only). "<table>$partitions" has
+   partition.<column>_day as a date and file_count (partitions-field): compact_days.files_sql now reads it.
+4. OPTIMIZE ... WHERE ts >= TIMESTAMP '<day>' AND ts < TIMESTAMP '<next day>' on the hidden partition day(ts):
+   accepted, that day 2 -> 1 data files, the other day unchanged (optimize-where, files-before/after). A WHERE on
+   another column fails with GENERIC_INTERNAL_ERROR: Unexpected FilterNode found in plan (optimize-where-other-col).
+5. "$path" IN (...) limits what is read: 263 B for the small object against 7138042 B for the folder, in a
+   SELECT and in a MERGE's USING (select-path, merge-path against select-day, merge-day).

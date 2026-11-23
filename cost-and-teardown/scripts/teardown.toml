@@ -1,0 +1,17 @@
+# The steps of scripts/teardown.sh: every recipe's clean-up and every team script's `down`. Steps with hourly parts
+# run first (hourly = true), in the order written; `last = true` runs at the end (the shared bucket). A command is
+# run from this folder; a Python script runs in the same process (`uv run python` is not needed here).
+# Add one [[step]] per recipe you copied, for example:
+#   [[step]]
+#   name = "ext-backfill"
+#   command = "../project-skeleton/ext-backfill/clean_up.py --yes"
+
+[[step]]
+name = "demonstration system"
+command = "clean_up.py --yes"
+hourly = true                 # the Kinesis stream bills by the hour
+
+[[step]]
+name = "shared bucket and workgroups"
+command = "scripts/lake.py down --yes"
+last = true

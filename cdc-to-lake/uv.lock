@@ -738,9 +738,15 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+awslambda = [
+    { name = "docker" },
+]
 dynamodb = [
     { name = "docker" },
     { name = "py-partiql-parser" },
+]
+glue = [
+    { name = "pyparsing" },
 ]
 s3 = [
     { name = "py-partiql-parser" },
@@ -1243,33 +1249,35 @@ wheels = [
 [[package]]
 name = "recipe-cdc-to-lake"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "duckdb" },
     { name = "pyarrow" },
+    { name = "pydantic" },
     { name = "pyiceberg", extra = ["glue", "pyarrow", "pyiceberg-core", "sql-sqlite"] },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "behave" },
-    { name = "moto", extra = ["dynamodb", "s3"] },
+    { name = "moto", extra = ["awslambda", "dynamodb", "glue", "s3"] },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "boto3", specifier = ">=1.35" },
-    { name = "duckdb", specifier = ">=1.1" },
+    { name = "boto3", specifier = ">=1.40" },
+    { name = "duckdb", specifier = ">=1.4" },
     { name = "pyarrow", specifier = ">=17" },
+    { name = "pydantic", specifier = ">=2.9" },
     { name = "pyiceberg", extras = ["sql-sqlite", "pyarrow", "glue", "pyiceberg-core"], specifier = ">=0.10" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "behave", specifier = ">=1.3.3" },
-    { name = "moto", extras = ["dynamodb", "s3", "firehose", "cloudwatch"], specifier = ">=5.0" },
+    { name = "moto", extras = ["dynamodb", "s3", "firehose", "cloudwatch", "athena", "glue", "iam", "awslambda", "logs", "scheduler", "sns", "sts"], specifier = ">=5.1" },
     { name = "pytest", specifier = ">=8" },
 ]
 

@@ -25,11 +25,15 @@ name = "reports read an export in the lake, not the live table"
 source = "L12-L13; DynamoDB developer guide, export to S3"
 
 [[practices]]
+name = "location lookups by key: items stored under their map cell and type, a request reads its cell and its neighbours, the code computes the distances"
+source = "L12; DynamoDB developer guide, access patterns (bp-general-nosql-design) and transactions (transaction-apis)"
+
+[[practices]]
 name = "vector search where the data already is: an index added to the table, filters applied during the search, the bill measured in bytes on a sample"
 source = "L17; DynamoDB developer guide, vector search (VectorSearchWorkingWith, VectorSearchMonitoring)"
 
 [instruments]
-files = ["main/run.sh", "ext-riders-and-drivers/run.sh", "ext-nightly-report/run.sh", "ext-vector-search/run.sh", "ext-vector-search/vectors.py", "ext-vector-search/vectors.json", "lib.sh", "clean_up.sh"]
+files = ["main/run.sh", "ext-riders-and-drivers/run.sh", "ext-nightly-report/run.sh", "ext-vector-search/run.sh", "ext-vector-search/vectors.py", "ext-vector-search/vectors.json", "ext-nearby/run.sh", "ext-nearby/nearby.py", "ext-nearby/clean_up.py", "ext-nearby/sim/generate.py", "ext-nearby/scripts/tags.py", "lib.sh", "clean_up.sh"]
 
 [validates]
 command = "uv run pytest -q"
@@ -40,6 +44,7 @@ main = "main/run.sh"
 ext-riders-and-drivers = "ext-riders-and-drivers/run.sh"
 ext-nightly-report = "ext-nightly-report/run.sh"
 ext-vector-search = "ext-vector-search/run.sh"
+ext-nearby = "ext-nearby/run.sh"
 
 [commands]
 setup = "uv sync"
@@ -47,7 +52,7 @@ test = "uv run pytest -q"          # offline, no AWS account
 scenarios = "uv run behave"        # offline: the scenarios of the README's Requirements
 run = "bash main/run.sh"           # in the team sandbox; KEEP=1 keeps the tables for the extensions
 dry_run = "DRY=1 bash main/run.sh"
-clean = "bash clean_up.sh"         # BUCKET=<bucket> as well after ext-nightly-report
+clean = "bash clean_up.sh --yes"         # BUCKET=<bucket> as well after ext-nightly-report
 
 [env]
 PREFIX = "first part of every table name; default recipe"
@@ -57,6 +62,12 @@ DRY = "1 prints the commands and runs none"
 BUCKET = "an S3 bucket in ca-central-1; ext-nightly-report only"
 KB_MCP_TOKEN = "your course token; ext-vector-search makes its vectors through the course LLM gateway when it and COURSE_GATEWAY_URL are set"
 WAIT_MINUTES = "how long ext-vector-search waits for its vector index, default 30"
+TEAM = "ext-nearby: the Team tag of its tables, default $PREFIX"
+OWNER = "ext-nearby: the Owner tag of its tables, default your login name"
+PURPOSE = "ext-nearby: adds the tag purpose=<value> (the course's own runs set recipe)"
+SPEED = "ext-nearby: how many times faster than real time the hour is replayed, default 5"
+MAX_RINGS = "ext-nearby: the most rings a nearest-N request reads, default 3"
+LEDGER = "ext-nearby: its ledger of created tables, default ext-nearby/state/ledger.jsonl"
 
 [constraints]                       # what an assistant must keep when it changes this recipe
 no_keys_in_code = true

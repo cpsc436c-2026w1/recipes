@@ -76,7 +76,7 @@ def test_recipe_toml_has_the_fields_of_the_template():
     assert r["validates"]["command"] == "uv run pytest -q" and r["validates"]["shows"].strip()
     assert r["commands"]["setup"] == "uv sync" and r["commands"]["test"] == "uv run pytest -q"
     assert r["commands"]["run"].startswith("uv run python")
-    assert r["commands"].get("clean", "") == ("uv run python clean_up.py" if (ROOT / "clean_up.py").exists() else "")
+    assert r["commands"].get("clean", "") == ("uv run python clean_up.py --yes" if (ROOT / "clean_up.py").exists() else "")
     assert r["constraints"]["no_keys_in_code"] is True
     for name, command in {**r["commands"], **r.get("extension_commands", {})}.items():
         for target in re.findall(r"uv run python (?:-m )?(\S+)", command):
@@ -107,7 +107,7 @@ def test_every_command_in_the_readmes_names_a_file_in_the_folder():
 # --- this recipe ---
 RUN_PRODUCTS = ("runs",)                                  # what a run writes (README, Cost and clean-up)
 README_GIVES = [["-m", "main.run"], ["ext-gepa-direct/optimize_direct.py"], ["ext-eval-matrix/matrix.py"],
-                ["clean_up.py"]]
+                ["ext-eval-matrix/matrix.py", "--case", "rides"], ["ext-eval-matrix/groups.py"], ["clean_up.py"], ["clean_up.py", "--yes"]]
 
 
 def test_offline_runs_twice_and_clean_up_leaves_nothing(tmp_path):
@@ -124,12 +124,18 @@ def test_offline_runs_twice_and_clean_up_leaves_nothing(tmp_path):
         after_file = next((copy / "runs").glob("2*/instructions_after.txt"))
         matrix = python(copy, "ext-eval-matrix/matrix.py", "--runs", "1", "--prompt", f"after={after_file}")
         assert matrix.returncode == 0, matrix.stderr[-2000:]
+        rides = python(copy, "ext-eval-matrix/matrix.py", "--case", "rides", "--runs", "1",
+                       "--compare", "qwen3.6-35b-a3b/seed,qwen3.8-27b/seed", "--out", str(copy / "runs" / "rides"))
+        assert rides.returncode == 0, rides.stderr[-2000:]
+        saved = copy / "runs" / "rides" / "cases.jsonl"
+        again = python(copy, "ext-eval-matrix/groups.py", str(saved), "--compare", "qwen3.6-35b-a3b/seed,qwen3.8-27b/seed")
+        assert again.returncode == 0 and "| all |" in again.stdout, again.stderr[-2000:]
         created = set(inventory(copy)) - set(before)
         assert created and all(name.startswith("runs/") for name in created), sorted(created)[:5]
-        clean = python(copy, "clean_up.py")
+        clean = python(copy, "clean_up.py", "--yes")
         assert clean.returncode == 0 and "removed" in clean.stdout, attempt
         assert inventory(copy) == before, attempt
-    assert "nothing to remove" in python(copy, "clean_up.py").stdout     # a clean-up with nothing left still succeeds
+    assert "nothing to remove" in python(copy, "clean_up.py", "--yes").stdout     # a clean-up with nothing left still succeeds
 
 
 def test_gateway_run_without_the_environment_stops_before_any_call(tmp_path):

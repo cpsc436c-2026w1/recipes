@@ -228,7 +228,7 @@ def test_a_mapping_in_use_for_a_moment_is_tried_again(monkeypatch):
 
 def test_the_command_exits_non_zero_when_a_step_failed(monkeypatch, capsys):
     with mock_aws():
-        monkeypatch.setattr("sys.argv", ["clean_up.py"])
+        monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
         assert clean_up_module.main() == 0
         create_everything(Settings())
         real_session = boto3.Session

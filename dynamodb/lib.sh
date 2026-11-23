@@ -136,9 +136,9 @@ or_refused() {
 # last step of every scenario: clean up, unless KEEP=1 (README, Cost and clean-up)
 finish() {
   if [ -n "${KEEP:-}" ]; then
-    say "Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh"
+    say "Done. KEEP=1: everything stays for the extensions. Clean up later with: bash clean_up.sh (it lists), then bash clean_up.sh --yes"
   else
     say "Clean up (run with KEEP=1 to keep everything for the extensions)"
-    bash "$HERE/clean_up.sh"
+    bash "$HERE/clean_up.sh" --yes
   fi
 }

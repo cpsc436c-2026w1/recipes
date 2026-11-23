@@ -1,0 +1,128 @@
+# The Athena path of scripts/live_run.sh (ENGINE=athena), 2026-11-23, account masked. The hourly schedule fired
+# within a minute of `up` and its sweep ran the MERGE before the script's own sweep did ("no start: the last run
+# started 0 min ago"). 122 staged objects for 111 raw ones: the sweep's lost-object check and an S3 event checked
+# 11 objects at the same moment, each with its own sequencer; the MERGE kept one row per event_id (2,508).
+# An earlier try of this variant lost every S3 event: the check function failed each call with
+# KMSAccessDeniedException ("unable to decrypt the environment variables"), and the sweep's lost-object check staged
+# the objects instead; `up` now invokes each function until it answers (scripts/etl.py wait_ready).
+$ ENGINE=athena scripts/etl.py up
+created  s3://recipe-s3etl-lake-111122223333 (tagged, public access blocked, athena-results/ expire after 7 days)
+run log  recipe-s3etl-runs
+created  workgroup recipe-s3etl-wg
+table    recipe_s3etl_lake.trip_events_clean: Iceberg, partitioned by event_day
+trigger  recipe-s3etl-s3-event-etl: raw/trip-events/*.jsonl -> recipe-s3etl-etl-check
+exit 0
+created  Athena workgroup recipe-s3etl-wg
+$ sim/land_cases.py --run-id live053315
+landed   111 objects, 2515 deliveries; 3 lines of 20261123T0537Z-live053315.jsonl broken
+$ wait for the checks (staged objects of this run, as many as landed: 109 to 111)
+staged 122 of 111
+$ quarantine
+2026-11-22 21:33:58        979 quarantine/trip-events-rows/dt=2026-11-23/20261123T0537Z-live053315-00000000000000006B03D04130CFB541.jsonl
+$ sim/land_cases.py --again, and the created event of the copied object sent again
+copied   raw/trip-events/dt=2026-11-23/20261123T0603Z-live053315.jsonl -> raw/trip-events/dt=2026-11-23/20261123T0603Z-live053315-again.jsonl
+repeat   raw/trip-events/dt=2026-11-23/20261123T0603Z-live053315.jsonl
+$ aws lambda invoke recipe-s3etl-etl-sweep
+no start: the last run started 0 min ago, under the gap of 60 min: the sweep will start one
+REPORT RequestId: 6d05d7be-4185-472c-856b-d8a1276e76c0	Duration: 8182.60 ms	Billed Duration: 8183 ms	Memory Size: 128 MB	Max Memory Used: 115 MB	
+$ the run log (etl)
+2026-11-23T05:34:31.577Z	finished	None
+$ count: rows, event_ids, from the copy, source_key as a path
+SUCCEEDED	8653
+_col0	_col1	_col2	_col3	2508	2508	0	0
+$ clean_up.py
+would remove s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+dry run: nothing was deleted. Run again with --yes to delete.
+$ clean_up.py --yes
+removed  notification entry recipe-s3etl-s3-event-etl of recipe-s3etl-lake-111122223333 (the other entries kept)
+removed  schedule group recipe-s3etl-s3-event-etl and its schedule
+removed  function recipe-s3etl-etl-check
+removed  log group /aws/lambda/recipe-s3etl-etl-check
+removed  function recipe-s3etl-etl-sweep
+removed  log group /aws/lambda/recipe-s3etl-etl-sweep
+removed  Glue job recipe-s3etl-etl
+removed  role recipe-s3etl-etl-check-role
+removed  role recipe-s3etl-etl-sweep-role
+removed  role recipe-s3etl-etl-glue-role
+removed  role recipe-s3etl-etl-scheduler-role
+removed  topic recipe-s3etl-etl-alerts
+removed  run log items etl, etl-object, etl-lock of recipe-s3etl-runs
+removed  table recipe-s3etl-runs
+removed  Glue table recipe_s3etl_lake.trip_events_clean
+removed  Glue table recipe_s3etl_lake.trip_events_stage
+removed  s3://recipe-s3etl-lake-111122223333/stage/trip-events/
+removed  s3://recipe-s3etl-lake-111122223333/quarantine/trip-events-rows/
+removed  s3://recipe-s3etl-lake-111122223333/lake/etl-state/
+removed  s3://recipe-s3etl-lake-111122223333/lake/trip_events_clean/
+removed  s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+exit 0
+$ what is left
+[]
+[]
+[
+    [
+        "recipe-s3etl-s3-event-etl",
+        "DELETING"
+    ]
+]
+
+# Then the teardown of what was left (the bucket, the workgroup, the Glue database), and the proof:
+$ PREFIX=recipe-s3etl LEDGER=../s3-event-etl/state/ledger.jsonl scripts/teardown.sh --dry-run --steps scripts/teardown-s3etl.toml   # after the scripts' runs
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 3 resources before the teardown
+would run s3-event-etl: cd ../s3-event-etl && env -u VIRTUAL_ENV uv run python clean_up.py --yes
+would run shared bucket and workgroups: scripts/lake.py down --yes
+would delete     Athena workgroup recipe-s3etl-wg
+would delete     Glue database recipe_s3etl_lake
+would delete     S3 bucket recipe-s3etl-lake-111122223333
+dry run: nothing was deleted. Run again without --dry-run to delete.
+$ scripts/teardown.sh --steps scripts/teardown-s3etl.toml
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 3 resources before the teardown
+removed  notification entry recipe-s3etl-s3-event-etl of recipe-s3etl-lake-111122223333 (the other entries kept)
+absent   schedule group recipe-s3etl-s3-event-etl and its schedule
+absent   function recipe-s3etl-etl-check
+absent   log group /aws/lambda/recipe-s3etl-etl-check
+absent   function recipe-s3etl-etl-sweep
+absent   log group /aws/lambda/recipe-s3etl-etl-sweep
+removed  Glue job recipe-s3etl-etl
+absent   role recipe-s3etl-etl-check-role
+absent   role recipe-s3etl-etl-sweep-role
+absent   role recipe-s3etl-etl-glue-role
+absent   role recipe-s3etl-etl-scheduler-role
+removed  topic recipe-s3etl-etl-alerts
+absent   run log items etl, etl-object, etl-lock of recipe-s3etl-runs
+absent   Glue table recipe_s3etl_lake.trip_events_clean
+absent   Glue table recipe_s3etl_lake.trip_events_stage
+removed  s3://recipe-s3etl-lake-111122223333/stage/trip-events/
+removed  s3://recipe-s3etl-lake-111122223333/quarantine/trip-events-rows/
+removed  s3://recipe-s3etl-lake-111122223333/lake/etl-state/
+removed  s3://recipe-s3etl-lake-111122223333/lake/trip_events_clean/
+removed  s3://recipe-s3etl-lake-111122223333/jobs/s3-event-etl/
+kept     bucket recipe-s3etl-lake-111122223333, raw/trip-events/ and the workgroup (scripts/lake.py down)
+step     s3-event-etl: exit 0
+removed  Athena workgroup recipe-s3etl-wg
+absent   Athena workgroup recipe-s3etl-ctas-wg
+removed  s3://recipe-s3etl-lake-111122223333 and its 116 object versions
+step     shared bucket and workgroups: exit 0
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+removed  Glue database recipe_s3etl_lake (left after the steps)
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+teardown complete: 0 still there, 0 by hand -> docs/resources.md
+exit 0
+
+== recipe-s3etl
+tag Team=recipe-s3etl:        
+schedule groups:    
+buckets:            
+Glue databases:     
+workgroups:         
+IAM roles:          
+functions:          
+tables:             
+Glue jobs:          
+topics:             
+streams:            
+log groups:         

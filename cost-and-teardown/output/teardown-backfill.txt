@@ -1,0 +1,77 @@
+# The teardown run against what ext-backfill / s3-event-etl left, before their own clean-ups (live, 2026-11-23,
+# account masked). First the dry run, read, then the teardown, then the proof.
+
+$ PREFIX=recipe-backfill LEDGER=$OTHER_LEDGER scripts/teardown.sh --dry-run --steps scripts/teardown-backfill.toml
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 8 resources before the teardown
+would run ext-backfill: cd ../project-skeleton && uv run python ext-backfill/clean_up.py --yes
+would run shared bucket and workgroups: scripts/lake.py down --yes
+kept (borrowed)  Athena data source course
+would delete     Athena workgroup recipe-backfill-ctas-wg
+would delete     Athena workgroup recipe-backfill-wg
+would delete     DynamoDB table recipe-backfill-trips-by-id
+would delete     Glue database recipe_backfill_lake
+kept (borrowed)  CloudWatch log group /aws-dynamodb/imports
+would delete     S3 bucket recipe-backfill-lake-111122223333
+left: found by name only, not in the ledger Glue table recipe_backfill_lake.trips_history
+dry run: nothing was deleted. Run again without --dry-run to delete.
+exit 0
+
+$ PREFIX=recipe-backfill LEDGER=../project-skeleton/state/ledger.jsonl scripts/teardown.sh --steps scripts/teardown-backfill.toml
+kept     S3 bucket recipe-backfill-lake-111122223333 (scripts/lake.py down)
+kept     Athena workgroups recipe-backfill-wg and recipe-backfill-ctas-wg (scripts/lake.py down)
+kept     Athena data source course (the course's)
+kept     Glue table recipe_backfill_lake.trips (scheduled-merge's)
+removed  DynamoDB table recipe-backfill-trips-by-id
+removed  Glue table recipe_backfill_lake.trips_history
+removed  s3://recipe-backfill-lake-111122223333/history/trips/: 321 objects
+removed  s3://recipe-backfill-lake-111122223333/imports/trips-by-id/: 6 objects
+removed  Glue database recipe_backfill_lake
+absent   Glue table recipe_backfill_lake.trips_all
+absent   Glue table recipe_backfill_lake.history_raw
+checked  nothing of ext-backfill is left (a table being deleted counts as gone)
+absent   .local/ext-backfill/
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+inventory 8 resources before the teardown
+step     ext-backfill: exit 0
+removed  Athena workgroup recipe-backfill-wg
+removed  Athena workgroup recipe-backfill-ctas-wg
+removed  s3://recipe-backfill-lake-111122223333 and its 31 object versions
+step     shared bucket and workgroups: exit 0
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+skipped  2 IAM roles whose tags are refused (the account's own, not the team's)
+teardown complete: 0 still there, 0 by hand -> docs/resources.md
+exit 0
+# Resources of team recipe-backfill (PREFIX recipe-backfill)
+
+Torn down: every resource the team created was asked for by its own service after the deletes, and answered not found.
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Athena data source | `course` | borrowed | per use | never deleted: the course's | ledger, name | kept |
+| Athena workgroup | `recipe-backfill-ctas-wg` | created | per use | scripts/lake.py down | ledger, tag | deleted 2026-11-23T03:54:00Z |
+| Athena workgroup | `recipe-backfill-wg` | created | per use | scripts/lake.py down | ledger, tag | deleted 2026-11-23T03:54:00Z |
+| DynamoDB table | `recipe-backfill-trips-by-id` | created | monthly | ext-backfill/clean_up.py --yes | ledger, tag | deleted 2026-11-23T03:54:00Z |
+| Glue database | `recipe_backfill_lake` | created | per use | ext-backfill/clean_up.py --yes | ledger, tag, name | deleted 2026-11-23T03:54:01Z |
+| CloudWatch log group | `/aws-dynamodb/imports` | borrowed | per use | kept: written by DynamoDB for every import of the account, 7 days | ledger | kept |
+| S3 bucket | `recipe-backfill-lake-111122223333` | created | monthly | scripts/lake.py down | ledger, tag | deleted 2026-11-23T03:54:01Z |
+
+## Not in the ledger
+
+| Type | Name | Created or borrowed | Bills | Clean-up step | Found by | After teardown |
+|---|---|---|---|---|---|---|
+| Glue table | `recipe_backfill_lake.trips_history` | — | per use | — | name | deleted 2026-11-23T03:54:01Z |
+
+$ what is left of recipe-backfill
+tag Team=recipe-backfill:        
+schedule groups:    
+buckets:            
+Glue databases:     
+workgroups:         
+IAM roles:          
+functions:          
+tables:             
+Glue jobs:          
+topics:             
+streams:            
+log groups:         

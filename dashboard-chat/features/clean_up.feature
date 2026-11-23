@@ -21,6 +21,21 @@ Feature: Clean-up removes what the recipe created, and nothing else
     And 7 printed lines start with "would remove, if it exists:"
     And the printed output holds "dynamodb table test-chat-traces"
 
+  @R71
+  Scenario: Without --yes nothing is deleted
+    Given any call to AWS fails the scenario
+    When clean_up.py runs from the command line
+    Then the exit code is 0
+    And 7 printed lines start with "would remove, if it exists:"
+    And the printed output holds "Nothing deleted. Run again with --yes to delete these."
+
+  @R70
+  Scenario: With --yes it deletes
+    When clean_up.py runs from the command line with "--yes"
+    Then the exit code is 0
+    And the printed output holds "7 resources removed for PREFIX=test"
+    And the account has 0 tables, 0 alarms, 0 topics and 0 subscriptions
+
   @R72
   Scenario: A table that is still being deleted
     Given the DynamoDB table "test-chat-traces" is in the DELETING state
@@ -32,7 +47,7 @@ Feature: Clean-up removes what the recipe created, and nothing else
   @R73
   Scenario: AWS refuses a step
     Given AWS refuses every DescribeTable call with "AccessDeniedException"
-    When clean_up.py runs from the command line
+    When clean_up.py runs from the command line with "--yes"
     Then the exit code is 1
     And 3 error lines start with "FAILED dynamodb table"
     And the printed output holds "removed sns topic test-chat-alarms"

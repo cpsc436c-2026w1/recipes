@@ -1,0 +1,6 @@
+# What a run writes: the creation ledger (ARNs with the account number), the evidence of each replay and the
+# generated data sets. In a team repository, commit state/ledger.jsonl (every member's creates are on it).
+state/
+evidence/
+sim/data/
+.local/

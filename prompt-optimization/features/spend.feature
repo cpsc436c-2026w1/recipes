@@ -20,8 +20,8 @@ Feature: The spend cap in code
 
   @R20
   Scenario: The search stops at 60% of the money cap, and the test runs still fit
-    # A cap with room, above the 60%, for the calls in flight: four task calls or one reflection call are
-    # held at about 0.002 CAD together.
+    # A cap with room, above the 60%, for the calls in flight: four task calls are held at about 0.007 CAD
+    # together, one reflection call at about 0.0034 (16,384 output tokens each).
     When main/run.py runs with "--runs 1 --max-cad 0.01 --max-reflection-calls 50 --max-metric-calls 400"
     Then the exit code is 0
     And the report's last line is "The search ended at: money cap (search stops at 60% of 0.01 CAD)"
@@ -30,18 +30,18 @@ Feature: The spend cap in code
 
   @R21 @R22
   Scenario: A call past the money cap is refused, the search is cut, and its result is still written
-    # One task call is held at about 0.0005 CAD (its prompt's bytes as input tokens, 4,000 output tokens): the cap
+    # One task call is held at about 0.0017 CAD (its prompt's bytes as input tokens, 16,384 output tokens): the cap
     # has room for one call in flight and not for two, so the second call of the first evaluation is refused.
     Given every call to the stub task model takes 0.05 seconds
-    When main/run.py runs with "--runs 1 --max-cad 0.0007"
-    Then the report's last line starts with "The search ended at: spend cap, call refused (spent 0.000000 CAD, 0.0004"
-    And the report's last line holds "held for calls in flight, this call can cost up to 0.0004"
-    And the report's last line holds "cap 0.0007), model call 2 (every role counted)"
+    When main/run.py runs with "--runs 1 --max-cad 0.003"
+    Then the report's last line starts with "The search ended at: spend cap, call refused (spent 0.000000 CAD, 0.0017"
+    And the report's last line holds "held for calls in flight, this call can cost up to 0.0017"
+    And the report's last line holds "cap 0.0030), model call 2 (every role counted)"
     And the report's last line ends with "was refused and the search was cut there"
     And the run folder holds "answers.json, candidates.json, instructions_after.txt, instructions_before.txt, program.json, report.md, run.json, spend.json"
     And the spend file counts 0 calls for "reflect"
     And the spend file counts 1 calls for "task"
-    And the whole run spent more than nothing and at most 0.0007 CAD
+    And the whole run spent more than nothing and at most 0.003 CAD
 
   @R21
   Scenario: Calls in flight cannot take the run past the money cap
@@ -56,7 +56,7 @@ Feature: The spend cap in code
   @R21
   Scenario: A cap below the most one call can cost lets no call through
     When main/run.py runs with "--runs 1 --max-cad 0.00002"
-    Then the report's last line holds "this call can cost up to 0.0004"
+    Then the report's last line holds "this call can cost up to 0.0017"
     And the report's last line holds "cap 0.000020), model call 1 (every role counted) was refused"
     And the spend file counts no call and no money
 

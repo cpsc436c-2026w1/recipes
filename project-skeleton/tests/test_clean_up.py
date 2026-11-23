@@ -138,7 +138,7 @@ def test_the_command_exits_non_zero_when_a_step_failed(aws, monkeypatch, tmp_pat
     one = OneSession(aws)
     refuse(one.client("dynamodb"), "delete_table", "AccessDeniedException")
     monkeypatch.setenv("PREFIX", "c1")
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     monkeypatch.setattr(clean_up, "session", lambda: one)
     monkeypatch.setattr(clean_up, "LOCAL_ROOT", tmp_path / ".local")
     assert clean_up.main() == 1

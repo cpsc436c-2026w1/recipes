@@ -211,7 +211,7 @@ def test_fargate_scripts_dry_run_prints_commands_and_runs_none(tmp_path, script)
               "stop.sh": ["aws ecs stop-task"],
               "teardown.sh": ["aws ecs delete-cluster", "aws ecr delete-repository", "aws secretsmanager delete-secret",
                               "aws iam delete-role", "aws ecs delete-task-definitions",
-                              "done: everything deploy.sh made"]}[script]
+                              "Nothing deleted. Run again with --yes to delete these."]}[script]
     for text in wanted:
         assert text in out, text
     assert "aws ecs run-task" not in out or script == "start.sh"  # only start.sh starts a task
@@ -283,3 +283,31 @@ def test_deploy_takes_the_new_names_and_kb_mcp_token_wins(tmp_path):
     done = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
     assert "tok-new" not in done.stdout + done.stderr and "tok-old" not in done.stdout + done.stderr
+
+
+def _fargate_teardown(tmp_path, *args):
+    calls = tmp_path / "calls.log"
+    for tool in ("aws", "docker", "curl"):
+        fake = tmp_path / tool
+        fake.write_text(f'#!/bin/bash\necho "{tool} $*" >> "{calls}"\nexit 99\n')
+        fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "PREFIX": "recipe-ana"}
+    env.pop("DRY", None)
+    done = subprocess.run(["bash", str(ROOT / "ext-shiny-app" / "fargate" / "teardown.sh"), *args], env=env,
+                          capture_output=True, text=True, timeout=120)
+    return done, (calls.read_text() if calls.exists() else "")
+
+
+def test_fargate_teardown_bare_deletes_nothing_and_says_so(tmp_path):
+    """The clean-up contract (AGENTS.md): without --yes, teardown.sh prints its commands and runs none of them."""
+    done, calls = _fargate_teardown(tmp_path)
+    assert done.returncode == 0, done.stderr
+    assert calls == "", calls
+    assert done.stdout.rstrip().splitlines()[-1] == "Nothing deleted. Run again with --yes to delete these."
+
+
+def test_fargate_teardown_with_yes_deletes(tmp_path):
+    """With --yes the deletes are made (here against a stand-in that refuses them, so the run reports FAILED)."""
+    done, calls = _fargate_teardown(tmp_path, "--yes")
+    assert "ecs delete-cluster" in calls or "ecr delete-repository" in calls or "stop-task" in calls or "aws " in calls
+    assert "Nothing deleted. Run again with --yes to delete these." not in done.stdout

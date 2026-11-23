@@ -76,7 +76,7 @@ def test_recipe_toml_has_the_fields_of_the_template():
     assert r["validates"]["command"] == "uv run pytest -q" and r["validates"]["shows"].strip()
     assert r["commands"]["setup"] == "uv sync" and r["commands"]["test"] == "uv run pytest -q"
     assert r["commands"]["run"].startswith("uv run python")
-    assert r["commands"].get("clean", "") == ("uv run python clean_up.py" if (ROOT / "clean_up.py").exists() else "")
+    assert r["commands"].get("clean", "") == ("uv run python clean_up.py --yes" if (ROOT / "clean_up.py").exists() else "")
     assert r["constraints"]["no_keys_in_code"] is True
     for name, command in {**r["commands"], **r.get("extension_commands", {})}.items():
         for target in re.findall(r"uv run python (?:-m )?(\S+)", command):
@@ -106,7 +106,7 @@ def test_every_command_in_the_readmes_names_a_file_in_the_folder():
 
 # --- this recipe ---
 RUN_PRODUCTS = ("misroutes.jsonl", "routes.jsonl", "eval-misroutes.jsonl")   # what a run writes ([resources].local_files)
-README_GIVES = [["-m", "main.run"], ["ext-eval/routing_eval.py"], ["clean_up.py"], ["clean_up.py", "--dry-run"]]
+README_GIVES = [["-m", "main.run"], ["ext-eval/routing_eval.py"], ["clean_up.py"], ["clean_up.py", "--yes"]]
 
 
 def test_resources_in_recipe_toml_are_what_a_run_creates_and_clean_up_removes(tmp_path):
@@ -124,13 +124,13 @@ def test_resources_in_recipe_toml_are_what_a_run_creates_and_clean_up_removes(tm
         assert set(now) - set(before) == declared, attempt
         # The captured runs in output/ are part of the recipe: an offline run writes the same stub report back.
         assert {k: v for k, v in now.items() if k in before} == before, attempt
-        dry = python(copy, "clean_up.py", "--dry-run")
+        dry = python(copy, "clean_up.py")
         assert dry.returncode == 0 and set(re.findall(r"would delete (\S+)", dry.stdout)) == declared
         assert set(inventory(copy)) - set(before) == declared            # a dry run deletes nothing
-        clean = python(copy, "clean_up.py")
+        clean = python(copy, "clean_up.py", "--yes")
         assert clean.returncode == 0 and set(re.findall(r"^deleted (\S+)", clean.stdout, flags=re.M)) == declared
         assert inventory(copy) == before, attempt
-    assert python(copy, "clean_up.py").returncode == 0                   # nothing left: still succeeds
+    assert python(copy, "clean_up.py", "--yes").returncode == 0                   # nothing left: still succeeds
 
 
 def test_gateway_run_without_the_environment_stops_before_any_call(tmp_path):

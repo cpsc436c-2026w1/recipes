@@ -20,6 +20,11 @@ MAX_MODEL_CALLS = 4  # one call that writes SQL, one retry after a rejected quer
 STEP_LIMIT_REPLY = "I could not answer within the step limit."
 
 
+class ToolRefused(Exception):
+    """An engine's refusal that goes back to the model word for word as the tool result, with no engine name in
+    front (ext-athena-engine: "query limit reached", "daily scan limit reached")."""
+
+
 @dataclass
 class Step:
     kind: str  # "model_call" or "tool_call"
@@ -58,17 +63,20 @@ class Answer:
 
 
 def answer(question: str, *, user_id: str, model, engine: Engine, data_version: str = "",
-           extra_sql_rules: tuple[SqlRule, ...] = (), traces=None) -> Answer:
+           extra_sql_rules: tuple[SqlRule, ...] = (), traces=None, prompt=system_prompt,
+           tool: dict = RUN_SQL_TOOL) -> Answer:
+    """prompt(schema, customer_id) -> the system prompt, and tool, the run_sql definition: an extension with other
+    tables or another engine passes its own (ext-athena-engine)."""
     t0 = time.monotonic()
     ans = Answer(request_id=str(uuid.uuid4()), question=question, user_id=user_id, status="no_answer",
                  data_version=data_version)
     messages = [
-        {"role": "system", "content": system_prompt(engine.schema(), customer_id=user_id)},
+        {"role": "system", "content": prompt(engine.schema(), customer_id=user_id)},
         {"role": "user", "content": question},
     ]
     try:
         for n in range(1, MAX_MODEL_CALLS + 1):
-            reply = _timed_model_call(model, messages, ans, t0)
+            reply = _timed_model_call(model, messages, ans, t0, tool)
             if reply.cap_used_up:
                 # Decision (bounded work): an empty reply that stopped at max_tokens is neither an answer nor a
                 # refusal. The question ends as an error that says so; the rows of a query that ran are taken back,
@@ -100,10 +108,10 @@ def answer(question: str, *, user_id: str, model, engine: Engine, data_version: 
     return ans
 
 
-def _timed_model_call(model, messages, ans: Answer, t0: float) -> ModelReply:
+def _timed_model_call(model, messages, ans: Answer, t0: float, tool: dict = RUN_SQL_TOOL) -> ModelReply:
     start = time.monotonic()
     try:
-        reply = model.chat(messages, tools=[RUN_SQL_TOOL])
+        reply = model.chat(messages, tools=[tool])
     except Exception as e:
         ans.steps.append(Step("model_call", getattr(model, "model", "?"), _ms(t0, start), _ms(start), "error",
                               detail=str(e)[:200]))
@@ -126,14 +134,17 @@ def _run_tool(call, engine: Engine, ans: Answer, t0: float, extra_rules) -> dict
         result, status, detail = {"error": f"unknown tool {call.name}; the only tool is run_sql"}, "rejected", ""
     else:
         try:
-            check_sql(sql, engine.tables, extra_rules)
+            check_sql(sql, engine.tables, extra_rules, dialect=getattr(engine, "dialect", "duckdb"))
             out = engine.run(sql)
             ans.sql, ans.columns, ans.rows = sql, out["columns"], out["rows"]
             result, status, detail, truncated = out, "ok", sql, out["truncated"] or ""
         except SqlRejected as e:
             result, status, detail = {"error": f"SQL check: {e}"}, "rejected", f"{sql} -- {e}"
-        except Exception as e:  # DuckDB errors go back to the model so it can fix the query
-            result, status, detail = {"error": f"DuckDB: {str(e).splitlines()[0][:200]}"}, "error", sql
+        except ToolRefused as e:
+            result, status, detail = {"error": str(e)}, "rejected", f"{sql} -- {e}"
+        except Exception as e:  # engine errors go back to the model so it can fix the query
+            name = getattr(engine, "name", "DuckDB")
+            result, status, detail = {"error": f"{name}: {str(e).splitlines()[0][:200]}"}, "error", sql
     ans.steps.append(Step("tool_call", call.name, _ms(t0, start), _ms(start), status, detail=detail[:500],
                           truncated=truncated))
     return result

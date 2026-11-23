@@ -13,7 +13,10 @@ you are an assistant, follow these rules when you use a recipe or change one.
 ## Keep the course constraints
 
 - Region `ca-central-1`. Every resource name starts with `$PREFIX`. Every recipe has a clean-up step; run it after a
-  real run, so nothing keeps billing in the team's sandbox.
+  real run, so nothing keeps billing in the team's sandbox. Every clean-up keeps one contract: a bare run (or
+  `--dry-run`) lists what it would delete, deletes nothing and ends with "Nothing deleted. Run again with --yes to
+  delete these."; only `--yes` deletes. Read the list, then run it again with `--yes`. A new clean-up keeps the same
+  contract and has a test of both (bare deletes nothing, `--yes` deletes).
 - No keys, tokens or account numbers in code, commits or outputs. Model calls go through the course LLM gateway with
   the student's own course token, read from `KB_MCP_TOKEN` and the address from `COURSE_GATEWAY_URL` in the
   environment. Keep `COURSE_MCP_TOKEN` and `GATEWAY_URL` as the fallback when the new names are not set.

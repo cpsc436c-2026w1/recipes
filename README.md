@@ -50,24 +50,28 @@ and `ext-*`, and its README compares them in one table.
 
 | Recipe | What you build | Lakehouse first | Operational first | Generative AI first | Lectures |
 |---|---|:---:|:---:|:---:|---|
-| [project-skeleton](project-skeleton/) | live updates arrive, are stored, reach the lake and show as one number, with representatives of the three project shapes | yes | yes | yes | L3, L8, L10–L17 |
-| [dynamodb](dynamodb/) | a DynamoDB store keyed by the app's reads, with conditional writes, transactions, an export to the lake, and vector search over messages in the same table | | yes | yes | L10–L13, L17 |
-| [lambda-dynamodb](lambda-dynamodb/) | an HTTPS API (Lambda function URL) over that store, with a least-privilege role | | yes | | L2–L3, L12–L13, L16 |
-| [streaming-ingestion](streaming-ingestion/) | Kinesis → Lambda → DynamoDB with the lag measured | yes | yes | | L14 |
+| [project-skeleton](project-skeleton/) | live updates arrive, are stored, reach the lake and show as one number, with representatives of the three project shapes; ext-backfill: a month of past trips in the lake beside the live ones, counted per day against the source, and in DynamoDB by id (import from S3 or batch writes) | yes | yes | yes | L3, L8, L10–L17 |
+| [dynamodb](dynamodb/) | a DynamoDB store keyed by the app's reads, with conditional writes, transactions, an export to the lake, vector search over messages in the same table, and location lookups by map cell (nearby drivers, the nearest stations) | | yes | yes | L10–L13, L17 |
+| [lambda-dynamodb](lambda-dynamodb/) | an HTTPS API (Lambda function URL) over that store, with a least-privilege role; extensions: a page of counts by zone with each zone's freshness (`ext-dashboard-page/`, also a lake variant), the read-path latency experiment (`ext-read-path/`) | | yes | | L2–L3, L11–L13, L16 |
+| [simulated-runs](simulated-runs/) | simulated events with injected faults and their known answer, one replayer for every target, whole-run checks offline and on AWS, and a daily check of the deployed system | yes | yes | yes | L13–L14 |
+| [streaming-ingestion](streaming-ingestion/) | Kinesis → Lambda → DynamoDB with the lag measured; a scheduled source poller and SQS queue ingestion as extensions | yes | yes | | L14 |
 | [concurrency-correctness](concurrency-correctness/) | two clients race on one item, a conditional write accepts one, and a retried write applies once | | yes | | L12–L14, L17 |
 | [llm-gateway](llm-gateway/) | a client for the course LLM gateway that handles budget and rate refusals, and a model gateway's source and deploy | | | yes | L15–L17 |
 | [llm-probes](llm-probes/) | a table of what an LLM endpoint supports, per model | yes | yes | yes | L15–L17 |
-| [dashboard-chat](dashboard-chat/) | ask plain-language questions over a team's table and get answers from read-only SQL through the gateway, with a trace for each question. The same feature is available as a web page (Shiny Express with querychat) | yes | yes | yes | L15–L16 |
+| [dashboard-chat](dashboard-chat/) | ask plain-language questions over a team's table and get answers from read-only SQL through the gateway, with a trace for each question. The same feature is available as a web page (Shiny Express with querychat); `ext-athena-engine/`: the chat's SQL runs on Athena over a table in the lake, through a Lambda function whose role reads only two tables in a workgroup with a 100 MB cutoff; 3 queries and 18 s a question, a daily cap of 5 GB billed, Data scanned and cost in each trace | yes | yes | yes | L15–L16 |
 | [hybrid-retrieval-eval](hybrid-retrieval-eval/) | keyword search and search by embeddings (numeric representations of meaning), combined by result rank, with an evaluation of the retrieved results | | | yes | L17 |
-| [cdc-to-lake](cdc-to-lake/) | every change to a DynamoDB table reaches an Iceberg table that Athena queries, with its lag measured | yes | yes | | L11, L13 |
+| [lake-layout-experiment](lake-layout-experiment/) | the same trips table in four layouts (Hive and Iceberg, flat and by day) at three sizes grown past Athena's 10 MB minimum, three zone-count queries 10 times each in Athena and in DuckDB on Lambda, summarised from one SQL file (medians with IQR, billed MB, cost per 1,000 queries) | yes | | | L2, L10–L11 |
+| [cdc-to-lake](cdc-to-lake/) | every change to a DynamoDB table reaches an Iceberg table that Athena queries, with its lag measured; extensions add an hourly MERGE INTO with late data rebuilt (`ext-scheduled-merge/`) and compaction by a rule per day, nightly, with alarms (`ext-maintenance/`) | yes | yes | | L11, L13 |
+| [s3-event-etl](s3-event-etl/) | each file checked as it lands in S3, bad rows kept with the reason, good rows loaded once into Iceberg by a bounded Glue job or one Athena MERGE | yes | | | L7–L8, L10–L11 |
 | [zero-etl-search](zero-etl-search/) | a search index kept in step with a DynamoDB table by a Lambda function on its stream, with a search demo; OpenSearch Ingestion as an extension | | yes | yes | L14, L17 |
 | [llm-state-dynamodb](llm-state-dynamodb/) | chat history per signed-in user, an answer cache and traces for an LLM app, in DynamoDB | | yes | yes | L12–L13, L16–L17 |
 | [limits-and-alarms](limits-and-alarms/) | a budget, reserved concurrency, and alarms on errors, latency and cost per request | yes | yes | yes | L16–L17 |
+| [cost-and-teardown](cost-and-teardown/) | every resource on one list (tags, ledger, inventory by four routes), the cost of a run, 30 days and a year from measured units, and a teardown that proves nothing is left | yes | yes | yes | L1–L2, L11–L12, L16, L18 |
 | [mcp-server-minimal](mcp-server-minimal/) | a small MCP server with a schema tool and a read-only query tool over your tables | yes | yes | yes | L15, L17 |
-| [agent-agentcore](agent-agentcore/) | a Strands agent whose caps, approval and once-only write live in hooks, with its tools behind an AgentCore Gateway, hosted on AgentCore Runtime, scored by an Inspect eval | yes | yes | yes | L17–L18 |
+| [agent-agentcore](agent-agentcore/) | a Strands agent whose caps, approval and once-only write live in hooks, with its tools behind an AgentCore Gateway, hosted on AgentCore Runtime, scored by an Inspect eval; `ext-sdk-lambda/`: the bounded agent with Strands or Pydantic AI on Lambda behind a function URL (auth `AWS_IAM`), one read-only SQL tool over one day of trips in DuckDB, the value shown only when the tool log holds it, caps and a 25 s deadline on both SDKs, gateway refusals as `did_not_answer` | yes | yes | yes | L17–L18 |
 | [model-routing](model-routing/) | a small model labels each request and app code picks the path; the large model gets only the hard ones | | | yes | L16–L17 |
 | [workflow-patterns](workflow-patterns/) | prompt chain, parallel calls and evaluator-optimizer, one short file each, with app code deciding every next step | | | yes | L17–L18 |
-| [prompt-optimization](prompt-optimization/) | one LLM step's instructions tuned with GEPA, an instruction optimizer, and reported on test questions the optimizer never saw | | | yes | L15, L17 |
+| [prompt-optimization](prompt-optimization/) | one LLM step's instructions tuned with GEPA, an instruction optimizer, and reported on test questions the optimizer never saw; its eval matrix reports per group of questions, tests two cells on the same cases and compares a version without the model | | | yes | L15, L17 |
 
 ## Recipes by project extension
 
@@ -76,21 +80,30 @@ and `ext-*`, and its README compares them in one table.
 | Streaming ingestion | [streaming-ingestion](streaming-ingestion/) `main/` |
 | Windowed aggregates with late records | [streaming-ingestion](streaming-ingestion/) `ext-windowed-aggregates/` |
 | Fan-out to several consumers | [streaming-ingestion](streaming-ingestion/) `ext-fan-out/` |
+| Polling a source on a schedule (a file per period, missing ones shown) | [streaming-ingestion](streaming-ingestion/) `ext-source-poller/` |
+| Events through an SQS queue, a dead-letter queue and a replay | [streaming-ingestion](streaming-ingestion/) `ext-queue-ingest/` |
 | Concurrency correctness | [concurrency-correctness](concurrency-correctness/) `main/`, `ext-idempotent-retry/`; [dynamodb](dynamodb/) `main/`, `ext-riders-and-drivers/`; [lambda-dynamodb](lambda-dynamodb/) `main/` |
 | Operational store to the lake | [dynamodb](dynamodb/) `ext-nightly-report/`; [cdc-to-lake](cdc-to-lake/) `main/` |
 | Change data capture | [cdc-to-lake](cdc-to-lake/) `main/` |
 | Lag monitoring | [cdc-to-lake](cdc-to-lake/) `ext-lag-alarm/` |
 | Table maintenance | [cdc-to-lake](cdc-to-lake/) `ext-maintenance/` |
+| Scheduled merge with late data | [cdc-to-lake](cdc-to-lake/) `ext-scheduled-merge/` |
+| File checks and quarantine as files land | [s3-event-etl](s3-event-etl/) `pipeline/` |
+| Backfill of past data | [project-skeleton](project-skeleton/) `ext-backfill/` |
 | Rollback or schema evolution | [cdc-to-lake](cdc-to-lake/) `ext-rollback-or-schema/` |
+| Dashboard / page with freshness | [lambda-dynamodb](lambda-dynamodb/) `ext-dashboard-page/` |
 | Chat on the dashboard | [dashboard-chat](dashboard-chat/) `main/`, `ext-shiny-app/` |
 | Answer or retrieval cache | [dashboard-chat](dashboard-chat/) `ext-answer-cache/`; [llm-state-dynamodb](llm-state-dynamodb/) `ext-answer-cache/` |
-| Guardrails with a red-team log | [dashboard-chat](dashboard-chat/) `ext-guardrails-redteam/` |
+| Guardrails with a red-team log; injection through stored text (rider comments reach the model only through a tool whose SQL the code writes, as marked data; a citation check and a number check in code; typed attacks and attacks in data rows counted apart, with an eval of 16 cases × 3 runs) | [dashboard-chat](dashboard-chat/) `ext-guardrails-redteam/` |
 | Trace analysis and alarms | [dashboard-chat](dashboard-chat/) `ext-trace-alarms/`; [llm-state-dynamodb](llm-state-dynamodb/) `ext-traces/`; [limits-and-alarms](limits-and-alarms/) `main/`; [lambda-dynamodb](lambda-dynamodb/) `ext-metrics/` |
+| Latency experiments | [lambda-dynamodb](lambda-dynamodb/) `ext-read-path/` |
+| Nearby and nearest-N lookups by key | [dynamodb](dynamodb/) `ext-nearby/` |
 | Agent under controlled autonomy | [limits-and-alarms](limits-and-alarms/) `ext-runaway-loop/` |
 | Hybrid retrieval with an eval | [hybrid-retrieval-eval](hybrid-retrieval-eval/) `main/`, `ext-filters/`; [zero-etl-search](zero-etl-search/) `main/`, `demo/`, `ext-embeddings/` |
 | Model routing, cheap model first | [model-routing](model-routing/) `main/`, `ext-eval/`; [hybrid-retrieval-eval](hybrid-retrieval-eval/) `ext-model-routing/` |
 | MCP server | [mcp-server-minimal](mcp-server-minimal/) `main/`, `ext-confirmed-write/` |
 | Prompt optimisation, with an eval example (part of the generative-AI-first shape, not an extension on the proposal page) | [prompt-optimization](prompt-optimization/) `main/`, `ext-gepa-direct/`, `ext-eval-matrix/` |
+| Eval per group of questions, a paired comparison of two alternatives, a version without the model | [prompt-optimization](prompt-optimization/) `ext-eval-matrix/` (`--case rides`, `--compare A,B`) |
 | Every model call (any GenAI extension) | [llm-gateway](llm-gateway/) `main/`; check the endpoint first with [llm-probes](llm-probes/) |
 | Your own gateway in front of a provider key | [llm-gateway](llm-gateway/) `ext-deploy/` |
 
@@ -112,11 +125,13 @@ The table lists the packages the recipes use, their purposes and the recipes whe
 | [uv](https://docs.astral.sh/uv/) and [`pyproject.toml`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) | `uv sync` installs the dependency versions recorded in `uv.lock`. `uv run` runs tests and scenarios with commands such as `uv run pytest -q` and `uv run behave`. | every recipe |
 | [boto3](https://docs.aws.amazon.com/boto3/latest/) | AWS calls in the scripts and clean-up; see each recipe's README for details | the recipes with an AWS part, listed under their "AWS permissions" |
 | [moto](https://docs.getmoto.org/en/latest/) | a stand-in for AWS in the offline tests | the recipes with an AWS part |
+| [Pydantic](https://pydantic.dev/docs/validation/latest/get-started/) | the event models every line is validated against | cdc-to-lake, cost-and-teardown, lambda-dynamodb, s3-event-etl, simulated-runs |
 | [HTTPX](https://www.python-httpx.org/) | HTTP calls to the course LLM gateway and to other model endpoints | dashboard-chat, hybrid-retrieval-eval, llm-gateway, llm-probes, model-routing, zero-etl-search |
-| [DuckDB](https://duckdb.org/docs/2.0/clients/python/overview.html) | SQL over local files in the offline runs | cdc-to-lake, dashboard-chat, mcp-server-minimal, project-skeleton, prompt-optimization |
+| [DuckDB](https://duckdb.org/docs/2.0/clients/python/overview.html) | SQL over local files in the offline runs | cdc-to-lake, dashboard-chat, lambda-dynamodb, mcp-server-minimal, project-skeleton, prompt-optimization, s3-event-etl, simulated-runs |
 | [pytest](https://docs.pytest.org/en/stable/) | offline tests; run `uv run pytest -q` inside a recipe folder | every recipe |
 | [behave](https://behave.readthedocs.io/en/latest/) | scenarios that check the requirements in the recipe's Requirements section; run `uv run behave` inside a recipe folder | every recipe with a Requirements section |
 | [DSPy](https://dspy.ai/) and [GEPA](https://github.com/gepa-ai/gepa) | prompt optimization; see the recipe's README for each package's role | prompt-optimization |
+| [SciPy](https://scipy.org/) and [NumPy](https://numpy.org/) | the exact McNemar test and the stratified bootstrap of the eval matrix | prompt-optimization |
 | [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | a Model Context Protocol (MCP) server and a client that connects to the server | mcp-server-minimal |
 | [querychat](https://posit-dev.github.io/querychat/) and [Shiny for Python](https://shiny.posit.co/py/) | a chat web page over a data table; see the recipe's README for each package's role | dashboard-chat (`ext-shiny-app/`) |
 | [opensearch-py](https://docs.opensearch.org/latest/clients/python-low-level/) | signed requests to an OpenSearch Serverless collection; see the recipes' READMEs for details | hybrid-retrieval-eval, zero-etl-search |
@@ -129,7 +144,7 @@ past a recipe.
 
 | Package | What it is |
 |---|---|
-| [Pydantic](https://pydantic.dev/docs/validation/latest/get-started/) and [pydantic-settings](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/) | data validation with Python type hints, and settings read from the environment |
+| [pydantic-settings](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/) | settings read from the environment, built on Pydantic (which simulated-runs uses) |
 | [Pydantic AI](https://pydantic.dev/docs/ai/overview/) and [Pydantic Evals](https://pydantic.dev/docs/ai/evals/evals/) | an agent framework and an evaluation library from the Pydantic project |
 | [Logfire](https://pydantic.dev/docs/logfire/get-started/) | tracing and logs for Python apps; Logfire is built on OpenTelemetry |
 | [Inspect](https://inspect.aisi.org.uk/) | a framework for LLM evaluations |

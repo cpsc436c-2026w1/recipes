@@ -9,8 +9,8 @@ lectures = ["L15", "L17"]
 core = ["course LLM gateway", "DSPy", "GEPA", "DuckDB"]
 secondary = []
 region = "ca-central-1"            # no AWS resources; the course LLM gateway runs in ca-central-1
-cost_one_run = "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); capped by --max-cad"
-summary = "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix."
+cost_one_run = "0 offline (stub); 0.0099 CAD through the course LLM gateway with the defaults and 0.0063 CAD for the matrix (measured 2026-11-12, output/main-gateway and output/ext-eval-matrix-gateway); the rides matrix 0.0141 CAD (measured 2026-11-23 on the gateway, 16,384 output tokens asked for each call, output/ext-eval-matrix-rides-gateway); capped by --max-cad"
+summary = "A DSPy signature for one LLM step, a metric that names each failure, a dspy.GEPA run on train and validation questions, and a before and after pass-rate table on test questions the optimizer never saw; two variants run GEPA directly over a prompt string and compare models and prompts in an eval matrix, which reports the outcomes per group of questions, counts each case once, tests two cells on the same cases with the exact McNemar test, and compares each model cell with a cell without a model (the rides case)."
 
 # What the recipe teaches
 [[practices]]
@@ -29,12 +29,20 @@ source = "L15 demo evals/gepa/results.md (the same prompt passed 33% to 75% over
 name = "Use the simplest model that passes the eval"
 source = "L16-17; AGENTCOST02-BP01 (ext-eval-matrix)"
 
+[[practices]]
+name = "Report the outcomes per group of questions, count each case once, and compare two alternatives on the same cases with an exact test"
+source = "ext-eval-matrix (ours: the exact McNemar test as a binomial test of the discordant cases; a bootstrap stratified by group as a descriptive interval)"
+
+[[practices]]
+name = "Compare the model step with a version without the model, scored by the same metric"
+source = "ext-eval-matrix, cell no-model/templates (ours)"
+
 [instruments]
-files = ["main/program.py", "main/metric.py", "main/optimize.py", "main/report.py", "main/models.py", "main/data.py", "ext-gepa-direct/optimize_direct.py", "ext-eval-matrix/matrix.py"]
+files = ["main/program.py", "main/metric.py", "main/optimize.py", "main/report.py", "main/models.py", "main/data.py", "ext-gepa-direct/optimize_direct.py", "ext-eval-matrix/matrix.py", "ext-eval-matrix/groups.py", "ext-eval-matrix/score.py", "ext-eval-matrix/templates.py", "ext-eval-matrix/rides.py"]
 
 [validates]
 command = "uv run pytest -q"
-shows = "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model"
+shows = "the loop runs end to end on a stub model and the optimized prompt passes more test questions; no test question reaches the optimizer; each spend cap stops the run; the gateway request has the right path, token and model; the eval matrix counts each case once, reports per group, and its exact test and interval give the worked numbers of the README"
 
 [commands]
 setup = "uv sync"
@@ -42,7 +50,9 @@ test = "uv run pytest -q"          # offline, no AWS account, no token
 scenarios = "uv run behave"        # the README's requirements, as behave scenarios; offline
 run = "uv run python -m main.run --target gateway"
 run_offline = "uv run python -m main.run"
-clean = "uv run python clean_up.py"
+run_matrix_rides = "uv run python ext-eval-matrix/matrix.py --case rides"
+run_live_rides = "bash ext-eval-matrix/run_live.sh"
+clean = "uv run python clean_up.py --yes"   # run it first without --yes: it lists what it would delete
 
 [constraints]                       # what an assistant must keep when it changes this recipe
 no_keys_in_code = true
@@ -50,4 +60,4 @@ name_prefix_env = "PREFIX"          # unused: the recipe creates no named resour
 model_calls_through = "course LLM gateway"
 gateway_env = ["COURSE_GATEWAY_URL", "KB_MCP_TOKEN"]   # GATEWAY_URL and COURSE_MCP_TOKEN still work when these are not set
 test_split_only_in = ["main/report.py", "main/run.py after optimize()", "ext-gepa-direct/optimize_direct.py after optimize()", "ext-eval-matrix/matrix.py"]
-spend_cap_flags = ["--max-metric-calls", "--max-reflection-calls", "--max-cad"]
+spend_cap_flags = ["--max-metric-calls", "--max-reflection-calls", "--max-calls", "--max-cad"]

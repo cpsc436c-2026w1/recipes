@@ -1,0 +1,126 @@
+ext-dashboard-page: live run, 2026-11-23 (UTC), ca-central-1, the stream variant (no --lake).
+Account masked as 111122223333; the function URL is not shown (the one-time schedule deleted it at 01:11 UTC, the
+function was deleted at 01:12 UTC).
+PREFIX=recipe-dash. The page was read in
+headless Chromium (playwright) on localhost (serve_local.py) and on the public URL.
+
+### 2026-11-23T01:04:07Z bash ext-dashboard-page/run.sh
+== 1. The counts table (created if missing; one your counting function writes is used as it is)
+table recipe-dash-zone-counts: created
+== 2. The page's role: Query on the counts table (and the slot table), its own log group
+$ aws iam create-role recipe-dash-page-role
+$ aws iam put-role-policy recipe-dash-page-role policy
+== 3. The page's log group, then the function
+$ aws logs create-log-group /aws/lambda/recipe-dash-page
+$ aws logs put-retention-policy /aws/lambda/recipe-dash-page 7 days
+$ aws lambda get-function recipe-dash-page
+$ aws lambda create-function recipe-dash-page python3.12 arm64 128 MB 10 s (page.py, page.html, slots.py)
+  (the role is not usable yet: trying again in 5 s, attempt 2)
+$ aws lambda create-function recipe-dash-page python3.12 arm64 128 MB 10 s (page.py, page.html, slots.py)
+  (the role is not usable yet: trying again in 5 s, attempt 3)
+$ aws lambda create-function recipe-dash-page python3.12 arm64 128 MB 10 s (page.py, page.html, slots.py)
+== 4. The schedule group (tagged) and the role the URL's one-time schedule runs as
+$ aws scheduler create-schedule-group recipe-dash-dashboard-page
+$ aws iam create-role recipe-dash-dash-url-role
+$ aws iam put-role-policy recipe-dash-dash-url-role policy
+== Done: the page is deployed without a public URL. Show it locally with serve_local.py, or publicly with: bash ext-dashboard-page/run.sh url-on 3
+exit 0
+### 2026-11-23T01:04:31Z bash ext-dashboard-page/run.sh load rush-hour
+table recipe-dash-zone-counts: there already, used as it is
+{"data_set": "rush-hour", "requests": 837, "count_items": 36, "latest_items": 3, "sent": 2515, "failed": 0}
+exit 0
+
+### 2026-11-23T01:04:40Z uv run python ext-dashboard-page/serve_local.py, then headless Chromium on http://localhost:8080/
+freshness: data as of 00:59:58 UTC, read at 01:04:41 UTC
+series: zone 48: 20 23 38 23 21 32 28 33 25 21 23 17
+series: zone 161: 9 17 12 15 10 17 15 26 15 17 18 20
+series: zone 230: 33 36 28 23 28 32 29 33 33 29 19 19
+table rows: 4
+   zone | 00:00 | 00:05 | 00:10 | 00:15 | 00:20 | 00:25 | 00:30 | 00:35 | 00:40 | 00:45 | 00:50 | 00:55
+   zone 48 | 20 | 23 | 38 | 23 | 21 | 32 | 28 | 33 | 25 | 21 | 23 | 17
+   zone 161 | 9 | 17 | 12 | 15 | 10 | 17 | 15 | 26 | 15 | 17 | 18 | 20
+   zone 230 | 33 | 36 | 28 | 23 | 28 | 32 | 29 | 33 | 33 | 29 | 19 | 19
+responses: 200 /; 200 Chart.js 4.4.1 from cdnjs; 200 api/zone-counts
+(the 12 values of each zone add up to the data set: 304, 191 and 342 trips)
+
+### 2026-11-23T01:04:53Z bash ext-dashboard-page/run.sh url-on 0.1
+== 1. First the one-time schedule that deletes the URL at 2026-11-23T01:10:54 UTC
+$ aws scheduler create-schedule recipe-dash-url-off at(2026-11-23T01:10:54) in recipe-dash-dashboard-page
+== 2. Then the URL (auth type NONE) and the two statements a public URL needs
+$ aws lambda create-function-url-config recipe-dash-page NONE
+$ aws lambda add-permission recipe-dash-page url-public
+$ aws lambda add-permission recipe-dash-page url-invoke
+The page is public until 2026-11-23T01:10:54 UTC: <function URL, deleted>
+End it earlier with: bash ext-dashboard-page/run.sh url-off
+exit 0
+### 2026-11-23T01:04:56Z curl -sD - <url>api/zone-counts (headers)
+HTTP/1.1 200 OK
+Date: Mon, 23 Nov 2026 01:05:01 GMT
+Content-Type: application/json
+Content-Length: 931
+Connection: keep-alive
+x-amzn-RequestId: 3f5b4736-c694-4184-ad2c-9d0a4c654a0b
+cache-control: no-store
+X-Amzn-Trace-Id: Root=1-6b039138-4d894aeb30bf11d82441f8e0;Parent=22740ee08826ad97;Sampled=0;Lineage=1:5c40e908:0
+
+### curl POST, unknown path
+POST /api/zone-counts -> 405
+GET /nope -> 404
+### 2026-11-23T01:05:01Z headless Chromium on the public URL
+freshness: data as of 00:59:58 UTC, read at 01:05:02 UTC
+series: zone 48: 23 38 23 21 32 28 33 25 21 23 17 -
+series: zone 161: 17 12 15 10 17 15 26 15 17 18 20 -
+series: zone 230: 36 28 23 28 32 29 33 33 29 19 19 -
+table rows: 4
+   zone | 00:05 | 00:10 | 00:15 | 00:20 | 00:25 | 00:30 | 00:35 | 00:40 | 00:45 | 00:50 | 00:55 | 01:00
+   zone 48 | 23 | 38 | 23 | 21 | 32 | 28 | 33 | 25 | 21 | 23 | 17 | no data
+   zone 161 | 17 | 12 | 15 | 10 | 17 | 15 | 26 | 15 | 17 | 18 | 20 | no data
+   zone 230 | 36 | 28 | 23 | 28 | 32 | 29 | 33 | 33 | 29 | 19 | 19 | no data
+responses: 200 /; 200 Chart.js 4.4.1 from cdnjs; 200 api/zone-counts
+### 2026-11-23T01:05:03Z uv run python ext-dashboard-page/bench.py <url>
+100 reads, 0 failed; p50 89.4 ms, p95 113.6 ms: PASS (p95 under 1,000 ms)
+exit 0
+### 2026-11-23T01:06:44Z done
+
+### polling get-function-url-config (schedule at 2026-11-23T01:10:54 UTC)
+01:07:13 URL config still there
+01:08:13 URL config still there
+01:09:14 URL config still there
+01:10:14 URL config still there
+01:11:00 URL config still there
+2026-11-23T01:11:15Z An error occurred (ResourceNotFoundException) when calling the GetFunctionUrlConfig operation: The resource you requested does not exist.
+### curl the old URL
+GET <old url>api/zone-counts -> 403
+### aws scheduler list-schedules --group-name recipe-dash-dashboard-page
+(end of list)
+### aws lambda get-policy (statements left on the function)
+url-public lambda:InvokeFunctionUrl
+url-invoke lambda:InvokeFunction
+
+
+### The REPORT lines of recipe-dash-page (aws logs filter-log-events, before the clean-up): 105 calls
+REPORT RequestId: 3f5b4736-c694-4184-ad2c-9d0a4c654a0b | Duration: 5353.66 ms | Billed Duration: 5422 ms | Memory Size: 128 MB | Max Memory Used: 91 MB | Init Duration: 68.22 ms
+REPORT RequestId: 573e4c1e-48f4-4737-811c-c3d968fbc5ce | Duration: 1.59 ms | Billed Duration: 2 ms | Memory Size: 128 MB | Max Memory Used: 91 MB
+...
+105 calls: billed 14593 ms in all (14.593 s x 128 MB = 1.824 GB-seconds); median billed 90 ms;
+one cold call (the first, the curl above: Init 68.22 ms, then 5,353.66 ms in the handler, which imports
+boto3 and makes its client on the first read, page.py), every other call warm; 404/405 answers billed 2 ms; max memory used 91 MB of 128
+
+### Units from CloudWatch (AWS/DynamoDB, AWS/Logs, AWS/Lambda, AWS/Scheduler; 01:00 to 01:30 UTC)
+recipe-dash-zone-counts  ConsumedWriteCapacityUnits 64.0   (the load at 01:04 of 36 count items and 3 latest items: each replayer
+                                                            batch writes again the items it touched, load_counts.py)
+recipe-dash-zone-counts  ConsumedReadCapacityUnits 154.5   (103 JSON reads x 3 eventually consistent Queries x 0.5)
+/aws/lambda/recipe-dash-page  IncomingBytes 51358          (489 bytes a call)
+recipe-dash-page  Invocations 105                          (curl 3, Chromium 2, bench.py 100)
+Scheduler  InvocationAttemptCount 1                        (the one-time schedule recipe-dash-url-off)
+Data transfer out: 102 JSON replies of 931 bytes (Content-Length above) and one page of 5,395 bytes
+
+### Cost of this run, measured units x the course price sheet (ca-central-1, 2026-11-18), free tier left out
+Lambda requests      105 x 0.20 per million                  0.000021 USD
+Lambda duration      1.824 GB-s x 0.0000133334 (arm64)        0.000024 USD
+DynamoDB reads       154.5 units x 0.1375 per million         0.000021 USD
+DynamoDB writes      64 units x 0.6875 per million            0.000044 USD
+CloudWatch Logs      51,358 bytes x 0.55 per GB               0.000026 USD
+Scheduler            1 invocation x 1.10 per million          0.000001 USD
+Data transfer out    100,357 bytes x 0.09 per GB              0.000008 USD
+Total                                                        0.00015 USD (0.00021 CAD); 0.0005% of the 30 USD lease

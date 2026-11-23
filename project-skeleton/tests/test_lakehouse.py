@@ -55,7 +55,7 @@ def test_setup_creates_the_pipeline(aws):
     assert table["Parameters"]["projection.enabled"] == "true"
     assert [c["Name"] for c in table["StorageDescriptor"]["Columns"]] == ["event_id", "entity_id", "event_time", "value"]
     wg = aws.client("athena").get_work_group(WorkGroup="t1-wg")["WorkGroup"]["Configuration"]
-    assert wg["BytesScannedCutoffPerQuery"] == 1_000_000_000
+    assert wg["BytesScannedCutoffPerQuery"] == 2 ** 30
     assert out["stream_arn"].endswith(":stream/t1-updates")
 
 

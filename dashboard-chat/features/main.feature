@@ -128,7 +128,7 @@ Feature: Chat on the dashboard, the main scenario
     Then the gateway stand-in received 1 request
     And the request went to "https://gw.example/v1/chat/completions"
     And the request's Authorization header is "Bearer tok-123"
-    And the request body field "max_tokens" is 400
+    And the request body field "max_tokens" is 16384
     And the request body field "temperature" is 0
     And the request body field "model" is "qwen3.6-35b-a3b"
 
@@ -145,7 +145,7 @@ Feature: Chat on the dashboard, the main scenario
     And a gateway stand-in that asks for a query, then replies with no text and finish_reason "length"
     When customer "c-0007" asks "How many orders are there?"
     Then the gateway stand-in received 2 requests
-    And every request body has the field "max_tokens" 600
+    And every request body has the field "max_tokens" 16384
 
   @R36
   Scenario: A reply that used its token cap before any text

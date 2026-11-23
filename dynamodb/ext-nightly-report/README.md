@@ -74,7 +74,7 @@ bash ext-nightly-report/run.sh                # the export takes a few minutes; 
 ```
 
 Clean-up: the run ends with it, and because `BUCKET` is set it also deletes the export and the Athena results. After
-a run with `KEEP=1`, or one that stopped with a `FAILED` line, run `bash clean_up.sh` in the same terminal with the
+a run with `KEEP=1`, or one that stopped with a `FAILED` line, run `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` in the same terminal with the
 same `PREFIX` and `BUCKET`. Cost: see below.
 
 ## What you should see
@@ -91,5 +91,5 @@ the query casts it (`CAST(Item.fare_quote.N AS double)`). An attribute missing f
 ## Cost
 
 For this small table every part is well under a cent (the export billed 0 bytes). PITR bills 0.22 USD per GB-month
-while it is on; `bash clean_up.sh` deletes the table, which ends it. The Athena query's Data scanned was 956 bytes. Athena bills
+while it is on; `bash clean_up.sh` (it lists what it would delete), then `bash clean_up.sh --yes` deletes the table, which ends it. The Athena query's Data scanned was 956 bytes. Athena bills
 5.50 USD per TB of Data scanned in ca-central-1 (AWS bulk price list).

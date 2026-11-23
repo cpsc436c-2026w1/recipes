@@ -1,0 +1,103 @@
+# The rides case: test questions of the SQL step over table `trips` (data/trips_hour.csv, or data/trips.parquet when
+# make_trips_day.sql has built the whole day). Each case has a `group` (ext-eval-matrix/matrix.py stops before the
+# first model call, with exit code 2, if one does not) and `answerable`. An answerable case has a reference query
+# whose value is the correct answer, computed in DuckDB when the file is loaded; a case the table cannot answer has
+# none, and the right reply is CANNOT_ANSWER. Times are New York local time, as in the source; a window "between
+# 08:00 and 08:15" holds the requests at or after 08:00 and before 08:15. 4 groups of 5 cases, 4 answerable and
+# 1 not in each. Only the eval matrix reads this file; nothing here tunes a prompt on it.
+- id: o1
+  group: one-zone
+  answerable: true
+  question: How many trips were requested in zone 161?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161
+- id: o2
+  group: one-zone
+  answerable: true
+  question: How many trips were requested in zone 48?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48
+- id: o3
+  group: one-zone
+  answerable: true
+  question: What is the longest trip, in miles, among the trips requested in zone 230?
+  sql: SELECT MAX(trip_miles) FROM trips WHERE pickup_zone_id = 230
+- id: o4
+  group: one-zone
+  answerable: true
+  question: How many trips requested in zone 230 were longer than 5 miles?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 230 AND trip_miles > 5
+- id: o5
+  group: one-zone
+  answerable: false
+  question: How many trips requested in zone 161 were shared with another rider?
+- id: t1
+  group: time-window
+  answerable: true
+  question: How many trips were requested between 08:00 and 08:15?
+  sql: SELECT COUNT(*) FROM trips WHERE requested_time >= TIMESTAMP '2024-03-14 08:00:00' AND requested_time < TIMESTAMP '2024-03-14 08:15:00'
+- id: t2
+  group: time-window
+  answerable: true
+  question: How many trips were requested in zone 161 between 08:00 and 09:00?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 161 AND requested_time >= TIMESTAMP '2024-03-14 08:00:00' AND requested_time < TIMESTAMP '2024-03-14 09:00:00'
+- id: t3
+  group: time-window
+  answerable: true
+  question: How many trips were requested in zone 230 between 08:30 and 08:45?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 230 AND requested_time >= TIMESTAMP '2024-03-14 08:30:00' AND requested_time < TIMESTAMP '2024-03-14 08:45:00'
+- id: t4
+  group: time-window
+  answerable: true
+  question: How many trips were requested in zone 48 between 08:15 and 08:30?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id = 48 AND requested_time >= TIMESTAMP '2024-03-14 08:15:00' AND requested_time < TIMESTAMP '2024-03-14 08:30:00'
+- id: t5
+  group: time-window
+  answerable: false
+  question: How many trips were requested between 08:00 and 09:00 on 2024-03-15?
+- id: z1
+  group: zone-compare
+  answerable: true
+  question: How many more trips were requested in zone 161 than in zone 48?
+  sql: SELECT COUNT(*) FILTER (WHERE pickup_zone_id = 161) - COUNT(*) FILTER (WHERE pickup_zone_id = 48) FROM trips
+- id: z2
+  group: zone-compare
+  answerable: true
+  question: By how many dollars is the average fare in zone 230 higher than in zone 161?
+  sql: SELECT AVG(fare) FILTER (WHERE pickup_zone_id = 230) - AVG(fare) FILTER (WHERE pickup_zone_id = 161) FROM trips
+- id: z3
+  group: zone-compare
+  answerable: true
+  question: How many trips were requested in zones 48 and 230 together?
+  sql: SELECT COUNT(*) FROM trips WHERE pickup_zone_id IN (48, 230)
+- id: z4
+  group: zone-compare
+  answerable: true
+  question: Of the trips requested in zones 161 and 230, what percentage were requested in zone 161?
+  sql: SELECT 100.0 * COUNT(*) FILTER (WHERE pickup_zone_id = 161) / COUNT(*) FROM trips WHERE pickup_zone_id IN (161, 230)
+- id: z5
+  group: zone-compare
+  answerable: false
+  question: How many minutes longer did riders wait for their pickup in zone 48 than in zone 161?
+- id: f1
+  group: fare-sum
+  answerable: true
+  question: What is the total of all fares, in dollars?
+  sql: SELECT SUM(fare) FROM trips
+- id: f2
+  group: fare-sum
+  answerable: true
+  question: What is the average fare, in dollars, of the trips requested in zone 48?
+  sql: SELECT AVG(fare) FROM trips WHERE pickup_zone_id = 48
+- id: f3
+  group: fare-sum
+  answerable: true
+  question: What is the total distance, in miles, of the trips requested in zone 161?
+  sql: SELECT SUM(trip_miles) FROM trips WHERE pickup_zone_id = 161
+- id: f4
+  group: fare-sum
+  answerable: true
+  question: What is the fare per mile, in dollars, over all trips (all fares divided by all miles)?
+  sql: SELECT SUM(fare) / SUM(trip_miles) FROM trips
+- id: f5
+  group: fare-sum
+  answerable: false
+  question: What is the total of the tips, in dollars?

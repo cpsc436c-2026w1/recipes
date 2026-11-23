@@ -85,7 +85,7 @@ uv run python ext-idempotent-retry/run.py --target aws
 Run by us on 2026-11-12 (`../output/ext-idempotent-retry.txt`).
 
 Clean-up: after `--keep` or a run that stopped early, run
-`uv run python clean_up.py` with the same `PREFIX`. The run removes both tables itself. Cost: two tables, 2 plain writes and 2 transactions of 2 items:
+`uv run python clean_up.py` (it lists what it would delete), then `uv run python clean_up.py --yes` with the same `PREFIX`. The run removes both tables itself. Cost: two tables, 2 plain writes and 2 transactions of 2 items:
 far below 0.001 USD (0.6875 USD per million write request units in ca-central-1, AWS bulk price list).
 
 ## What you should see

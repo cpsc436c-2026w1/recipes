@@ -76,7 +76,7 @@ def test_recipe_toml_has_the_fields_of_the_template():
     assert r["validates"]["command"] == "uv run pytest -q" and r["validates"]["shows"].strip()
     assert r["commands"]["setup"] == "uv sync" and r["commands"]["test"] == "uv run pytest -q"
     assert r["commands"]["run"].startswith("uv run python")
-    assert r["commands"].get("clean", "") == ("uv run python clean_up.py" if (ROOT / "clean_up.py").exists() else "")
+    assert r["commands"].get("clean", "") == ("uv run python clean_up.py --yes" if (ROOT / "clean_up.py").exists() else "")
     assert r["constraints"]["no_keys_in_code"] is True
     for name, command in {**r["commands"], **r.get("extension_commands", {})}.items():
         for target in re.findall(r"uv run python (?:-m )?(\S+)", command):
@@ -107,7 +107,7 @@ def test_every_command_in_the_readmes_names_a_file_in_the_folder():
 # --- this recipe ---
 RUN_PRODUCTS = ("data", "refunds.duckdb", "refunds.duckdb.wal")   # what a run writes ([resources].local_files)
 README_GIVES = [["-m", "main.server"], ["-m", "main.client"], ["ext-confirmed-write/write_server.py"],
-                ["ext-confirmed-write/walk.py", "--approver", "ana"], ["clean_up.py"], ["clean_up.py", "--dry-run"]]
+                ["ext-confirmed-write/walk.py", "--approver", "ana"], ["clean_up.py"], ["clean_up.py", "--yes"]]
 TOKEN = "token-for-this-test-only-0123456789"
 SECRET = "approval-secret-for-this-test-only-01"
 
@@ -163,13 +163,13 @@ def test_the_readme_commands_run_twice_and_clean_up_leaves_nothing(tmp_path):
             _stop(writer)
         created = set(inventory(copy)) - set(before)
         assert {"data/orders.parquet", "data/stores.parquet", "output/refunds.duckdb"} <= created, attempt
-        dry = python(copy, "clean_up.py", "--dry-run")
+        dry = python(copy, "clean_up.py")
         assert set(re.findall(r"would delete (\S+)", dry.stdout)) == created
         assert set(inventory(copy)) - set(before) == created              # a dry run deletes nothing
-        clean = python(copy, "clean_up.py")
+        clean = python(copy, "clean_up.py", "--yes")
         assert clean.returncode == 0 and set(re.findall(r"^deleted (\S+)", clean.stdout, flags=re.M)) == created
         assert inventory(copy) == before, attempt
-    assert python(copy, "clean_up.py").returncode == 0                    # nothing left: still succeeds
+    assert python(copy, "clean_up.py", "--yes").returncode == 0                    # nothing left: still succeeds
 
 
 def test_servers_refuse_to_start_without_their_secrets(tmp_path):

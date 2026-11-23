@@ -199,7 +199,7 @@ def test_clean_up_reports_a_refused_step_tries_the_rest_and_exits_1(monkeypatch,
     monkeypatch.setattr(ddb, "describe_table", refuse)
     real_client = boto3.client
     monkeypatch.setattr(cu.boto3, "client", lambda name, **kw: ddb if name == "dynamodb" else real_client(name, **kw))
-    monkeypatch.setattr("sys.argv", ["clean_up.py"])
+    monkeypatch.setattr("sys.argv", ["clean_up.py", "--yes"])
     with pytest.raises(SystemExit) as e:
         cu.main()
     out = capsys.readouterr()

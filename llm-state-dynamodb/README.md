@@ -115,14 +115,14 @@ runs them offline. The requirements of an extension are in its own README, and t
 
 **Clean-up**
 
-- **R40** (event) When `clean_up.py` runs, the recipe shall delete the four tables of this `PREFIX` that exist.
-- **R41** (event) When `clean_up.py --dry-run` runs, the recipe shall print the tables it would delete and delete
+- **R40** (event) When `clean_up.py --yes` runs, the recipe shall delete the four tables of this `PREFIX` that exist.
+- **R41** (event) When `clean_up.py` runs without `--yes` (or with `--dry-run`), the recipe shall print the tables it would delete and delete
   none.
 - **R42** (state) While a table is in the `DELETING` state, the recipe shall report it as `absent` in a clean-up and
   delete the other tables.
 - **R43** (unwanted) If AWS refuses a step of `clean_up.py`, then the recipe shall exit with code 1 after it has
   tried every other table and printed `FAILED` for the refused one.
-- **R44** (event) When `clean_up.py` runs and a table is already gone, the recipe shall report it as `absent` and
+- **R44** (event) When `clean_up.py --yes` runs and a table is already gone, the recipe shall report it as `absent` and
   exit with code 0.
 - **R45** (ubiquitous) The recipe shall leave in place every table other than its own four, also one whose name
   starts with the name of one of them.
@@ -256,8 +256,8 @@ From your local device or AWS CloudShell, in the terminal of the AWS run, with t
 starts with your prefix, then delete them:
 
 ```bash
-uv run python clean_up.py --dry-run    # lists the tables it would delete
-uv run python clean_up.py              # deletes the tables of this PREFIX: main and both extensions, up to four
+uv run python clean_up.py    # lists the tables it would delete
+uv run python clean_up.py --yes              # deletes the tables of this PREFIX: main and both extensions, up to four
 ```
 
 ## Adapt it

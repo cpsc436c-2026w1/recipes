@@ -1,0 +1,52 @@
+Cost of the live runs of 2026-11-23 (ext-scheduled-merge, ext-maintenance, the Athena probes and uv run behave --tags=@live),
+collected before the clean-up. Athena and Lambda are measured: GetQueryExecution of every query of the four workgroups
+(DataScannedInBytes; billed at 10 MB a query at least, 5.50 USD per TB) and the REPORT lines of the two functions
+(0.0000133334 USD per GB-s). S3 requests are computed from the objects written and read (AWS does not report
+them per request without request metrics): course price sheet, ca-central-1, 2026-11-18. CAD at 1.45.
+
+Athena recipe-lake-wg: 51 queries, 19923591 B Data scanned, billed 400 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00210 USD
+    CREATE       7 queries            0 B scanned, billed       0 MB
+    INSERT       3 queries            0 B scanned, billed      30 MB
+    MERGE        7 queries     12737096 B scanned, billed      70 MB
+    OPTIMIZE     2 queries          250 B scanned, billed      10 MB
+    SELECT      22 queries      7179190 B scanned, billed     200 MB
+    VACUUM       1 queries            0 B scanned, billed      10 MB
+    metadata     9 queries         7055 B scanned, billed      80 MB
+Athena recipe-lake-ctas-wg: 3 queries, 4941651 B Data scanned, billed 30 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00016 USD
+    CREATE       3 queries      4941651 B scanned, billed      30 MB
+Athena recipe-lake-live-wg: 126 queries, 7153615 B Data scanned, billed 1240 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00650 USD
+    CREATE       2 queries            0 B scanned, billed       0 MB
+    OPTIMIZE     2 queries      3156244 B scanned, billed      20 MB
+    SELECT     114 queries      3990875 B scanned, billed    1140 MB
+    metadata     8 queries         6496 B scanned, billed      80 MB
+Athena recipe-lake-live-ctas-wg: 36 queries, 63226846 B Data scanned, billed 360 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00189 USD
+    CREATE      36 queries     63226846 B scanned, billed     360 MB
+Lambda recipe-lake-merge-run: 5 invocations, 30267 ms billed at 256 MB = 7.57 GB-s = 0.000101 USD
+Lambda recipe-lake-compact-days: 2 invocations, 37956 ms billed at 256 MB = 9.49 GB-s = 0.000127 USD
+
+S3 PUT/COPY/LIST (computed, 0.0055 USD per 1,000): replay 110 objects; land_parquet --days 3 4,320; the probe
+  table 1,480 data files twice; SIM02 2,120 + 1,440 (the full run re-landed dt=2026-11-21 after the late file);
+  SIM01 thirty days 43,200; CTAS outputs, Iceberg metadata, manifests, file lists and listings about 1,500
+  = about 55,650 requests = 0.306 USD
+S3 GET (computed, 0.00044 USD per 1,000): the thirty-day count before (43,200), the 30 CTAS (43,200) and their
+  day counts (43,200); the nightly run's 3 days (4,320 x 2); SIM02/SIM05 days (1,440 x 3 x 3); the OPTIMIZE of
+  1,440 files (x 2); the MERGE reads (110 x 8) and the rest, about 150,000 = 0.066 USD
+Glue Data Catalog, DynamoDB on demand, CloudWatch Logs, Scheduler, 2 alarms for a few hours, S3 storage of
+  about 0.3 GB for a few hours: under 0.002 USD together (computed)
+
+Athena 0.0107 USD (measured), Lambda 0.0002 USD (measured), S3 requests 0.372 USD (computed), the rest under 0.002
+Total about 0.385 USD = 0.56 CAD, 1.3% of the 30 USD lease: about 0.03 USD for the two extensions' own runs
+(recipe-lake-wg, recipe-lake-ctas-wg, the two functions, 4,430 PUTs), about 0.30 USD for the thirty-day @live
+example (43,200 PUTs, about 130,000 GETs), the rest for the probes and the other three @live examples.
+
+Second session, the same day (the source of one read, R100 again, the failing night for the Errors metric):
+Athena recipe-lake-wg: 16 queries, 1459601 B Data scanned, billed 110 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00058 USD
+    CREATE       4 queries            0 B scanned, billed       0 MB
+    MERGE        4 queries      1422008 B scanned, billed      40 MB
+    SELECT       6 queries        37126 B scanned, billed      60 MB
+    metadata     2 queries          467 B scanned, billed      10 MB
+Athena recipe-lake-ctas-wg: 0 queries, 0 B Data scanned, billed 0 MB (10 MB a query at least, DDL without a scan and failed free) = 0.00000 USD
+Lambda recipe-lake-merge-run: 3 invocations, 28728 ms billed at 256 MB = 7.18 GB-s = 0.000096 USD
+Lambda recipe-lake-compact-days: 1 invocations, 6883 ms billed at 256 MB = 1.72 GB-s = 0.000023 USD
+S3: 111 objects, manifests and table files, about 200 requests (computed) = 0.001 USD
+Second session about 0.002 USD; both sessions about 0.387 USD = 0.56 CAD, 1.3% of the 30 USD lease.

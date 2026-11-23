@@ -103,15 +103,16 @@ def test_compaction_reads_fewer_files_and_bytes_with_the_same_answer(tmp_path):
 
 
 def test_schedules_are_valid_for_eventbridge_scheduler():
-    s = Settings(scheduler_role_arn="arn:aws:iam::111122223333:role/scheduler")
-    defs = maintenance.schedule_definitions(s, "111122223333")
-    assert json.loads(defs[0]["Target"]["Input"])["QueryString"].startswith("OPTIMIZE test_cdc.trip_changes")
+    fn = "arn:aws:lambda:ca-central-1:111122223333:function:test-compact-days"
+    defs = maintenance.schedule_definitions("test", fn, "arn:aws:iam::111122223333:role/scheduler")
+    assert [json.loads(d["Target"]["Input"]) for d in defs] == [{"mode": "compact"}, {"mode": "vacuum"}]
     with mock_aws():
         sch = boto3.client("scheduler")
+        sch.create_schedule_group(Name="test-maintenance-compaction")
         for d in defs:
             sch.create_schedule(**d)
-        assert sorted(x["Name"] for x in sch.list_schedules()["Schedules"]) == ["test-lake-optimize",
-                                                                               "test-lake-vacuum"]
+        assert sorted(x["Name"] for x in sch.list_schedules(GroupName="test-maintenance-compaction")["Schedules"]) \
+            == ["test-compact-schedule", "test-lake-vacuum"]
 
 
 # --- rollback on AWS: the credentials PyIceberg gets ---

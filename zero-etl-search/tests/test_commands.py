@@ -36,7 +36,7 @@ TOML_COMMANDS = [v for k, v in RECIPE["commands"].items() if k != "setup"] + lis
 
 def test_the_readmes_give_the_commands_of_the_recipe():
     for needed in ("uv run pytest -q", "uv run python -m main.run", "uv run python -m main.run --target aws",
-                   "uv run python clean_up.py", "uv run python clean_up.py --dry-run",
+                   "uv run python clean_up.py", "uv run python clean_up.py --yes",
                    "uv run python ext-embeddings/worker.py", "uv run python ext-zero-etl/zero_etl.py",
                    "uv run marimo edit demo/search_demo.py", "uv run marimo edit demo/search_demo.py -- --target aws",
                    "uv run python ext-zero-etl/pipeline.py --write"):

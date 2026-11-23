@@ -1,0 +1,45 @@
+# ext-sdk-lambda, offline runs (scripted models, synthetic SIM01 stand-in), 2026-11-23
+# The live run (deploy, invoke_url.py --measure, trip_eval.py --backend gateway, @live scenarios): not run yet.
+
+$ uv run python ext-sdk-lambda/make_trips.py --synthetic --out build/trips-synthetic.parquet
+total                     19074  (SIM01: 19074)
+zone 161, 08:00-09:00       191  (SIM01: 191)
+zone 48                    4345  (SIM01: 4345)
+zone 161                   7661  (SIM01: 7661)
+zone 230                   7068  (SIM01: 7068)
+exit code 0
+
+$ uv run --env-file ext-sdk-lambda/.env.example python ext-sdk-lambda/trip_eval.py --backend scripted --trips build/trips-synthetic.parquet
+strands      runs correct 36/36 (answers 30, refusals 6); cases passed 12/12; PASS (needs 29 runs and 10 cases)
+  zone161-08         3/3
+  zone48-17          3/3
+  zone230-night      3/3
+  zone48-morning     3/3
+  zone230-late       3/3
+  zone161-noon       3/3
+  compare-161-230    3/3
+  most-of-three-08   3/3
+  day-total          3/3
+  day-zone230        3/3
+  tips               3/3
+  other-day          3/3
+pydantic-ai  runs correct 36/36 (answers 30, refusals 6); cases passed 12/12; PASS (needs 29 runs and 10 cases)
+  zone161-08         3/3
+  zone48-17          3/3
+  zone230-night      3/3
+  zone48-morning     3/3
+  zone230-late       3/3
+  zone161-noon       3/3
+  compare-161-230    3/3
+  most-of-three-08   3/3
+  day-total          3/3
+  day-zone230        3/3
+  tips               3/3
+  other-day          3/3
+exit code 0
+
+$ uv run behave features/ext_sdk_lambda.feature
+1 feature passed, 0 failed, 0 skipped
+13 rules passed, 0 failed, 0 skipped
+16 scenarios passed, 0 failed, 3 skipped
+85 steps passed, 0 failed, 11 skipped

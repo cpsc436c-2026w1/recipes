@@ -3,3 +3,8 @@ __pycache__/
 .pytest_cache/
 *.db
 warehouse/
+# What a run writes: the creation ledger (ARNs with the account number), replay evidence, generated data sets.
+state/
+evidence/
+sim/data/
+.local/

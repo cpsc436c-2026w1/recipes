@@ -1,0 +1,14 @@
+# The rows of the course price sheet this recipe uses: ca-central-1, USD, read 2026-11-18 from AWS's public bulk price
+# list (the sheet's date). CAD at 1.45, the course's planning rate, is computed where a cost is printed.
+# A copy of the rows, not a shared helper: when the sheet changes, change the values and `date`.
+date = "2026-11-18"
+region = "ca-central-1"
+cad_per_usd = 1.45
+
+athena_per_tb = 5.50             # USD per TB scanned (2^40 bytes), 10 MB minimum per query
+lambda_arm64_gb_s = 0.0000133334 # USD per GB-second, arm64
+lambda_request = 0.0000002       # USD per request (0.20 per million)
+s3_get_per_1000 = 0.00044        # USD per 1,000 GET and other requests
+s3_put_per_1000 = 0.0055         # USD per 1,000 PUT, COPY, POST, LIST requests
+s3_gb_month = 0.025              # USD per GB-month, S3 Standard
+glue_requests_per_million = 1.00 # USD per million Data Catalog requests, beyond the free tier
