@@ -27,7 +27,7 @@ REGION = os.environ.get("AWS_REGION", "ca-central-1")
 
 
 def compare(rows, newest_ms, close_delay_s, expected) -> list[dict]:
-    """Each window beside its true count, marked final once the watermark has passed its end."""
+    """Each window beside its true count, marked final once the watermark has reached or passed its end."""
     watermark = None if newest_ms is None else newest_ms - close_delay_s * 1000
     out = []
     for w in rows:

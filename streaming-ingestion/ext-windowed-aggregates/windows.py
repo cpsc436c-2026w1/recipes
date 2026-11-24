@@ -2,7 +2,7 @@
 
 Rule for late records (README "Decisions"):
 - the watermark is the newest event time seen so far on the shard, minus a close delay (CLOSE_DELAY_S, default 120 s);
-- a window is closed once the watermark has passed its end;
+- a window is closed once the watermark has reached or passed its end;
 - a record for a closed window is late. LATE_RULE=drop (default) leaves the count as it was and adds 1 to the window's
   late_dropped, so the drops are counted; LATE_RULE=correct adds it to the count and adds 1 to corrections, so a reader
   that already took the window's first value knows it changed.
@@ -136,7 +136,7 @@ def handler(event, context=None, ddb=None, table=None, rule=None, close_delay_s=
 
 def read_windows(ddb, table: str) -> tuple[list[dict], int | None]:
     """Every window, and the newest event time seen, taken as the smallest over the shards (a slow shard holds the
-    watermark back). A window is final once that time minus the close delay has passed its end."""
+    watermark back). A window is final once that time minus the close delay has reached or passed its end."""
     windows, marks, kwargs = [], [], {"TableName": table}
     while True:
         page = ddb.scan(**kwargs)

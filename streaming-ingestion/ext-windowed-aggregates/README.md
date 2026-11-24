@@ -17,7 +17,7 @@ for a window that is already final.
 
 1. The **watermark** is the newest event time seen on the shard, minus the close delay (default 120 s,
    `--close-delay`). It moves after each batch, never back.
-2. A window is final once the watermark has passed its end.
+2. A window is final once the watermark has reached or passed its end.
 3. A record for a final window is late. With `--late-rule drop` (default) the count stays and the window's
    `late_dropped` goes up by 1. With `--late-rule correct` the count goes up and so does `corrections`, so a reader
    that showed the first value knows it changed.
@@ -32,7 +32,7 @@ for a window that is already final.
 | Late records (R72, R73) | drop and count, or correct and count the corrections; chosen per run | dropped records are visible in `late_dropped`; a rising count says the close delay is too short | DDIA 2e ch. 12, "Handling straggler events" |
 | Counting each update once (R74) | the count and a marker `seen#<update_id>` are written in one transaction. The marker must not exist yet | a stream delivers at least once, and `ADD 1` applied twice counts twice | request id with a conditional write: L14; DDIA 2e ch. 12, "Idempotence"; [REL04-BP04](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_prevent_interaction_failure_idempotent.html) |
 | Keeping markers (R75) | time to live of 2 days on `expires_at` | markers are needed only while a record can still be redelivered. The stream keeps records 24 h by default | [DynamoDB TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html); [Kinesis retention](https://docs.aws.amazon.com/streams/latest/dev/kinesis-extended-retention.html) |
-| Several shards | one watermark per shard; a window is final when the smallest of them has passed the window's end | a slow or quiet shard must not let windows close early | follows from the watermark rule above (one clock per input) |
+| Several shards | one watermark per shard; a window is final when the smallest of them has reached or passed the window's end | a slow or quiet shard must not let windows close early | follows from the watermark rule above (one clock per input) |
 
 A transaction writes two items, and DynamoDB charges two write units per item in a transaction, so each update takes
 4 write units ([DynamoDB pricing](https://aws.amazon.com/dynamodb/pricing/)).
@@ -46,7 +46,7 @@ The scenarios are in `features/extensions.feature`.
   5-minute tumbling windows by event time.
 - **R71** (optional) Where `ext-windowed-aggregates` is used, the recipe shall report a window as final once the
   newest event time seen on the shard, minus the close delay (120 seconds unless `--close-delay` names another
-  number), has passed the window's end.
+  number), has reached or passed the window's end.
 - **R72** (complex) Where `ext-windowed-aggregates` is used, if a record arrives for a final window and the late
   rule is `drop`, then the recipe shall leave the window's count as it is and add 1 to its `late_dropped`.
 - **R73** (complex) Where `ext-windowed-aggregates` is used, if a record arrives for a final window and the late
